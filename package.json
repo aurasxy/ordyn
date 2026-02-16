@@ -1,6 +1,6 @@
 {
   "name": "ordyn",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "SOLUS - Order Analytics for Walmart, Target, Pokemon Center & more",
   "main": "src-protected/main.js",
   "scripts": {

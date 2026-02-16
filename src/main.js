@@ -3514,6 +3514,10 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
         const allSearches = [
           // FROM patterns - only retailers that have direct email addresses
           { from: 'walmart', retailer: 'walmart' },
+          { from: '_em_walmart_', retailer: 'walmart' },
+          { from: '_at_walmart', retailer: 'walmart' },
+          { from: '_walmart_com_', retailer: 'walmart' },
+          { from: 'donotreply_at_walmart', retailer: 'walmart' },
           { from: 'target', retailer: 'target' },
           { from: 'oe1_target', retailer: 'target' },
           { from: '_target_com_', retailer: 'target' },
@@ -3534,7 +3538,16 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           { subject: 'Thank you for shopping', retailer: 'pokecenter' },
           { subject: 'Thank you', retailer: null },
           { subject: 'thanks for your order', retailer: 'walmart' },
+          { subject: 'thanks for your delivery', retailer: 'walmart' },
           { subject: 'delivery order', retailer: 'walmart' },
+          { subject: 'Walmart.com order', retailer: 'walmart' },
+          { subject: 'Your Walmart', retailer: 'walmart' },
+          { subject: 'Walmart', retailer: 'walmart' },
+          { subject: 'Shipped:', retailer: null },
+          { subject: 'Arriving', retailer: null },
+          { subject: 'out for delivery', retailer: null },
+          { subject: 'Your delivery', retailer: null },
+          { subject: 'ready for pickup', retailer: null },
           { subject: 'shopping', retailer: null },
           { subject: 'Your order', retailer: 'target' },
           { subject: "Sam's Club order", retailer: 'samsclub' },
@@ -4194,7 +4207,7 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
 
               const isOrderEmail = subjectLower.includes('order') ||
                                    subjectLower.includes('shipped') ||
-                                   subjectLower.includes('delivered') ||
+                                   subjectLower.includes('deliver') ||
                                    subjectLower.includes('arriving') ||
                                    subjectLower.includes('on the way') ||
                                    subjectLower.includes('out for delivery') ||
@@ -4208,7 +4221,12 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
                                    subjectLower.includes('thank you') ||
                                    subjectLower.includes('thanks for') ||
                                    subjectLower.includes('your package') ||
-                                   subjectLower.includes('shopping');
+                                   subjectLower.includes('shopping') ||
+                                   subjectLower.includes('pickup') ||
+                                   subjectLower.includes('pick up') ||
+                                   subjectLower.includes('receipt') ||
+                                   subjectLower.includes('purchase') ||
+                                   subjectLower.includes('substitut');
 
               if (!isOrderEmail) {
                 skippedNonOrder++;

@@ -1,0 +1,108 @@
+{
+  "name": "ordyn",
+  "version": "2.1.0",
+  "description": "SOLUS - Order Analytics for Walmart, Target, Pokemon Center & more",
+  "main": "src-protected/main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:protected": "electron . --main=src-protected/main.js",
+    "build": "electron-builder",
+    "build:win": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --x64",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:protected": "node build-obfuscated.js && electron-builder",
+    "build:protected:win": "node build-obfuscated.js && set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --x64",
+    "publish:win": "node build-obfuscated.js && set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --x64 --publish always",
+    "publish:mac": "node build-obfuscated.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --publish always",
+    "obfuscate": "node build-obfuscated.js",
+    "restore": "node build-obfuscated.js --restore",
+    "pack": "electron-builder --dir",
+    "genkeys": "node generate-keys.js"
+  },
+  "author": "SOLUS",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.1.7",
+    "imap": "^0.8.19",
+    "mailparser": "^3.6.5",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "javascript-obfuscator": "^4.1.0"
+  },
+  "build": {
+    "appId": "com.solus.app",
+    "productName": "SOLUS",
+    "copyright": "Copyright © 2024-2026 SOLUS",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src-protected/**/*",
+      "assets/**/*",
+      "!valid-licenses.json"
+    ],
+    "extraResources": [
+      {
+        "from": "sku-mappings.json",
+        "to": "sku-mappings.json"
+      },
+      {
+        "from": "product-images",
+        "to": "product-images"
+      }
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "aurasxy",
+      "repo": "ordyn",
+      "private": true,
+      "releaseType": "release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "SOLUS-${version}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "artifactName": "SOLUS-${version}-setup.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "SOLUS-${version}-${arch}.${ext}",
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png",
+      "artifactName": "SOLUS-${version}.${ext}"
+    },
+    "asar": true,
+    "compression": "maximum"
+  }
+}

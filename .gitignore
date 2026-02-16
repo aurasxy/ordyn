@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+
+# Dev tools (not for public release)
+dev-tools/
+
+# Local data
+.emls/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Protected/backup source (generated)
+src-protected/
+src-backup/
+package.original.json
+
+# Sensitive files
+*.csv
+*.env
+
+# IDE
+.vscode/
+.idea/
+
+# Windows special files
+nul
+
+# Sensitive / dev-only
+valid-licenses.json
+generate-keys.js
+.claude/
+.rebrand-backup/
+package2.json
+temp_script.js
+*.png
+!build/icon.png
+!assets/*.png
+!product-images/*.jpg
+supabase/.temp/

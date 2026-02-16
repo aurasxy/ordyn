@@ -3456,7 +3456,7 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
     const existingDbOrders = store.get('orders', []);
     // Retailers whose parsers already validate orders (promo filter + unique order ID format)
     // These don't need a separate confirmation email to be considered real orders
-    const selfValidatingRetailers = new Set(['bestbuy', 'costco']);
+    const selfValidatingRetailers = new Set(['bestbuy', 'costco', 'walmart']);
     existingDbOrders.forEach(o => {
       if (o.status === 'confirmed' || selfValidatingRetailers.has(o.retailer)) {
         confirmedOrderIds.add(`${o.retailer}-${o.orderId}`);
@@ -3524,7 +3524,12 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           { from: 'pokemon', retailer: 'pokecenter' },
           { from: 'em_pokemon', retailer: 'pokecenter' },
           { from: 'samsclub', retailer: 'samsclub' },
+          { from: '_at_samsclub', retailer: 'samsclub' },
+          { from: '_samsclub_com_', retailer: 'samsclub' },
+          { from: '_em_samsclub_', retailer: 'samsclub' },
           { from: 'costco', retailer: 'costco' },
+          { from: '_at_costco', retailer: 'costco' },
+          { from: '_costco_com_', retailer: 'costco' },
           { from: 'bestbuy', retailer: 'bestbuy' },
           { from: 'bestbuyinfo_at', retailer: 'bestbuy' },
           { from: '_bestbuy_com_', retailer: 'bestbuy' },
@@ -3569,39 +3574,18 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
 
         logDebug('info', `Starting search with ${searches.length} patterns`, { dateFrom, dateTo });
 
+        // Check if deep scan mode is enabled
+        const syncSettings = store.get('syncSettings', {});
+        const deepScanEnabled = syncSettings.deepScanEnabled || false;
+
         function runNextSearch() {
           if (searchIndex >= searches.length) {
-            // All searches done - dedupe and fetch
-            allResultIds = [...new Set(allResultIds)];
-            totalEmails = allResultIds.length;
-
-            logDebug('info', 'Search complete', {
-              totalEmailsFound: totalEmails,
-              searchResults,
-              uniqueAfterDedupe: totalEmails
-            });
-            // Log non-zero search results to user sync log for visibility
-            const nonZeroResults = Object.entries(searchResults).filter(([, v]) => v > 0);
-            if (nonZeroResults.length > 0) {
-              addUserLog(`Search hits: ${nonZeroResults.map(([k, v]) => `${k}=${v}`).join(', ')}`);
+            // All targeted searches done - run safety net if not in deep scan mode
+            if (!deepScanEnabled) {
+              runSafetyNet();
+            } else {
+              finishSearchPhase();
             }
-
-            if (totalEmails === 0) {
-              logDebug('warn', 'No emails found matching search criteria');
-              sendProgress('No emails found', 0, 0);
-              addUserLog(`No retailer emails found for this date range`, 'warning');
-              updateAccountSync(accountId);
-              imap.end();
-              safeResolve({ success: true, orders: 0 });
-              return;
-            }
-
-            sendProgress(`Found ${totalEmails} emails`, 0, totalEmails);
-            // Count how many searches returned results
-            const patternsWithResults = Object.values(searchResults).filter(c => c > 0).length;
-            addUserLog(`Searched ${searches.length} patterns, ${patternsWithResults} matched`);
-            addUserLog(`Found ${totalEmails} emails to process`);
-            fetchAll(allResultIds);
             return;
           }
 
@@ -3639,7 +3623,128 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           });
         }
 
-        runNextSearch();
+        // Safety net: run a few broad searches after targeted ones to catch missed emails
+        function runSafetyNet() {
+          const existingIds = new Set(allResultIds);
+          const safetyNetSearches = [
+            { subject: 'order' },
+            { subject: 'confirmation' },
+            { subject: 'shipment' }
+          ];
+          let safetyIndex = 0;
+          let safetyNetNew = 0;
+
+          sendProgress('Running safety net searches...', 0, safetyNetSearches.length);
+
+          function nextSafetySearch() {
+            if (safetyIndex >= safetyNetSearches.length) {
+              if (safetyNetNew > 0) {
+                addUserLog(`Safety net found ${safetyNetNew} additional emails`);
+                logDebug('info', `Safety net caught ${safetyNetNew} emails missed by targeted searches`);
+              }
+              finishSearchPhase();
+              return;
+            }
+
+            const s = safetyNetSearches[safetyIndex];
+            let criteria = [];
+            if (s.subject) criteria.push(['SUBJECT', s.subject]);
+            if (dateFrom) criteria.push(['SINCE', new Date(dateFrom + 'T00:00:00')]);
+            if (dateTo) {
+              const before = new Date(dateTo + 'T00:00:00');
+              before.setDate(before.getDate() + 1);
+              criteria.push(['BEFORE', before]);
+            }
+
+            imap.search(criteria, (err, results) => {
+              if (!err && results && results.length > 0) {
+                let newCount = 0;
+                results.forEach(id => {
+                  if (!existingIds.has(id)) {
+                    existingIds.add(id);
+                    allResultIds.push(id);
+                    newCount++;
+                  }
+                });
+                if (newCount > 0) {
+                  safetyNetNew += newCount;
+                  searchResults[`SAFETY:${s.subject}`] = newCount;
+                }
+              }
+              safetyIndex++;
+              nextSafetySearch();
+            });
+          }
+
+          nextSafetySearch();
+        }
+
+        // Finalize search phase and start fetching
+        function finishSearchPhase() {
+          allResultIds = [...new Set(allResultIds)];
+          totalEmails = allResultIds.length;
+
+          logDebug('info', 'Search complete', {
+            totalEmailsFound: totalEmails,
+            searchResults,
+            uniqueAfterDedupe: totalEmails,
+            deepScanEnabled
+          });
+          // Log non-zero search results to user sync log for visibility
+          const nonZeroResults = Object.entries(searchResults).filter(([, v]) => v > 0);
+          if (nonZeroResults.length > 0) {
+            addUserLog(`Search hits: ${nonZeroResults.map(([k, v]) => `${k}=${v}`).join(', ')}`);
+          }
+
+          if (totalEmails === 0) {
+            logDebug('warn', 'No emails found matching search criteria');
+            sendProgress('No emails found', 0, 0);
+            addUserLog(`No retailer emails found for this date range`, 'warning');
+            updateAccountSync(accountId);
+            imap.end();
+            safeResolve({ success: true, orders: 0 });
+            return;
+          }
+
+          sendProgress(`Found ${totalEmails} emails`, 0, totalEmails);
+          const patternsWithResults = Object.values(searchResults).filter(c => c > 0).length;
+          addUserLog(`Searched ${searches.length} patterns, ${patternsWithResults} matched`);
+          addUserLog(`Found ${totalEmails} emails to process`);
+          fetchAll(allResultIds);
+        }
+
+        // Deep scan mode: skip targeted searches, fetch ALL emails in date range
+        if (deepScanEnabled) {
+          logDebug('info', 'Deep scan mode enabled - fetching all emails in date range');
+          addUserLog('Deep scan mode: scanning all emails in date range (this may take longer)');
+          let criteria = [];
+          if (dateFrom) criteria.push(['SINCE', new Date(dateFrom + 'T00:00:00')]);
+          if (dateTo) {
+            const before = new Date(dateTo + 'T00:00:00');
+            before.setDate(before.getDate() + 1);
+            criteria.push(['BEFORE', before]);
+          }
+          if (criteria.length === 0) criteria.push('ALL');
+
+          sendProgress('Deep scan: searching all emails...', 0, 1);
+          imap.search(criteria, (err, results) => {
+            if (err) {
+              logDebug('error', 'Deep scan search error', { error: err.message });
+              addUserLog(`Deep scan search error: ${err.message}`, 'error');
+              imap.end();
+              safeResolve({ success: false, error: `Deep scan failed: ${err.message}` });
+              return;
+            }
+            if (results && results.length > 0) {
+              allResultIds = results;
+              searchResults['DEEP_SCAN:ALL'] = results.length;
+              addUserLog(`Deep scan found ${results.length} total emails`);
+            }
+            finishSearchPhase();
+          });
+        } else {
+          runNextSearch();
+        }
       }
 
       function fetchAll(ids) {
@@ -4358,6 +4463,21 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
               clearInterval(checkDone);
 
               const filteredOrders = allOrders.filter(o => confirmedOrderIds.has(`${o.retailer}-${o.orderId}`));
+
+              // Log orders that were parsed but dropped by confirmation filter
+              const droppedOrders = allOrders.filter(o => !confirmedOrderIds.has(`${o.retailer}-${o.orderId}`));
+              if (droppedOrders.length > 0) {
+                const droppedByRetailer = {};
+                droppedOrders.forEach(o => {
+                  if (!droppedByRetailer[o.retailer]) droppedByRetailer[o.retailer] = [];
+                  droppedByRetailer[o.retailer].push(o.orderId);
+                });
+                logDebug('warn', 'Orders parsed but dropped (no confirmation email found)', {
+                  droppedCount: droppedOrders.length,
+                  byRetailer: Object.fromEntries(Object.entries(droppedByRetailer).map(([r, ids]) => [r, { count: ids.length, sampleIds: ids.slice(0, 5) }]))
+                });
+                addUserLog(`  └ ${droppedOrders.length} order events dropped (no matching confirmation email)`, 'warning');
+              }
 
               // Count orders by retailer for debug
               const retailerCounts = {};
@@ -6028,7 +6148,8 @@ const defaultSyncSettings = {
   autoResumeDelay: 1,  // Default: 1 minute (60 seconds)
   autoSyncInterval: 0,        // Minutes between auto-syncs (0 = disabled)
   syncOnStartup: true,        // Whether to sync on app startup
-  skipStartupCooldown: false  // Whether to skip 2-hour cooldown on startup
+  skipStartupCooldown: false, // Whether to skip 2-hour cooldown on startup
+  deepScanEnabled: false      // Whether to scan ALL emails instead of targeted searches
 };
 
 ipcMain.handle('get-sync-settings', () => {

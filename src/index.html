@@ -4874,6 +4874,16 @@
                   </select>
                 </div>
                 <p style="font-size:12px;color:var(--text-muted);margin-top:12px;">When a sync pauses (e.g., max reconnects reached), it will automatically resume after the selected delay.</p>
+
+                <!-- Deep Scan Mode -->
+                <div class="settings-toggle-row" style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">
+                  <div class="settings-toggle-info">
+                    <div class="settings-toggle-title">Deep Scan Mode</div>
+                    <div class="settings-toggle-desc">Scans ALL emails in date range instead of targeted searches. Much slower but catches orders that filtered searches might miss (e.g., unusual subject lines, HME relay addresses).</div>
+                  </div>
+                  <div class="toggle-switch" id="deepScanToggle" onclick="toggleDeepScan()"></div>
+                </div>
+                <p style="font-size:12px;color:var(--text-muted);margin-top:8px;">Only enable if you suspect missing orders. First sync may take 30+ minutes with deep scan on.</p>
               </div>
             </div>
           </div>
@@ -6768,6 +6778,10 @@ async function loadSyncSettings() {
   const cooldownToggle = $('skipStartupCooldownToggle');
   if (cooldownToggle) cooldownToggle.classList.toggle('active', settings.skipStartupCooldown || false);
 
+  // Deep scan mode
+  const deepScanToggle = $('deepScanToggle');
+  if (deepScanToggle) deepScanToggle.classList.toggle('active', settings.deepScanEnabled || false);
+
   // Update displays
   updateLastSyncDisplay();
   setupAutoSyncInterval();
@@ -6927,6 +6941,14 @@ async function updateAutoResumeDelay() {
   } else {
     toast('Auto-resume disabled', 'info');
   }
+}
+
+async function toggleDeepScan() {
+  const toggle = $('deepScanToggle');
+  const isEnabled = !toggle.classList.contains('active');
+  toggle.classList.toggle('active', isEnabled);
+  await window.api.updateSyncSettings({ deepScanEnabled: isEnabled });
+  toast(isEnabled ? 'Deep scan mode enabled - next sync will scan all emails' : 'Deep scan mode disabled', isEnabled ? 'warning' : 'success');
 }
 
 // Check if we should auto-sync on startup

@@ -421,6 +421,20 @@ if (needsSourceMigration) {
   store.set('orders', existingOrders);
 }
 
+// Status priority for order merging: cancelled > declined > delivered > shipped > confirmed
+const STATUS_PRIORITY = { cancelled: 5, declined: 4, delivered: 3, shipped: 2, confirmed: 1 };
+
+// Migration: Merge duplicate order entries (confirmed + shipped + delivered -> single entry)
+if (!store.get('ordersMerged', false)) {
+  const allOrders = store.get('orders', []);
+  const merged = mergeOrderEntries(allOrders);
+  if (merged.length < allOrders.length) {
+    console.log(`[MIGRATION] Merged duplicate order entries: ${allOrders.length} -> ${merged.length}`);
+    store.set('orders', merged);
+  }
+  store.set('ordersMerged', true);
+}
+
 // ==================== LICENSE SYSTEM ====================
 // Uses Supabase backend for license validation with offline grace period
 
@@ -617,11 +631,91 @@ function getOrders(retailer = null) {
   return orders.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 }
 
+// Merge multiple order entries for the same orderId into a single entry.
+// Keeps confirmed email's item/image/amount (most reliable), merges tracking/delivery fields from later emails.
+function mergeOrderEntries(orderList) {
+  if (!orderList || orderList.length === 0) return [];
+
+  const map = new Map(); // key: "retailer-orderId" -> merged order
+
+  for (const o of orderList) {
+    const key = `${o.retailer}-${o.orderId}`;
+    const existing = map.get(key);
+
+    if (!existing) {
+      map.set(key, { ...o });
+      continue;
+    }
+
+    // Upgrade status to highest priority
+    const newPri = STATUS_PRIORITY[o.status] || 0;
+    const curPri = STATUS_PRIORITY[existing.status] || 0;
+    if (newPri > curPri) existing.status = o.status;
+
+    // Prefer confirmed email's item/image (shipped/delivered often include recommendations)
+    if (o.item && (o.status === 'confirmed' || !existing.item)) existing.item = o.item;
+    if (o.imageUrl && (o.status === 'confirmed' || !existing.imageUrl)) existing.imageUrl = o.imageUrl;
+
+    // Prefer confirmed email's amount (most accurate); only take new if existing is empty
+    if (o.status === 'confirmed' && o.amount && o.amount > 0) {
+      existing.amount = o.amount;
+    } else if (o.amount && o.amount > 0 && (!existing.amount || existing.amount === 0)) {
+      existing.amount = o.amount;
+    }
+
+    // Prefer confirmed order's date for drop grouping
+    if (o.status === 'confirmed' && o.date) existing.date = o.date;
+    if (o.date && !existing.date) existing.date = o.date;
+
+    // Merge delivery/shipping fields from shipped/delivered emails
+    if (o.tracking && !existing.tracking) existing.tracking = o.tracking;
+    if (o.carrier && !existing.carrier) existing.carrier = o.carrier;
+    if (o.trackingUrl && !existing.trackingUrl) existing.trackingUrl = o.trackingUrl;
+    if (o.eta && !existing.eta) existing.eta = o.eta;
+    if (o.shippingAddress && !existing.shippingAddress) existing.shippingAddress = o.shippingAddress;
+    if (o.addressLine1 && !existing.addressLine1) existing.addressLine1 = o.addressLine1;
+    if (o.city && !existing.city) existing.city = o.city;
+    if (o.state && !existing.state) existing.state = o.state;
+    if (o.zip && !existing.zip) existing.zip = o.zip;
+    if (o.addressKey && !existing.addressKey) existing.addressKey = o.addressKey;
+    if (o.shipDate && !existing.shipDate) existing.shipDate = o.shipDate;
+    if (o.quantity && (!existing.quantity || existing.quantity === 0)) existing.quantity = o.quantity;
+    if (o.email && !existing.email) existing.email = o.email;
+    if (o.accountId && !existing.accountId) existing.accountId = o.accountId;
+  }
+
+  return Array.from(map.values());
+}
+
 function saveOrder(order) {
   const orders = store.get('orders', []);
-  const existingIdx = orders.findIndex(o => o.orderId === order.orderId && o.retailer === order.retailer && o.status === order.status);
+  // Match by retailer + orderId only (not status) - all stages merge into one entry
+  const existingIdx = orders.findIndex(o => o.orderId === order.orderId && o.retailer === order.retailer);
   if (existingIdx >= 0) {
-    orders[existingIdx] = { ...orders[existingIdx], ...order };
+    const existing = orders[existingIdx];
+    // Merge using same priority logic
+    const newPri = STATUS_PRIORITY[order.status] || 0;
+    const curPri = STATUS_PRIORITY[existing.status] || 0;
+    if (newPri > curPri) existing.status = order.status;
+    if (order.item && (order.status === 'confirmed' || !existing.item)) existing.item = order.item;
+    if (order.imageUrl && (order.status === 'confirmed' || !existing.imageUrl)) existing.imageUrl = order.imageUrl;
+    if (order.status === 'confirmed' && order.amount && order.amount > 0) {
+      existing.amount = order.amount;
+    } else if (order.amount && order.amount > 0 && (!existing.amount || existing.amount === 0)) {
+      existing.amount = order.amount;
+    }
+    if (order.tracking && !existing.tracking) existing.tracking = order.tracking;
+    if (order.carrier && !existing.carrier) existing.carrier = order.carrier;
+    if (order.trackingUrl && !existing.trackingUrl) existing.trackingUrl = order.trackingUrl;
+    if (order.eta && !existing.eta) existing.eta = order.eta;
+    if (order.shippingAddress && !existing.shippingAddress) existing.shippingAddress = order.shippingAddress;
+    if (order.addressLine1 && !existing.addressLine1) existing.addressLine1 = order.addressLine1;
+    if (order.city && !existing.city) existing.city = order.city;
+    if (order.state && !existing.state) existing.state = order.state;
+    if (order.zip && !existing.zip) existing.zip = order.zip;
+    if (order.addressKey && !existing.addressKey) existing.addressKey = order.addressKey;
+    if (order.shipDate && !existing.shipDate) existing.shipDate = order.shipDate;
+    orders[existingIdx] = existing;
   } else {
     orders.push(order);
   }
@@ -632,53 +726,79 @@ function saveOrder(order) {
 // Batch save orders - much faster for large syncs
 function saveOrdersBatch(newOrders) {
   if (!newOrders || newOrders.length === 0) return 0;
-  
+
+  // Merge entries for the same order before saving
+  const merged = mergeOrderEntries(newOrders);
+
   const orders = store.get('orders', []);
   let added = 0;
-  
-  for (const order of newOrders) {
+
+  for (const order of merged) {
     // Tag source if not already set
     if (!order.source) {
       order.source = 'email';
     }
-    const existingIdx = orders.findIndex(o => o.orderId === order.orderId && o.retailer === order.retailer && o.status === order.status);
+    // Match by retailer + orderId only (not status)
+    const existingIdx = orders.findIndex(o => o.orderId === order.orderId && o.retailer === order.retailer);
     if (existingIdx >= 0) {
-      orders[existingIdx] = { ...orders[existingIdx], ...order };
+      const existing = orders[existingIdx];
+      // Merge: upgrade status, keep confirmed data, add shipping fields
+      const newPri = STATUS_PRIORITY[order.status] || 0;
+      const curPri = STATUS_PRIORITY[existing.status] || 0;
+      if (newPri > curPri) existing.status = order.status;
+      if (order.item && (order.status === 'confirmed' || !existing.item)) existing.item = order.item;
+      if (order.imageUrl && (order.status === 'confirmed' || !existing.imageUrl)) existing.imageUrl = order.imageUrl;
+      if (order.status === 'confirmed' && order.amount && order.amount > 0) {
+        existing.amount = order.amount;
+      } else if (order.amount && order.amount > 0 && (!existing.amount || existing.amount === 0)) {
+        existing.amount = order.amount;
+      }
+      if (order.date && (order.status === 'confirmed' || !existing.date)) existing.date = order.date;
+      if (order.tracking && !existing.tracking) existing.tracking = order.tracking;
+      if (order.carrier && !existing.carrier) existing.carrier = order.carrier;
+      if (order.trackingUrl && !existing.trackingUrl) existing.trackingUrl = order.trackingUrl;
+      if (order.eta && !existing.eta) existing.eta = order.eta;
+      if (order.shippingAddress && !existing.shippingAddress) existing.shippingAddress = order.shippingAddress;
+      if (order.addressLine1 && !existing.addressLine1) existing.addressLine1 = order.addressLine1;
+      if (order.city && !existing.city) existing.city = order.city;
+      if (order.state && !existing.state) existing.state = order.state;
+      if (order.zip && !existing.zip) existing.zip = order.zip;
+      if (order.addressKey && !existing.addressKey) existing.addressKey = order.addressKey;
+      if (order.shipDate && !existing.shipDate) existing.shipDate = order.shipDate;
+      if (order.quantity && (!existing.quantity || existing.quantity === 0)) existing.quantity = order.quantity;
+      if (order.email && !existing.email) existing.email = order.email;
+      if (order.accountId && !existing.accountId) existing.accountId = order.accountId;
+      orders[existingIdx] = existing;
     } else {
       orders.push(order);
       added++;
     }
   }
-  
+
   store.set('orders', orders);
   return added;
 }
 
 function markOrderDelivered(retailer, orderId) {
   const orders = store.get('orders', []);
-  
-  // Add a new "delivered" status entry for this order
-  const deliveredOrder = {
-    retailer,
-    orderId,
-    status: 'delivered',
-    date: localDateStr(),
-    manualStatus: true
-  };
-  
-  // Find an existing order to copy details from
-  const existing = orders.find(o => o.orderId === orderId && o.retailer === retailer);
-  if (existing) {
-    deliveredOrder.item = existing.item;
-    deliveredOrder.imageUrl = existing.imageUrl;
-    deliveredOrder.amount = existing.amount;
-    deliveredOrder.email = existing.email;
-    deliveredOrder.quantity = existing.quantity;
+
+  // Find the existing order and update its status (don't create a new entry)
+  const existingIdx = orders.findIndex(o => o.orderId === orderId && o.retailer === retailer);
+  if (existingIdx >= 0) {
+    orders[existingIdx].status = 'delivered';
+    orders[existingIdx].manualStatus = true;
+  } else {
+    // No existing entry — create one (edge case)
+    orders.push({
+      retailer,
+      orderId,
+      status: 'delivered',
+      date: localDateStr(),
+      manualStatus: true
+    });
   }
-  
-  orders.push(deliveredOrder);
+
   store.set('orders', orders);
-  
   console.log(`[MANUAL] Marked order ${orderId} as delivered`);
   return { success: true };
 }
@@ -1369,44 +1489,53 @@ function parseWalmartEmail(parsed, accountEmail) {
     return null;
   }
   
-  const productImages = extractWalmartImages(html);
-  let itemName = extractWalmartItemName(html);
-  if (!itemName && productImages.length > 0) {
-    itemName = extractNameFromImageUrl(productImages[0]);
-  }
-  
-  // Extract quantity - look for patterns like "5 items", "Qty: 3", "(5)"
+  // Only extract item/image/amount/quantity from confirmation emails.
+  // Shipped/delivered emails have unreliable amounts and item names — we just need the orderId to link back.
+  const isConfirmation = (status === 'confirmed');
+
+  let itemName = null;
+  let productImages = [];
   let quantity = 1;
-  const qtyPatterns = [
-    /(\d+)\s*items?\s*(?:see all|in your order)/i,
-    /quantity[:\s]*(\d+)/i,
-    /qty[:\s]*(\d+)/i,
-    /\((\d+)\)\s*<\/td>/i,
-    />\s*(\d+)\s*</
-  ];
-  for (const pattern of qtyPatterns) {
-    const qtyMatch = content.match(pattern);
-    if (qtyMatch) {
-      const q = parseInt(qtyMatch[1]);
-      if (q > 0 && q < 100) { quantity = q; break; }
+  let amount = 0;
+
+  if (isConfirmation || status === 'cancelled') {
+    productImages = extractWalmartImages(html);
+    itemName = extractWalmartItemName(html);
+    if (!itemName && productImages.length > 0) {
+      itemName = extractNameFromImageUrl(productImages[0]);
     }
+
+    // Extract quantity - look for patterns like "5 items", "Qty: 3", "(5)"
+    const qtyPatterns = [
+      /(\d+)\s*items?\s*(?:see all|in your order)/i,
+      /quantity[:\s]*(\d+)/i,
+      /qty[:\s]*(\d+)/i,
+      /\((\d+)\)\s*<\/td>/i,
+      />\s*(\d+)\s*</
+    ];
+    for (const pattern of qtyPatterns) {
+      const qtyMatch = content.match(pattern);
+      if (qtyMatch) {
+        const q = parseInt(qtyMatch[1]);
+        if (q > 0 && q < 100) { quantity = q; break; }
+      }
+    }
+
+    const amounts = [];
+    const amtRegex = /\$\s*([\d,]+\.?\d*)/g;
+    let amtMatch;
+    while ((amtMatch = amtRegex.exec(content)) !== null) {
+      const val = parseFloat(amtMatch[1].replace(/,/g, ''));
+      if (!isNaN(val) && val > 0 && val < 50000) amounts.push(val);
+    }
+    if (amounts.length > 0) amount = Math.max(...amounts);
   }
-  
+
   let orderDate = emailDate;
   const dateMatch = content.match(/order\s*date[:\s]*([A-Za-z]+,?\s*[A-Za-z]+\s+\d{1,2},?\s*\d{4})/i);
   if (dateMatch) {
     try { const d = new Date(dateMatch[1]); if (!isNaN(d)) orderDate = localDateStr(d); } catch (e) { /* Date parse failed - non-critical */ }
   }
-  
-  let amount = 0;
-  const amounts = [];
-  const amtRegex = /\$\s*([\d,]+\.?\d*)/g;
-  let amtMatch;
-  while ((amtMatch = amtRegex.exec(content)) !== null) {
-    const val = parseFloat(amtMatch[1].replace(/,/g, ''));
-    if (!isNaN(val) && val > 0 && val < 50000) amounts.push(val);
-  }
-  if (amounts.length > 0) amount = Math.max(...amounts);
   
   let email = accountEmail;
   if (parsed.to) {
@@ -1532,7 +1661,7 @@ function parseTargetEmail(parsed, accountEmail) {
     status = 'confirmed';
   }
   if (!status) return null;
-  
+
   // Extract amount
   let amount = 0;
   const amountPatterns = [
@@ -1548,7 +1677,7 @@ function parseTargetEmail(parsed, accountEmail) {
       break;
     }
   }
-  
+
   // ============ STRICT ITEM NAME EXTRACTION ============
   // Instead of rejecting bad names, positively identify good product names
   
@@ -1769,7 +1898,7 @@ function parseTargetEmail(parsed, accountEmail) {
   
   let itemName = null;
   let pairedImageUrl = null;  // Track image that's paired with the product name
-  
+
   // ===== PRIMARY METHOD: Look for product name after Target URL in text =====
   // In plain text, product names appear on line after click.oe1.target.com URL
   // This is the most reliable method

@@ -7522,7 +7522,12 @@ ipcMain.handle('download-update', async () => {
 });
 
 ipcMain.handle('install-update', () => {
-  autoUpdater.quitAndInstall(false, true);
+  // Use setImmediate to let the IPC response complete before quitting
+  setImmediate(() => {
+    autoUpdater.quitAndInstall(false, true);
+    // Fallback: force exit if quitAndInstall stalls (common on macOS)
+    setTimeout(() => { app.exit(0); }, 3000);
+  });
 });
 
 ipcMain.handle('get-app-version', () => {

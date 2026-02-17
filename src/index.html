@@ -18408,8 +18408,7 @@ function setupUpdateListeners() {
     console.log('[UPDATE] Available:', data.version);
     hideUpdateChecking();
     updateVersion = data.version;
-    $('appVersion').textContent = `v${data.version} ⬇️`;
-    $('appVersion').title = 'Downloading update...';
+    $('appVersion').title = `Downloading v${data.version}...`;
     $('updateBannerText').textContent = `⬇️ Downloading v${data.version}...`;
     $('updateBannerBtn').style.display = 'none';
     $('updateBanner').classList.add('show');
@@ -18432,8 +18431,7 @@ function setupUpdateListeners() {
     hideUpdateChecking();
     updateDownloaded = true;
     updateVersion = data.version;
-    $('appVersion').textContent = `v${data.version} ✨`;
-    $('appVersion').title = 'Update ready - click to install';
+    $('appVersion').title = `v${data.version} ready - click to install`;
     
     // Hide download banner
     $('updateBanner').classList.remove('show');

@@ -114,14 +114,6 @@ autoUpdater.allowDowngrade = false;
 let isCheckingForUpdate = false;
 let isDownloading = false;
 
-// For private GitHub repo authentication - uses GH_TOKEN env var
-const ghToken = process.env.GH_TOKEN;
-if (ghToken) {
-  autoUpdater.requestHeaders = {
-    'Authorization': `token ${ghToken}`
-  };
-}
-
 // Log update events for debugging
 autoUpdater.logger = console;
 

@@ -5454,6 +5454,7 @@
     </div>
     <div class="bulk-action-buttons">
       <button class="bulk-action-btn" onclick="bulkSelectAll()">Select All</button>
+      <button class="bulk-action-btn primary" onclick="bulkMarkDeliveredRetailer()">✓ Mark Delivered</button>
       <button class="bulk-action-btn primary" onclick="exportSelectedCSV()">📥 Export CSV</button>
       <button class="bulk-action-btn danger" onclick="clearBulkSelection()">✕ Clear</button>
     </div>
@@ -6211,6 +6212,41 @@ function clearBulkSelection() {
   bulkSelection.retailer = null;
   updateBulkUI();
   if (retailer) renderRetailerPage(retailer);
+}
+
+async function bulkMarkDeliveredRetailer() {
+  if (bulkSelection.selectedOrderIds.size === 0) return;
+  const retailer = bulkSelection.retailer;
+  if (!retailer) return;
+
+  const allOrders = computeOrderStatuses();
+  const selected = allOrders.filter(o =>
+    bulkSelection.selectedOrderIds.has(o.orderId) &&
+    o.retailer === retailer &&
+    o.finalStatus !== 'delivered' &&
+    o.finalStatus !== 'cancelled'
+  );
+
+  if (selected.length === 0) {
+    toast('No eligible orders to mark as delivered', 'warning');
+    return;
+  }
+
+  if (!await customConfirm('Mark Delivered', `Mark ${selected.length} order${selected.length !== 1 ? 's' : ''} as delivered?`, 'Mark Delivered', false)) return;
+
+  toast(`Marking ${selected.length} orders as delivered...`, 'info');
+  let successCount = 0;
+  for (const o of selected) {
+    const result = await window.api.markOrderDelivered(o.retailer, o.orderId);
+    if (result.success) {
+      orders.push({ retailer: o.retailer, orderId: o.orderId, status: 'delivered', date: localDateStr(), manualStatus: true });
+      await autoAddToInventory(o.retailer, o.orderId);
+      successCount++;
+    }
+  }
+  clearBulkSelection();
+  refreshAllViews();
+  toast(`${successCount} order${successCount !== 1 ? 's' : ''} marked as delivered`, 'success');
 }
 
 function exportSelectedCSV() {
@@ -11451,12 +11487,13 @@ async function autoAddToInventory(retailer, orderId) {
     // Extract order details
     const itemName = order.item || order.itemName || 'Unknown Item';
     const imageUrl = order.imageUrl || order.itemImage || null;
-    const price = order.amount || 0;
+    const totalAmount = order.amount || 0;
     const quantity = order.quantity || 1;
+    const costPerItem = quantity > 0 ? totalAmount / quantity : totalAmount;
     const sku = order.sku || null;
     const orderDate = order.date || localDateStr();
 
-    console.log('[AUTO-INV] Processing order:', { itemName, price, quantity, sku, retailer, orderDate });
+    console.log('[AUTO-INV] Processing order:', { itemName, totalAmount, costPerItem, quantity, sku, retailer, orderDate });
 
     // Check if this item already exists in inventory (by name + retailer)
     const existingItem = inventory.find(i =>
@@ -11468,7 +11505,7 @@ async function autoAddToInventory(retailer, orderId) {
     if (existingItem) {
       // Item exists - update quantity and recalculate weighted average cost
       const totalOldCost = existingItem.quantity * existingItem.costPerItem;
-      const totalNewCost = quantity * price;
+      const totalNewCost = quantity * costPerItem;
       const newTotalQty = existingItem.quantity + quantity;
       const weightedAvgCost = (totalOldCost + totalNewCost) / newTotalQty;
 
@@ -11493,7 +11530,7 @@ async function autoAddToInventory(retailer, orderId) {
       const newItem = {
         name: itemName,
         image: imageUrl,
-        costPerItem: price,
+        costPerItem: costPerItem,
         quantity: quantity,
         sku: sku,
         linkedRetailer: retailer,

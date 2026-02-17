@@ -87,15 +87,33 @@ async function handleGenerateToken(licenseKey: string) {
   // Check if a linked row already exists
   const { data: existing } = await supabase
     .from('discord_links')
-    .select('id')
+    .select('id, discord_user_id')
     .eq('license_key', licenseKey)
     .not('discord_user_id', 'is', null)
 
   if (existing && existing.length > 0) {
-    // Update existing linked row with new token
+    // Delete associated discord_channels first (foreign key constraint)
+    for (const row of existing) {
+      if (row.discord_user_id) {
+        await supabase
+          .from('discord_channels')
+          .delete()
+          .eq('discord_user_id', row.discord_user_id)
+      }
+    }
+
+    // Reset existing row to pending state with new token
     const { error } = await supabase
       .from('discord_links')
-      .update({ link_token: token, token_expires_at: expiresAt })
+      .update({
+        link_token: token,
+        token_expires_at: expiresAt,
+        discord_user_id: null,
+        discord_username: null,
+        linked_at: null,
+        guild_id: null,
+        is_active: true,
+      })
       .eq('license_key', licenseKey)
       .not('discord_user_id', 'is', null)
 

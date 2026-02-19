@@ -5863,6 +5863,8 @@ function localDateStr(d) {
 }
 
 // XSS protection utility
+function normalizeOrderId(id) { return id ? id.replace(/-/g, '').trim() : id; }
+
 function escapeHtml(str) {
   if (str == null) return '';
   return String(str)
@@ -7486,7 +7488,7 @@ function normalizeName(name) {
 function computeOrderStatuses() {
   const m = new Map(), p = { cancelled: 5, declined: 4, delivered: 3, shipped: 2, confirmed: 1 };
   orders.forEach(o => {
-    const key = `${o.retailer}-${o.orderId}`;
+    const key = `${o.retailer}-${normalizeOrderId(o.orderId)}`;
     const e = m.get(key);
     if (!e) {
       m.set(key, { ...o, finalStatus: o.status || 'confirmed', confirmedDate: o.status === 'confirmed' ? o.date : null });

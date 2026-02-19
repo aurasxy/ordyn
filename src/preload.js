@@ -37,7 +37,6 @@ contextBridge.exposeInMainWorld('api', {
   stopSync: (accountId) => ipcRenderer.invoke('stop-sync', accountId),
   getSyncSettings: () => ipcRenderer.invoke('get-sync-settings'),
   updateSyncSettings: (settings) => ipcRenderer.invoke('update-sync-settings', settings),
-  rescueFromSpam: (accountId) => ipcRenderer.invoke('rescue-from-spam', accountId),
   onSyncProgress: (callback) => {
     ipcRenderer.removeAllListeners('sync-progress');
     ipcRenderer.on('sync-progress', (_, msg) => callback(msg));
@@ -118,6 +117,7 @@ contextBridge.exposeInMainWorld('api', {
   clearAllData: () => ipcRenderer.invoke('clear-all-data'),
   clearOrders: () => ipcRenderer.invoke('clear-orders'),
   clearOrdersByTimeframe: (daysBack) => ipcRenderer.invoke('clear-orders-by-timeframe', daysBack),
+  refreshAllData: () => ipcRenderer.invoke('refresh-all-data'),
   parseEmlFile: (content, fileName) => ipcRenderer.invoke('parse-eml-file', content, fileName),
 
   // Jig Settings (Address Normalization)

@@ -4447,7 +4447,7 @@
             <div class="card-body">
               <div class="account-list" id="accountList"></div>
               <div class="empty" id="accountsEmpty"><div class="empty-icon">📧</div><div class="empty-title">No accounts added</div><div class="empty-text">Add a Gmail account to start syncing orders</div></div>
-              <div class="sync-panel" id="syncPanel" style="display:none;"><div class="sync-panel-header">Sync Options</div><div class="sync-options"><div class="form-group"><label class="form-label">From Date</label><input type="date" class="form-input" id="syncDateFrom"></div><div class="form-group"><label class="form-label">To Date</label><input type="date" class="form-input" id="syncDateTo"></div><button class="btn btn-success" id="syncRecentBtn">⚡ Sync Recent</button><button class="btn btn-primary" id="syncAllBtn">🔄 Sync All</button><button class="btn btn-secondary" id="rescueSpamBtn" title="Find order emails in spam and move to inbox">🛟 Rescue Spam</button><button class="btn btn-secondary" onclick="relinkEmailImages()" title="Re-match product names to local SKU images">🖼️ Refresh Images</button></div></div>
+              <div class="sync-panel" id="syncPanel" style="display:none;"><div class="sync-panel-header">Sync Options</div><div class="sync-options"><div class="form-group"><label class="form-label">From Date</label><input type="date" class="form-input" id="syncDateFrom"></div><div class="form-group"><label class="form-label">To Date</label><input type="date" class="form-input" id="syncDateTo"></div><button class="btn btn-success" id="syncRecentBtn">⚡ Sync Recent</button><button class="btn btn-primary" id="syncAllBtn">🔄 Sync All</button><button class="btn btn-secondary" onclick="relinkEmailImages()" title="Re-match product names to local SKU images">🖼️ Refresh Images</button><button class="btn btn-secondary" onclick="refreshAllData()" title="Deduplicate and merge order entries without resyncing">🔄 Refresh Data</button></div></div>
             </div>
           </div>
           <input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none;">
@@ -4836,6 +4836,8 @@
                     <option value="120">2 hours</option>
                     <option value="240">4 hours</option>
                     <option value="480">8 hours</option>
+                    <option value="720">12 hours</option>
+                    <option value="1440">24 hours</option>
                   </select>
                 </div>
                 <p style="font-size:12px;color:var(--text-muted);margin-top:8px;margin-bottom:16px;">Next auto-sync: <span id="nextAutoSyncTime">-</span></p>
@@ -4936,8 +4938,8 @@
           <div id="settings-tab-data" class="settings-tab-content">
             <div class="card"><div class="card-header"><div class="card-title">Data Management</div></div><div class="card-body"><div class="settings-row"><div class="settings-label">Total Accounts</div><div class="settings-value" id="settingsAccounts">0</div></div><div class="settings-row"><div class="settings-label">Total Orders</div><div class="settings-value" id="settingsOrders">0</div></div><div style="margin-top:16px;padding:12px;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border);"><div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Export Date Range</div><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;"><div style="display:flex;align-items:center;gap:6px;"><label style="font-size:11px;color:var(--text-secondary);">From:</label><input type="date" id="exportDateFrom" class="form-input" style="padding:6px 10px;font-size:12px;width:140px;"></div><div style="display:flex;align-items:center;gap:6px;"><label style="font-size:11px;color:var(--text-secondary);">To:</label><input type="date" id="exportDateTo" class="form-input" style="padding:6px 10px;font-size:12px;width:140px;"></div><button class="btn btn-secondary" onclick="clearExportDateRange()" style="padding:6px 12px;font-size:11px;">Clear Dates</button><span id="exportDateCount" style="font-size:11px;color:var(--text-muted);margin-left:auto;"></span></div></div><div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;"><button class="btn btn-secondary" id="exportBtn2">📥 Export JSON</button><button class="btn btn-secondary" onclick="exportCSV()">📊 Export CSV</button><button class="btn btn-secondary" onclick="exportOrderPDFs()">📄 Export PDFs</button><div class="dropdown" style="position:relative;"><button class="btn btn-warning" id="clearOrdersBtn" onclick="toggleClearOrdersDropdown(event)">🗑️ Clear Orders ▾</button><div id="clearOrdersDropdown" class="dropdown-menu dropdown-menu-scroll" style="display:none;position:absolute;bottom:100%;left:0;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;min-width:180px;z-index:1000;margin-bottom:4px;box-shadow:0 4px 12px rgba(0,0,0,0.3);"><div class="dropdown-item" onclick="clearOrdersByTimeframe(7)">Last 7 days</div><div class="dropdown-item" onclick="clearOrdersByTimeframe(14)">Last 14 days</div><div class="dropdown-item" onclick="clearOrdersByTimeframe(30)">Last 30 days</div><div class="dropdown-item" onclick="clearOrdersByTimeframe(60)">Last 60 days</div><div class="dropdown-item" onclick="clearOrdersByTimeframe(90)">Last 90 days</div><div style="border-top:1px solid var(--border);margin:4px 0;"></div><div class="dropdown-item" style="color:var(--danger);" onclick="clearOrdersOnly()">Clear All Orders</div></div></div><button class="btn btn-danger" id="clearDataBtn">🗑️ Clear All Data</button></div><p style="font-size:12px;color:var(--text-muted);margin-top:10px;">"Clear Orders" removes synced orders for the selected timeframe. Your IMAP accounts are kept.</p></div></div>
             <div class="card" style="margin-top:16px;">
-              <div class="card-header"><div class="card-title">Export Columns</div></div>
-              <div class="card-body">
+              <div class="card-header" style="cursor:pointer;user-select:none;" onclick="const b=this.nextElementSibling;const a=this.querySelector('.collapse-arrow');if(b.style.display==='none'){b.style.display='';a.style.transform='rotate(0deg)';}else{b.style.display='none';a.style.transform='rotate(-90deg)';}"><div class="card-title" style="display:flex;align-items:center;gap:8px;">Export Columns <span class="collapse-arrow" style="font-size:10px;transition:transform 0.2s;transform:rotate(-90deg);">&#9660;</span></div></div>
+              <div class="card-body" style="display:none;">
                 <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Choose which columns to include when exporting CSV.</p>
                 <div id="exportColumnsToggles">
                   <div class="settings-toggle-row"><div class="settings-toggle-info"><div class="settings-toggle-title">Date</div></div><div class="toggle-switch" id="exportCol-date" onclick="toggleExportColumn('date')"></div></div>
@@ -6919,8 +6921,8 @@ async function setupAutoSyncInterval() {
       // Record sync time before starting
       localStorage.setItem('lastGlobalSyncTime', now.toString());
 
-      // Sync all accounts
-      await syncAllAccounts();
+      // Sync recent orders for all accounts (faster than full sync)
+      await syncRecentAll();
     }
   }, 60000); // Check every minute
 
@@ -10514,51 +10516,6 @@ async function syncRecentAll() {
   toast('Recent sync complete!');
 }
 
-async function rescueFromSpam() {
-  if (syncingAccounts.size > 0) return;
-  if (accounts.length === 0) {
-    toast('No accounts to check', 'error');
-    return;
-  }
-  
-  toast('Checking spam folders...', 'info');
-  
-  // Mark all as syncing
-  accounts.forEach(acc => {
-    syncingAccounts.add(acc.id);
-    showAccountProgress(acc.id, 0, 0, 'Checking spam...');
-  });
-  
-  let totalRescued = 0;
-  
-  // Check each account's spam folder
-  const promises = accounts.map(acc => {
-    return window.api.rescueFromSpam(acc.id)
-      .then(async result => {
-        syncingAccounts.delete(acc.id);
-        
-        if (result.success) {
-          totalRescued += result.moved || 0;
-          showAccountProgress(acc.id, 100, 100, `✓ ${result.moved || 0} rescued`);
-          setTimeout(() => hideAccountProgress(acc.id), 2000);
-        } else {
-          showAccountProgress(acc.id, 0, 0, '✗ Error');
-          setTimeout(() => hideAccountProgress(acc.id), 3000);
-        }
-        return result;
-      });
-  });
-  
-  await Promise.all(promises);
-  
-  if (totalRescued > 0) {
-    toast(`Rescued ${totalRescued} emails from spam! Running sync...`, 'success');
-    // Auto-sync to pick up the rescued emails
-    setTimeout(() => syncRecentAll(), 1000);
-  } else {
-    toast('No order emails found in spam');
-  }
-}
 
 function getOrdersByRetailer(r) { return applySourceFilter(computeOrderStatuses()).filter(o => o.retailer === r); }
 function getDrops(list) {
@@ -12131,6 +12088,7 @@ function aggregateAccountData(orders, retailer) {
           confirmed: 0,
           cancelled: 0,
           manualCancels: 0,
+          declined: 0,
           shipped: 0,
           delivered: 0,
           totalOrders: 0,
@@ -12146,21 +12104,18 @@ function aggregateAccountData(orders, retailer) {
       acc.orders.push(order);
 
       // Update status counts
-      if (order.finalStatus === 'cancelled') {
+      const status = order.finalStatus || order.status || 'confirmed';
+      if (status === 'cancelled') {
         acc.cancelled++;
+        // manualCancel includes both user-initiated and non-penalizing cancels (out of stock, qty limits)
         if (order.manualCancel) acc.manualCancels++;
-        // Don't add to totalSpent for cancelled orders
-      } else if (order.finalStatus === 'delivered') {
-        acc.delivered++;
-        acc.confirmed++;
-        acc.totalSpent += order.amount || 0;
-      } else if (order.finalStatus === 'shipped') {
-        acc.shipped++;
-        acc.confirmed++;
-        acc.totalSpent += order.amount || 0;
+      } else if (status === 'declined') {
+        acc.declined++;
       } else {
-        acc.confirmed++; // confirmed status
+        acc.confirmed++;
         acc.totalSpent += order.amount || 0;
+        if (status === 'shipped') acc.shipped++;
+        if (status === 'delivered') acc.delivered++;
       }
 
       // Track latest order
@@ -12173,9 +12128,11 @@ function aggregateAccountData(orders, retailer) {
   return Array.from(accountMap.values()).map(acc => {
     // Average order value should be based on confirmed orders (orders that actually stuck)
     acc.avgOrderValue = acc.confirmed > 0 ? acc.totalSpent / acc.confirmed : 0;
-    // Manual cancels don't count against stick rate (user chose to cancel)
+    // Manual cancels and non-penalizing cancels (out of stock, quantity limits) don't count against stick rate
     const effectiveTotal = acc.totalOrders - (acc.manualCancels || 0);
     acc.stickRate = effectiveTotal > 0 ? (acc.confirmed / effectiveTotal) * 100 : 0;
+    acc.declineRate = acc.totalOrders > 0 ? (acc.declined / acc.totalOrders) * 100 : 0;
+    acc.cancelRate = acc.totalOrders > 0 ? (acc.cancelled / acc.totalOrders) * 100 : 0;
     acc.tier = getAccountStatsTier(acc.stickRate);
     return acc;
   });
@@ -14697,6 +14654,19 @@ async function clearOrdersByTimeframe(days) {
   const result = await window.api.clearOrdersByTimeframe(days);
   await loadData();
   toast(`Cleared ${result.removed} orders from the last ${days} days`);
+}
+
+// Refresh Data: re-merge and deduplicate all orders without resync
+async function refreshAllData() {
+  const result = await window.api.refreshAllData();
+  if (result.success) {
+    await loadData();
+    if (result.removed > 0) {
+      toast(`Refreshed data: merged ${result.removed} duplicate entries (${result.before} → ${result.after})`);
+    } else {
+      toast('Data refreshed — no duplicates found');
+    }
+  }
 }
 
 // Dev Tools: Import EML file for testing parser
@@ -18317,7 +18287,6 @@ $('saveFlexBtn').addEventListener('click', saveFlexAsPng);
 $('flexDiscordBtn').addEventListener('click', flexToDiscord);
 $('syncAllBtn').addEventListener('click', syncAllAccounts);
 $('syncRecentBtn').addEventListener('click', syncRecentAll);
-$('rescueSpamBtn').addEventListener('click', rescueFromSpam);
 $('exportBtn2').addEventListener('click', exportData);
 $('disconnectBtn').addEventListener('click', disconnectLicense);
 $('clearDataBtn').addEventListener('click', clearAllData);

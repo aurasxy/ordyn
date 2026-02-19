@@ -70,6 +70,12 @@ function toLocalDateString(date) {
   return `${year}-${month}-${day}`;
 }
 
+// Normalize order ID for consistent matching (strips hyphens, trims whitespace)
+function normalizeOrderId(orderId) {
+  if (!orderId) return orderId;
+  return orderId.replace(/-/g, '').trim();
+}
+
 // ==================== PASSWORD ENCRYPTION HELPERS ====================
 // Encrypt password using Electron's safeStorage API
 function encryptPassword(password) {
@@ -435,6 +441,17 @@ if (!store.get('ordersMerged', false)) {
   store.set('ordersMerged', true);
 }
 
+// Migration v2: Normalize order IDs (strip hyphens) and re-merge
+if (!store.get('ordersNormalized', false)) {
+  const allOrders = store.get('orders', []);
+  const merged = mergeOrderEntries(allOrders); // mergeOrderEntries already normalizes IDs
+  if (merged.length < allOrders.length) {
+    console.log(`[MIGRATION] Normalized & merged order IDs: ${allOrders.length} -> ${merged.length}`);
+  }
+  store.set('orders', merged);
+  store.set('ordersNormalized', true);
+}
+
 // ==================== LICENSE SYSTEM ====================
 // Uses Supabase backend for license validation with offline grace period
 
@@ -639,11 +656,13 @@ function mergeOrderEntries(orderList) {
   const map = new Map(); // key: "retailer-orderId" -> merged order
 
   for (const o of orderList) {
-    const key = `${o.retailer}-${o.orderId}`;
+    // Normalize orderId for consistent matching (e.g. "2000143-39663045" == "200014339663045")
+    const nid = normalizeOrderId(o.orderId);
+    const key = `${o.retailer}-${nid}`;
     const existing = map.get(key);
 
     if (!existing) {
-      map.set(key, { ...o });
+      map.set(key, { ...o, orderId: nid });
       continue;
     }
 
@@ -667,6 +686,10 @@ function mergeOrderEntries(orderList) {
     if (o.status === 'confirmed' && o.date) existing.date = o.date;
     if (o.date && !existing.date) existing.date = o.date;
 
+    // Merge cancellation info
+    if (o.cancelReason && !existing.cancelReason) existing.cancelReason = o.cancelReason;
+    if (o.manualCancel !== undefined && existing.manualCancel === undefined) existing.manualCancel = o.manualCancel;
+
     // Merge delivery/shipping fields from shipped/delivered emails
     if (o.tracking && !existing.tracking) existing.tracking = o.tracking;
     if (o.carrier && !existing.carrier) existing.carrier = o.carrier;
@@ -689,8 +712,10 @@ function mergeOrderEntries(orderList) {
 
 function saveOrder(order) {
   const orders = store.get('orders', []);
-  // Match by retailer + orderId only (not status) - all stages merge into one entry
-  const existingIdx = orders.findIndex(o => o.orderId === order.orderId && o.retailer === order.retailer);
+  // Match by retailer + normalized orderId - all stages merge into one entry
+  const nid = normalizeOrderId(order.orderId);
+  order.orderId = nid;
+  const existingIdx = orders.findIndex(o => normalizeOrderId(o.orderId) === nid && o.retailer === order.retailer);
   if (existingIdx >= 0) {
     const existing = orders[existingIdx];
     // Merge using same priority logic
@@ -738,10 +763,13 @@ function saveOrdersBatch(newOrders) {
     if (!order.source) {
       order.source = 'email';
     }
-    // Match by retailer + orderId only (not status)
-    const existingIdx = orders.findIndex(o => o.orderId === order.orderId && o.retailer === order.retailer);
+    // Match by retailer + normalized orderId (strips hyphens for consistent matching)
+    const nid = normalizeOrderId(order.orderId);
+    const existingIdx = orders.findIndex(o => normalizeOrderId(o.orderId) === nid && o.retailer === order.retailer);
     if (existingIdx >= 0) {
       const existing = orders[existingIdx];
+      // Normalize the stored orderId to prevent future mismatches
+      existing.orderId = nid;
       // Merge: upgrade status, keep confirmed data, add shipping fields
       const newPri = STATUS_PRIORITY[order.status] || 0;
       const curPri = STATUS_PRIORITY[existing.status] || 0;
@@ -754,6 +782,8 @@ function saveOrdersBatch(newOrders) {
         existing.amount = order.amount;
       }
       if (order.date && (order.status === 'confirmed' || !existing.date)) existing.date = order.date;
+      if (order.cancelReason && !existing.cancelReason) existing.cancelReason = order.cancelReason;
+      if (order.manualCancel !== undefined && existing.manualCancel === undefined) existing.manualCancel = order.manualCancel;
       if (order.tracking && !existing.tracking) existing.tracking = order.tracking;
       if (order.carrier && !existing.carrier) existing.carrier = order.carrier;
       if (order.trackingUrl && !existing.trackingUrl) existing.trackingUrl = order.trackingUrl;
@@ -781,17 +811,19 @@ function saveOrdersBatch(newOrders) {
 
 function markOrderDelivered(retailer, orderId) {
   const orders = store.get('orders', []);
+  const nid = normalizeOrderId(orderId);
 
   // Find the existing order and update its status (don't create a new entry)
-  const existingIdx = orders.findIndex(o => o.orderId === orderId && o.retailer === retailer);
+  const existingIdx = orders.findIndex(o => normalizeOrderId(o.orderId) === nid && o.retailer === retailer);
   if (existingIdx >= 0) {
     orders[existingIdx].status = 'delivered';
     orders[existingIdx].manualStatus = true;
+    orders[existingIdx].orderId = nid; // Normalize stored ID
   } else {
     // No existing entry — create one (edge case)
     orders.push({
       retailer,
-      orderId,
+      orderId: nid,
       status: 'delivered',
       date: localDateStr(),
       manualStatus: true
@@ -799,21 +831,22 @@ function markOrderDelivered(retailer, orderId) {
   }
 
   store.set('orders', orders);
-  console.log(`[MANUAL] Marked order ${orderId} as delivered`);
+  console.log(`[MANUAL] Marked order ${nid} as delivered`);
   return { success: true };
 }
 
 function deleteOrder(retailer, orderId) {
   const orders = store.get('orders', []);
+  const nid = normalizeOrderId(orderId);
 
   // Remove all order entries with this retailer/orderId (all statuses: confirmed, shipped, delivered, cancelled)
-  const filteredOrders = orders.filter(o => !(o.retailer === retailer && o.orderId === orderId));
+  const filteredOrders = orders.filter(o => !(o.retailer === retailer && normalizeOrderId(o.orderId) === nid));
 
   const removedCount = orders.length - filteredOrders.length;
 
   if (removedCount > 0) {
     store.set('orders', filteredOrders);
-    console.log(`[DELETE] Removed ${removedCount} order entries for ${retailer} order ${orderId}`);
+    console.log(`[DELETE] Removed ${removedCount} order entries for ${retailer} order ${nid}`);
     return { success: true, removed: removedCount };
   }
 
@@ -1271,7 +1304,10 @@ const STATUS_PATTERNS = {
 };
 
 function determineStatus(content, subject) {
-  // Check subject-based confirmations FIRST (these are definitive)
+  // Check CANCELLED subject patterns FIRST — "Order Cancellation Confirmation" must not match as confirmed
+  if (/cancell?ed/i.test(subject) || /cancellation/i.test(subject)) return 'cancelled';
+
+  // Subject-based confirmations (these are definitive)
   // Covers: "Thanks for your order", "Order confirmation", "We've received your order",
   // "Your order has been received", "Your order has been placed", "Order placed",
   // "We're prepping your preorder", "Your preorder items arrive today"
@@ -1287,7 +1323,6 @@ function determineStatus(content, subject) {
       /order delivered/i.test(subject) || /package delivered/i.test(subject) || /delivery complete/i.test(subject) ||
       /^delivered:/i.test(subject)) return 'delivered';
   if (/^shipped:/i.test(subject) || /has shipped/i.test(subject) || /on its way/i.test(subject)) return 'shipped';
-  if (/cancell?ed/i.test(subject) || /cancellation/i.test(subject)) return 'cancelled';
 
   const text = subject + ' ' + content;
   // Check delivered/shipped BEFORE cancelled — prevents delivery emails with "cancel" in footer from being misclassified
@@ -3392,6 +3427,9 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
     let imapConnection = null;
     let cancelled = false;
 
+    // Shared sync state accessible by timeout/cancel handlers (populated once IMAP ready fires)
+    let syncStateGetter = null; // Set to a function that returns current state once variables are in scope
+
     const safeResolve = (result) => {
       if (!resolved) {
         resolved = true;
@@ -3410,6 +3448,52 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
       }
     };
 
+    // Save progress from sync state (used by timeout/cancel to preserve work)
+    const saveProgressFromState = (reason) => {
+      if (!syncStateGetter) return 0;
+      const state = syncStateGetter();
+      if (state.allOrders.length === 0) return 0;
+
+      const selfValidatingRetailers = new Set(['bestbuy', 'costco', 'walmart']);
+      const filteredOrders = state.allOrders.filter(o => {
+        const key = `${o.retailer}-${normalizeOrderId(o.orderId)}`;
+        return state.confirmedOrderIds.has(key) || selfValidatingRetailers.has(o.retailer);
+      });
+
+      if (filteredOrders.length > 0) {
+        const byRetailer = {};
+        for (const o of filteredOrders) {
+          if (!byRetailer[o.retailer]) byRetailer[o.retailer] = [];
+          byRetailer[o.retailer].push(o);
+        }
+        let totalSaved = 0;
+        for (const [, orders] of Object.entries(byRetailer)) {
+          totalSaved += saveOrdersBatch(orders);
+        }
+        logDebug('info', `${reason}: saved ${totalSaved} orders from ${filteredOrders.length} filtered`, {
+          processed: state.processedCount,
+          total: state.totalEmails
+        });
+      }
+
+      // Save paused state so "Sync Recent" knows there's more to fetch
+      const pausedSyncs = store.get('pausedSyncs', {});
+      pausedSyncs[accountId] = {
+        remainingIds: [],
+        processedCount: state.processedCount,
+        totalEmails: state.totalEmails,
+        originalTotalEmails: state.totalEmails,
+        ordersFound: filteredOrders.length,
+        pausedAt: Date.now(),
+        dateFrom,
+        dateTo,
+        reason
+      };
+      store.set('pausedSyncs', pausedSyncs);
+
+      return filteredOrders.length;
+    };
+
     // Optional auto-timeout based on settings
     const syncSettings = store.get('syncSettings', { autoTimeoutEnabled: false, autoTimeoutSeconds: 120 });
     if (syncSettings.autoTimeoutEnabled && syncSettings.autoTimeoutSeconds > 0) {
@@ -3417,11 +3501,12 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
       masterTimeout = setTimeout(() => {
         if (!resolved) {
           logDebug('error', `Auto timeout after ${syncSettings.autoTimeoutSeconds}s`);
-          sendProgress('Timeout - check connection', 0, 0);
+          const saved = saveProgressFromState('timeout');
+          sendProgress(saved > 0 ? `Timeout - ${saved} orders saved` : 'Timeout - check connection', 0, 0);
           if (imapConnection) {
             try { imapConnection.end(); } catch (e) { /* Connection may already be closed */ }
           }
-          safeResolve({ success: false, error: `Sync timed out after ${syncSettings.autoTimeoutSeconds} seconds` });
+          safeResolve({ success: false, error: `Sync timed out after ${syncSettings.autoTimeoutSeconds} seconds`, ordersSaved: saved });
         }
       }, timeoutMs);
     }
@@ -3430,18 +3515,18 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
     const cancelSync = () => {
       if (!resolved) {
         cancelled = true;
+        const state = syncStateGetter ? syncStateGetter() : {};
         logDebug('warn', 'Sync cancelled by user', {
-          processed: processedCount,
-          total: totalEmails,
-          fetchTimeouts: fetchTimeoutCount,
-          parseTimeouts: parseTimeoutCount,
-          ordersFoundSoFar: allOrders.length
+          processed: state.processedCount || 0,
+          total: state.totalEmails || 0,
+          ordersFoundSoFar: state.allOrders?.length || 0
         });
-        sendProgress('Cancelled', 0, 0);
+        const saved = saveProgressFromState('cancelled');
+        sendProgress(saved > 0 ? `Cancelled - ${saved} orders saved` : 'Cancelled', 0, 0);
         if (imapConnection) {
           try { imapConnection.end(); } catch (e) { /* Connection may already be closed */ }
         }
-        safeResolve({ success: false, error: 'Sync cancelled by user', cancelled: true });
+        safeResolve({ success: false, error: 'Sync cancelled by user', cancelled: true, ordersSaved: saved });
       }
     };
 
@@ -3503,6 +3588,9 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
     const MAX_RECONNECT_ATTEMPTS = 3;
     let stallCheckInterval = null;
     let syncEmailIds = null; // Reference to email IDs for paused state saving
+
+    // Set state getter so timeout/cancel handlers can access current sync progress
+    syncStateGetter = () => ({ allOrders, confirmedOrderIds, processedCount, totalEmails, syncEmailIds });
 
     // Cumulative tracking for pause/resume - load from paused sync if resuming
     const storedPausedSyncs = store.get('pausedSyncs', {});
@@ -4727,121 +4815,6 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
       }
 
       safeResolve({ success: false, error: message });
-    });
-    
-    imap.connect();
-  });
-}
-
-// ==================== RESCUE FROM SPAM ====================
-async function rescueFromSpam(accountId) {
-  const accounts = store.get('accounts', []);
-  const account = accounts.find(a => a.id === accountId);
-  if (!account) return { success: false, error: 'Account not found' };
-  
-  return new Promise((resolve) => {
-    const imap = new Imap({
-      user: account.email,
-      password: (decryptPassword(account.password) || '').replace(/\s+/g, ''),
-      host: 'imap.gmail.com',
-      port: 993,
-      tls: true,
-      tlsOptions: { rejectUnauthorized: false },
-      connTimeout: 45000,
-      authTimeout: 30000,
-      keepalive: false
-    });
-
-    let movedCount = 0;
-    
-    imap.once('ready', () => {
-      // Open spam folder
-      imap.openBox('[Gmail]/Spam', false, (err) => {
-        if (err) {
-          console.log('[SPAM] Could not open spam folder:', err.message);
-          imap.end();
-          resolve({ success: true, moved: 0 });
-          return;
-        }
-        
-        // Search for retailer emails in spam
-        const searches = [
-          ['FROM', 'walmart'],
-          ['FROM', 'target'],
-          ['FROM', 'oe1_target'],      // iCloud HME Target relay format
-          ['FROM', '_target_com_'],    // iCloud HME Target alternate pattern
-          ['FROM', 'pokemon'],
-          ['FROM', 'narvar'],
-          ['FROM', 'pokemoncenter'],
-          ['FROM', 'samsclub'],
-          ['FROM', 'em_pokemon'],      // iCloud Hide My Email
-          ['FROM', '_em_walmart_'],    // iCloud Hide My Email
-          ['FROM', '_em_target_'],     // iCloud Hide My Email
-          ['FROM', '_em_samsclub_'],   // iCloud Hide My Email
-          ['SUBJECT', 'Arrived:'],
-          ['SUBJECT', 'Delivered:'],
-          ['SUBJECT', 'Shipped:'],
-          ['SUBJECT', 'order confirmed'],
-          ['SUBJECT', 'Your order'],
-          ['SUBJECT', 'Thank you for shopping'],
-          ['SUBJECT', 'thanks for your order'],
-          ['SUBJECT', 'PokemonCenter'],
-          ['SUBJECT', 'Pokemon Center'],
-          ['SUBJECT', 'Pokémon Center'],
-          ['SUBJECT', "Sam's Club order"],
-          ['SUBJECT', 'SamsClub.com'],
-          ['SUBJECT', 'has been canceled'],
-          ['SUBJECT', 'has been cancelled']
-        ];
-        
-        let allSpamIds = [];
-        let searchesDone = 0;
-        
-        searches.forEach(criteria => {
-          imap.search([criteria], (err, results) => {
-            searchesDone++;
-            if (!err && results && results.length > 0) {
-              results.forEach(id => {
-                if (!allSpamIds.includes(id)) allSpamIds.push(id);
-              });
-            }
-            
-            if (searchesDone >= searches.length) {
-              if (allSpamIds.length === 0) {
-                console.log('[SPAM] No order emails found in spam');
-                imap.end();
-                resolve({ success: true, moved: 0 });
-                return;
-              }
-              
-              console.log(`[SPAM] Found ${allSpamIds.length} potential order emails in spam`);
-              
-              // Move emails to inbox
-              imap.move(allSpamIds, 'INBOX', (moveErr) => {
-                if (moveErr) {
-                  console.error('[SPAM] Error moving emails:', moveErr.message);
-                  imap.end();
-                  resolve({ success: false, error: moveErr.message });
-                } else {
-                  movedCount = allSpamIds.length;
-                  console.log(`[SPAM] Moved ${movedCount} emails to inbox`);
-                  imap.end();
-                  resolve({ success: true, moved: movedCount });
-                }
-              });
-            }
-          });
-        });
-      });
-    });
-    
-    imap.once('error', (err) => {
-      console.error('[SPAM] IMAP error:', err.message);
-      resolve({ success: false, error: err.message });
-    });
-    
-    imap.once('end', () => {
-      console.log('[SPAM] Connection ended');
     });
     
     imap.connect();
@@ -6333,11 +6306,20 @@ ipcMain.handle('resume-sync', async (_, accountId) => {
   return syncAccount(accountId, pausedSync.dateFrom, pausedSync.dateTo, remainingIds);
 });
 
-ipcMain.handle('rescue-from-spam', (_, id) => rescueFromSpam(id));
 ipcMain.handle('get-data-path', () => store.path);
 ipcMain.handle('clear-all-data', () => clearAllData());
 ipcMain.handle('clear-orders', () => clearOrders());
 ipcMain.handle('clear-orders-by-timeframe', (_, daysBack) => clearOrdersByTimeframe(daysBack));
+
+ipcMain.handle('refresh-all-data', () => {
+  const allOrders = store.get('orders', []);
+  const before = allOrders.length;
+  const merged = mergeOrderEntries(allOrders);
+  store.set('orders', merged);
+  const removed = before - merged.length;
+  console.log(`[REFRESH] Deduplicated orders: ${before} -> ${merged.length} (${removed} merged)`);
+  return { success: true, before, after: merged.length, removed };
+});
 ipcMain.handle('get-jig-settings', () => getJigSettings());
 ipcMain.handle('save-jig-settings', (_, settings) => saveJigSettings(settings));
 
@@ -7205,7 +7187,7 @@ ipcMain.handle('sync-discord-orders', async () => {
         const primaryMatch = findSkuAndImage(parts[0]);
 
         return {
-          orderId: row.order_id || `discord-${row.message_id}`,
+          orderId: normalizeOrderId(row.order_id || `discord-${row.message_id}`),
           retailer: row.retailer,
           item: parts[0],
           items: items,
@@ -7230,7 +7212,7 @@ ipcMain.handle('sync-discord-orders', async () => {
         const { sku: matchedSku, image: matchedImage } = findSkuAndImage(itemName);
 
         return {
-          orderId: row.order_id || `discord-${row.message_id}`,
+          orderId: normalizeOrderId(row.order_id || `discord-${row.message_id}`),
           retailer: row.retailer,
           item: itemName,
           imageUrl: matchedImage || row.image_url,

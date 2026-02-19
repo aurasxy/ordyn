@@ -702,7 +702,16 @@ function mergeOrderEntries(orderList) {
     if (o.zip && !existing.zip) existing.zip = o.zip;
     if (o.addressKey && !existing.addressKey) existing.addressKey = o.addressKey;
     if (o.shipDate && !existing.shipDate) existing.shipDate = o.shipDate;
-    if (o.quantity && (!existing.quantity || existing.quantity === 0)) existing.quantity = o.quantity;
+    // Prefer confirmed email's quantity (most accurate); only take new if existing is empty
+    if (o.status === 'confirmed' && o.quantity && o.quantity > 0) {
+      existing.quantity = o.quantity;
+    } else if (o.quantity && o.quantity > 0 && (!existing.quantity || existing.quantity === 0)) {
+      existing.quantity = o.quantity;
+    }
+    // Preserve items array from confirmed email
+    if (o.items && o.items.length > 0 && (o.status === 'confirmed' || !existing.items || existing.items.length === 0)) {
+      existing.items = o.items;
+    }
     if (o.email && !existing.email) existing.email = o.email;
     if (o.accountId && !existing.accountId) existing.accountId = o.accountId;
   }
@@ -740,6 +749,14 @@ function saveOrder(order) {
     if (order.zip && !existing.zip) existing.zip = order.zip;
     if (order.addressKey && !existing.addressKey) existing.addressKey = order.addressKey;
     if (order.shipDate && !existing.shipDate) existing.shipDate = order.shipDate;
+    if (order.status === 'confirmed' && order.quantity && order.quantity > 0) {
+      existing.quantity = order.quantity;
+    } else if (order.quantity && order.quantity > 0 && (!existing.quantity || existing.quantity === 0)) {
+      existing.quantity = order.quantity;
+    }
+    if (order.items && order.items.length > 0 && (order.status === 'confirmed' || !existing.items || existing.items.length === 0)) {
+      existing.items = order.items;
+    }
     orders[existingIdx] = existing;
   } else {
     orders.push(order);
@@ -795,7 +812,14 @@ function saveOrdersBatch(newOrders) {
       if (order.zip && !existing.zip) existing.zip = order.zip;
       if (order.addressKey && !existing.addressKey) existing.addressKey = order.addressKey;
       if (order.shipDate && !existing.shipDate) existing.shipDate = order.shipDate;
-      if (order.quantity && (!existing.quantity || existing.quantity === 0)) existing.quantity = order.quantity;
+      if (order.status === 'confirmed' && order.quantity && order.quantity > 0) {
+        existing.quantity = order.quantity;
+      } else if (order.quantity && order.quantity > 0 && (!existing.quantity || existing.quantity === 0)) {
+        existing.quantity = order.quantity;
+      }
+      if (order.items && order.items.length > 0 && (order.status === 'confirmed' || !existing.items || existing.items.length === 0)) {
+        existing.items = order.items;
+      }
       if (order.email && !existing.email) existing.email = order.email;
       if (order.accountId && !existing.accountId) existing.accountId = order.accountId;
       orders[existingIdx] = existing;

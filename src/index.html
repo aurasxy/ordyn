@@ -7516,6 +7516,9 @@ function computeOrderStatuses() {
       if (o.zip && !e.zip) e.zip = o.zip;
       if (o.addressKey && !e.addressKey) e.addressKey = o.addressKey;
       if (o.shipDate && !e.shipDate) e.shipDate = o.shipDate;
+      // Preserve quantity and items (prefer confirmed email's data, or first non-zero)
+      if (o.quantity && o.quantity > 0 && (o.status === 'confirmed' || !e.quantity || e.quantity === 0)) e.quantity = o.quantity;
+      if (o.items && o.items.length > 0 && (o.status === 'confirmed' || !e.items || e.items.length === 0)) e.items = o.items;
     }
   });
   return Array.from(m.values());

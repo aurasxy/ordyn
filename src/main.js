@@ -6198,6 +6198,12 @@ ipcMain.handle('stop-sync', (_, accountId) => {
   const activeSync = activeSyncs.get(accountId);
   if (activeSync && activeSync.cancel) {
     activeSync.cancel();
+    // Also clear paused state to prevent auto-resume loop
+    const pausedSyncs = store.get('pausedSyncs', {});
+    if (pausedSyncs[accountId]) {
+      delete pausedSyncs[accountId];
+      store.set('pausedSyncs', pausedSyncs);
+    }
     return { success: true };
   }
 
@@ -6207,6 +6213,15 @@ ipcMain.handle('stop-sync', (_, accountId) => {
     const removed = syncQueue.splice(queueIndex, 1)[0];
     removed.reject(new Error('Sync cancelled'));
     return { success: true, wasQueued: true };
+  }
+
+  // Check if there's a paused sync waiting to auto-resume (stuck state)
+  const pausedSyncs = store.get('pausedSyncs', {});
+  if (pausedSyncs[accountId]) {
+    delete pausedSyncs[accountId];
+    store.set('pausedSyncs', pausedSyncs);
+    console.log(`[STOP] Cleared paused sync state for ${accountId}`);
+    return { success: true, clearedPaused: true };
   }
 
   return { success: false, error: 'No active sync for this account' };
@@ -7689,10 +7704,23 @@ function startAutoResumeTimer() {
             continue;
           }
 
+          // Check retry limit — give up after 3 consecutive auto-resume failures
+          const retryCount = pausedSync.autoResumeRetries || 0;
+          if (retryCount >= 3) {
+            console.log(`[Auto-Resume] Giving up after ${retryCount} failed retries for ${accountId}`);
+            delete pausedSync.autoResumeAt; // Stop auto-resuming, keep paused state for manual resume
+            store.set('pausedSyncs', pausedSyncs);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('sync-paused', { accountId, remainingCount: pausedSync.remainingIds?.length || 0, ordersFound: pausedSync.ordersFound || 0, autoResumeAt: null });
+            }
+            continue;
+          }
+
           const timeOverdue = Math.round((now - pausedSync.autoResumeAt) / 1000);
           console.log(`[Auto-Resume] Resuming paused sync for account ${accountId}`, {
             overdueSeconds: timeOverdue,
-            scheduledAt: new Date(pausedSync.autoResumeAt).toISOString()
+            scheduledAt: new Date(pausedSync.autoResumeAt).toISOString(),
+            attempt: retryCount + 1
           });
 
           // Notify frontend
@@ -7704,14 +7732,41 @@ function startAutoResumeTimer() {
           const remainingIds = pausedSync.remainingIds && pausedSync.remainingIds.length > 0
             ? pausedSync.remainingIds
             : null;
+          const prevRetries = retryCount; // Save before deleting
           delete pausedSyncs[accountId];
           store.set('pausedSyncs', pausedSyncs);
 
           // Start the sync from remaining IDs
           try {
-            await syncAccount(accountId, pausedSync.dateFrom, pausedSync.dateTo, remainingIds);
+            const result = await syncAccount(accountId, pausedSync.dateFrom, pausedSync.dateTo, remainingIds);
+            // Notify frontend so it can clean up UI state
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('sync-progress', {
+                accountId,
+                message: result.success ? `✓ ${result.orders || 0} orders` : `✗ ${result.error || 'Failed'}`,
+                current: 0,
+                total: 0
+              });
+            }
+            // If sync failed and re-paused, increment retry counter
+            if (!result.success) {
+              const updatedPaused = store.get('pausedSyncs', {});
+              if (updatedPaused[accountId]) {
+                updatedPaused[accountId].autoResumeRetries = prevRetries + 1;
+                store.set('pausedSyncs', updatedPaused);
+              }
+            }
           } catch (err) {
             console.log(`[Auto-Resume] Failed for ${accountId}`, { error: err.message });
+            // Notify frontend of failure so UI doesn't stay stuck
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('sync-progress', {
+                accountId,
+                message: `✗ ${err.message}`,
+                current: 0,
+                total: 0
+              });
+            }
           }
 
           // Only resume one sync per check to avoid overwhelming

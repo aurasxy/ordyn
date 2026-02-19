@@ -10354,12 +10354,14 @@ async function syncAccount(id) {
 
 async function stopSync(id) {
   const result = await window.api.stopSync(id);
-  if (result.success) {
-    syncingAccounts.delete(id);
-    showAccountProgress(id, 0, 0, 'Stopped');
-    setTimeout(() => hideAccountProgress(id), 1500);
-    toast('Sync stopped', 'info');
-  }
+  // Always clean up frontend state — the backend sync may have already ended
+  // but the UI can still be stuck showing syncing
+  syncingAccounts.delete(id);
+  delete pausedSyncs[id];
+  showAccountProgress(id, 0, 0, 'Stopped');
+  setTimeout(() => hideAccountProgress(id), 1500);
+  renderAccounts(); // Re-render to clear paused/resume UI
+  toast(result.clearedPaused ? 'Auto-resume cancelled' : 'Sync stopped', 'info');
 }
 
 async function pauseSync(id) {
@@ -18310,18 +18312,25 @@ if (window.api.onSyncProgress) {
         const current = data.current || 0;
         const message = data.message || '';
 
-        // Check if sync is complete
-        const isComplete = message.toLowerCase().includes('done') ||
+        // Check if sync is complete or errored
+        const msgLower = message.toLowerCase();
+        const isComplete = msgLower.includes('done') ||
                           message.includes('✓') ||
-                          message.toLowerCase().includes('timeout') ||
-                          message.toLowerCase().includes('cancelled') ||
+                          msgLower.includes('timeout') ||
+                          msgLower.includes('cancelled') ||
+                          msgLower.includes('connection error') ||
+                          msgLower.includes('error') ||
+                          msgLower.includes('paused') ||
                           (current === total && total > 0);
 
         if (isComplete) {
-          // Show completion message and schedule hide
+          // Clean up syncing state so stop button and auto-sync checks work
+          syncingAccounts.delete(data.accountId);
           showAccountProgress(data.accountId, total, total, message);
           setTimeout(() => hideAccountProgress(data.accountId), 2000);
         } else {
+          // Ensure this account is tracked as syncing when we see progress
+          syncingAccounts.add(data.accountId);
           // Show progress
           const percent = total > 0 ? Math.round((current / total) * 100) : 0;
           const text = total > 0 ? `${percent}%` : message || '...';

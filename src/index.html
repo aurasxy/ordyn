@@ -4149,25 +4149,25 @@
             <div class="live-track-header">
               <div>
                 <div class="live-track-title">FedEx Live Tracking</div>
-                <div class="live-track-subtitle" id="liveTrackSubtitle">Real-time updates for your FedEx shipments</div>
+                <div class="live-track-subtitle" id="liveTrackSubtitle">Set a date range and search to load tracking</div>
               </div>
-              <button class="btn-refresh-all" style="background:var(--bg-card);color:var(--text-muted);border:1px solid var(--border);margin-right:8px;" onclick="clearLiveTrackCache()">Clear Cache</button>
-              <button class="btn-refresh-all" id="liveTrackRefreshBtn" onclick="refreshAllLiveTracking()">Refresh All</button>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <label style="font-size:var(--text-xs);color:var(--text-muted);">From</label>
+                <input type="date" id="ltSearchFrom" style="padding:6px 8px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-size:var(--text-xs);">
+                <label style="font-size:var(--text-xs);color:var(--text-muted);">To</label>
+                <input type="date" id="ltSearchTo" style="padding:6px 8px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-size:var(--text-xs);">
+                <button class="btn-refresh-all" id="liveTrackSearchBtn" onclick="searchLiveTracking()">Search</button>
+                <button class="btn-refresh-all" style="background:var(--bg-card);color:var(--text-muted);border:1px solid var(--border);" onclick="clearLiveTrackCache()">Clear Cache</button>
+              </div>
             </div>
             <div class="lt-filter-bar" id="liveTrackFilterBar" style="display:none;">
               <div class="lt-filter-pills" id="liveTrackPills"></div>
-              <div class="lt-date-filters">
-                <label>From</label>
-                <input type="date" id="ltDateFrom" onchange="applyLiveTrackFilters()">
-                <label>To</label>
-                <input type="date" id="ltDateTo" onchange="applyLiveTrackFilters()">
-              </div>
             </div>
             <div id="liveTrackContent"></div>
-            <div id="liveTrackEmpty" class="live-track-empty" style="display:none;">
-              <div class="live-track-empty-icon">📦</div>
-              <div class="live-track-empty-title">No FedEx Shipments</div>
-              <div class="live-track-empty-text">Orders with FedEx tracking numbers will appear here automatically.</div>
+            <div id="liveTrackEmpty" class="live-track-empty">
+              <div class="live-track-empty-icon">📡</div>
+              <div class="live-track-empty-title">FedEx Live Tracking</div>
+              <div class="live-track-empty-text">Set a date range above and click Search to load real-time tracking for your FedEx shipments.</div>
             </div>
           </div>
 
@@ -13732,24 +13732,66 @@ let liveTrackExpandedSet = new Set();
 let liveTrackStatusFilter = 'all';
 let liveTrackFedexOrders = []; // cached after fetch so filters don't re-fetch
 
-async function renderLiveTracking() {
+function renderLiveTracking() {
+  // Just show the landing state - don't auto-fetch
   const content = $('liveTrackContent');
   const empty = $('liveTrackEmpty');
   const filterBar = $('liveTrackFilterBar');
 
+  // If we already have results loaded, re-render them
+  if (liveTrackFedexOrders.length > 0 && Object.keys(liveTrackingData).length > 0) {
+    empty.style.display = 'none';
+    content.style.display = 'block';
+    filterBar.style.display = 'flex';
+    buildLiveTrackPills();
+    applyLiveTrackFilters();
+    return;
+  }
+
+  // Default date range: last 30 days
+  if (!$('ltSearchFrom').value) {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    $('ltSearchFrom').value = localDateStr(d);
+  }
+  if (!$('ltSearchTo').value) {
+    $('ltSearchTo').value = localDateStr(new Date());
+  }
+
+  content.style.display = 'none';
+  content.innerHTML = '';
+  filterBar.style.display = 'none';
+  empty.style.display = 'block';
+  $('liveTrackSubtitle').textContent = 'Set a date range and click Search to load tracking';
+}
+
+async function searchLiveTracking() {
+  const content = $('liveTrackContent');
+  const empty = $('liveTrackEmpty');
+  const filterBar = $('liveTrackFilterBar');
+  const btn = $('liveTrackSearchBtn');
+  const dateFrom = $('ltSearchFrom').value;
+  const dateTo = $('ltSearchTo').value;
+
   const allOrders = applySourceFilter(computeOrderStatuses());
-  const fedexOrders = allOrders.filter(o => o.carrier === 'FedEx' && o.tracking && (o.finalStatus === 'shipped' || o.finalStatus === 'delivered'));
+  const fedexOrders = allOrders.filter(o => {
+    if (o.carrier !== 'FedEx' || !o.tracking || (o.finalStatus !== 'shipped' && o.finalStatus !== 'delivered')) return false;
+    if (dateFrom && o.date && o.date < dateFrom) return false;
+    if (dateTo && o.date && o.date > dateTo) return false;
+    return true;
+  });
 
   if (fedexOrders.length === 0) {
     content.style.display = 'none';
     filterBar.style.display = 'none';
     empty.style.display = 'block';
-    $('liveTrackSubtitle').textContent = 'Real-time updates for your FedEx shipments';
+    $('liveTrackSubtitle').textContent = 'No FedEx shipments found in this date range';
     return;
   }
 
   empty.style.display = 'none';
   content.style.display = 'block';
+  btn.disabled = true;
+  btn.textContent = 'Searching...';
 
   // Show skeleton while loading
   content.innerHTML = fedexOrders.map(() =>
@@ -13758,6 +13800,9 @@ async function renderLiveTracking() {
 
   const trackingNumbers = fedexOrders.map(o => o.tracking);
   const result = await window.api.fetchLiveTracking(trackingNumbers);
+
+  btn.disabled = false;
+  btn.textContent = 'Search';
 
   if (!result.success) {
     filterBar.style.display = 'none';
@@ -13768,7 +13813,7 @@ async function renderLiveTracking() {
   result.data.forEach(td => { liveTrackingData[td.trackingNumber] = td; });
   liveTrackFedexOrders = fedexOrders;
 
-  // Build filter pills with counts
+  $('liveTrackSubtitle').textContent = `${fedexOrders.length} shipment${fedexOrders.length !== 1 ? 's' : ''} found`;
   filterBar.style.display = 'flex';
   buildLiveTrackPills();
   applyLiveTrackFilters();
@@ -13802,8 +13847,6 @@ function setLiveTrackFilter(status) {
 function applyLiveTrackFilters() {
   const content = $('liveTrackContent');
   const statusMap = { IN_TRANSIT: 'in-transit', OUT_FOR_DELIVERY: 'out-for-delivery', DELIVERED: 'delivered', EXCEPTION: 'exception', PENDING: 'pending', ERROR: 'error' };
-  const dateFrom = $('ltDateFrom').value;
-  const dateTo = $('ltDateTo').value;
 
   let filtered = liveTrackFedexOrders;
 
@@ -13816,22 +13859,10 @@ function applyLiveTrackFilters() {
     });
   }
 
-  // Filter by date range (on estimated delivery)
-  if (dateFrom || dateTo) {
-    filtered = filtered.filter(o => {
-      const td = liveTrackingData[o.tracking];
-      if (!td || !td.estimatedDelivery) return true; // keep orders without ETA
-      const etaDate = td.estimatedDelivery.split('T')[0];
-      if (dateFrom && etaDate < dateFrom) return false;
-      if (dateTo && etaDate > dateTo) return false;
-      return true;
-    });
-  }
-
   $('liveTrackSubtitle').textContent = `${filtered.length} of ${liveTrackFedexOrders.length} shipment${liveTrackFedexOrders.length !== 1 ? 's' : ''}`;
 
   if (filtered.length === 0) {
-    content.innerHTML = `<div class="live-track-empty" style="padding:40px 20px;"><div class="live-track-empty-icon">🔍</div><div class="live-track-empty-title">No Matching Shipments</div><div class="live-track-empty-text">Try adjusting your filters.</div></div>`;
+    content.innerHTML = `<div class="live-track-empty" style="padding:40px 20px;"><div class="live-track-empty-icon">🔍</div><div class="live-track-empty-title">No Matching Shipments</div><div class="live-track-empty-text">Try adjusting your status filter.</div></div>`;
   } else {
     content.innerHTML = filtered.map(o => renderLiveTrackCard(o, liveTrackingData[o.tracking])).join('');
   }
@@ -13893,7 +13924,8 @@ async function refreshSingleTracking(tn) {
   const result = await window.api.fetchLiveTracking([tn]);
   if (result.success && result.data.length > 0) {
     liveTrackingData[tn] = result.data[0];
-    renderLiveTracking();
+    buildLiveTrackPills();
+    applyLiveTrackFilters();
     toast('Tracking updated', 'success');
   }
 }
@@ -13901,17 +13933,13 @@ async function refreshSingleTracking(tn) {
 async function clearLiveTrackCache() {
   await window.api.clearLiveTrackingCache();
   liveTrackingData = {};
-  renderLiveTracking();
-}
-
-async function refreshAllLiveTracking() {
-  const btn = $('liveTrackRefreshBtn');
-  btn.disabled = true;
-  btn.textContent = 'Refreshing...';
-  await window.api.clearLiveTrackingCache();
-  await renderLiveTracking();
-  btn.disabled = false;
-  btn.textContent = 'Refresh All';
+  liveTrackFedexOrders = [];
+  $('liveTrackContent').style.display = 'none';
+  $('liveTrackContent').innerHTML = '';
+  $('liveTrackFilterBar').style.display = 'none';
+  $('liveTrackEmpty').style.display = 'block';
+  $('liveTrackSubtitle').textContent = 'Cache cleared — set date range and search again';
+  toast('Live tracking cache cleared', 'info');
 }
 
 async function saveFlexAsPng() {

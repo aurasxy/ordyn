@@ -7986,7 +7986,7 @@ function startAutoResumeTimer() {
   }, 60000); // Check every minute
 }
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+app.on('activate', () => { if (app.isReady() && BrowserWindow.getAllWindows().length === 0) createWindow(); });
 app.on('before-quit', () => {
   telemetry.trackEvent(telemetry.Events.APP_CLOSE);
 });

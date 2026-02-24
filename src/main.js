@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, clipboard, nativeImage, dialog, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const Store = require('electron-store');
 
 // Get YYYY-MM-DD date string in local timezone (not UTC).
@@ -57,6 +58,30 @@ const { autoUpdater } = require('electron-updater');
 const licenseModule = require('./license');
 const telemetry = require('./telemetry');
 
+// ==================== SYNC LICENSE GATE ====================
+// Cache license validation so syncs don't re-check every time
+let syncLicenseValid = false;
+let syncLicenseCheckedAt = 0;
+const SYNC_LICENSE_CACHE_MS = 60 * 60 * 1000; // 1 hour
+
+async function requireValidLicense() {
+  const now = Date.now();
+  if (syncLicenseValid && (now - syncLicenseCheckedAt) < SYNC_LICENSE_CACHE_MS) {
+    return true;
+  }
+  const cache = licenseModule.readCache();
+  if (!cache || !cache.licenseKey) {
+    throw new Error('No active license. Please activate a license key in Settings.');
+  }
+  const result = await licenseModule.validateLicense(cache.licenseKey);
+  if (result && result.valid) {
+    syncLicenseValid = true;
+    syncLicenseCheckedAt = now;
+    return true;
+  }
+  throw new Error('License validation failed. Please check your license key.');
+}
+
 // ==================== DATE HELPER ====================
 // Convert Date to local YYYY-MM-DD format (not UTC)
 // This ensures email dates show in user's local timezone
@@ -81,15 +106,14 @@ function normalizeOrderId(orderId) {
 function encryptPassword(password) {
   if (!password) return null;
   if (!safeStorage.isEncryptionAvailable()) {
-    console.warn('[SECURITY] safeStorage encryption not available, storing password in plain text');
-    return password;
+    throw new Error('System keychain not available. Cannot securely store passwords. On Linux, install gnome-keyring or kwallet.');
   }
   try {
     const encrypted = safeStorage.encryptString(password);
     return encrypted.toString('base64');
   } catch (err) {
     console.error('[SECURITY] Failed to encrypt password:', err.message);
-    return password;
+    throw new Error('Failed to encrypt password. Check your system keychain.');
   }
 }
 
@@ -492,6 +516,8 @@ async function activateLicense(key) {
 
 async function deactivateLicense() {
   try {
+    syncLicenseValid = false;
+    syncLicenseCheckedAt = 0;
     const result = await licenseModule.deactivateLicense();
     return result;
   } catch (e) {
@@ -6167,15 +6193,17 @@ ipcMain.handle('download-pokecenter-image', (_, imageUrl, sku) => downloadPokece
 ipcMain.handle('get-orders', (_, retailer) => getOrders(retailer));
 ipcMain.handle('mark-order-delivered', (_, retailer, orderId) => markOrderDelivered(retailer, orderId));
 ipcMain.handle('delete-order', (_, retailer, orderId) => deleteOrder(retailer, orderId));
-ipcMain.handle('sync-account', (_, id, dateFrom, dateTo) => {
+ipcMain.handle('sync-account', async (_, id, dateFrom, dateTo) => {
+  await requireValidLicense();
   const currentMode = store.get('dataMode', 'imap');
   if (currentMode !== 'imap') {
-    return Promise.reject(new Error('IMAP sync is disabled in Discord mode. Switch to IMAP mode in Settings > General.'));
+    throw new Error('IMAP sync is disabled in Discord mode. Switch to IMAP mode in Settings > General.');
   }
   return queueSync(id, dateFrom, dateTo);
 });
 
 ipcMain.handle('resync-drop', async (_, retailer, date) => {
+  try { await requireValidLicense(); } catch (e) { return { success: false, error: e.message }; }
   const currentMode = store.get('dataMode', 'imap');
   if (currentMode !== 'imap') {
     return { success: false, error: 'IMAP sync is disabled in Discord mode' };
@@ -6634,6 +6662,7 @@ const LIVE_TRACKING_API_KEY = 'sk_solus_live_9f3a7b2e1d4c8f6a5b0e3d7c9a2f4b8e1c6
 
 ipcMain.handle('fetch-live-tracking', async (_, trackingNumbers) => {
   try {
+    await requireValidLicense();
     if (!LIVE_TRACKING_PROXY_URL || LIVE_TRACKING_PROXY_URL === 'REPLACE_WITH_RAILWAY_URL') {
       return { success: false, error: 'Live tracking proxy not configured' };
     }
@@ -6680,8 +6709,12 @@ ipcMain.handle('clear-live-tracking-cache', async () => {
 });
 
 // ==================== DISCORD WEBHOOKS ====================
+const DISCORD_WEBHOOK_RE = /^https:\/\/(discord\.com|discordapp\.com|canary\.discord\.com|ptb\.discord\.com)\/api\/webhooks\/\d+\/[\w-]+$/;
+function isValidWebhookUrl(url) {
+  return typeof url === 'string' && DISCORD_WEBHOOK_RE.test(url);
+}
 ipcMain.handle('save-discord-webhook', async (_, url) => {
-  if (!url || (!url.startsWith('https://discord.com/api/webhooks/') && !url.startsWith('https://discordapp.com/api/webhooks/'))) {
+  if (!isValidWebhookUrl(url)) {
     return { success: false, error: 'Invalid Discord webhook URL' };
   }
   store.set('discordWebhookUrl', url);
@@ -6694,7 +6727,7 @@ ipcMain.handle('get-discord-webhook', async () => {
 
 ipcMain.handle('test-discord-webhook', async (_, urlParam) => {
   const url = urlParam || store.get('discordWebhookUrl');
-  if (!url || (!url.startsWith('https://discord.com/api/webhooks/') && !url.startsWith('https://discordapp.com/api/webhooks/'))) {
+  if (!isValidWebhookUrl(url)) {
     return { success: false, error: 'Invalid Discord webhook URL' };
   }
 
@@ -6738,6 +6771,7 @@ ipcMain.handle('test-discord-webhook', async (_, urlParam) => {
 ipcMain.handle('send-discord-webhook', async (_, payload) => {
   const url = store.get('discordWebhookUrl');
   if (!url) return { success: false, error: 'No webhook URL configured' };
+  if (!isValidWebhookUrl(url)) return { success: false, error: 'Invalid Discord webhook URL' };
 
   try {
     const https = require('https');
@@ -7289,6 +7323,66 @@ ipcMain.handle('sync-discord-orders', async () => {
 
     store.set('discordAco.lastSync', new Date().toISOString());
 
+    // Auto-forward new orders to webhook with @mentions
+    const autoForwardEnabled = store.get('discordAco.autoForwardEnabled', false);
+    const webhookUrl = store.get('discordWebhookUrl');
+    if (autoForwardEnabled && webhookUrl && isValidWebhookUrl(webhookUrl) && convertedOrders.length > 0) {
+      try {
+        // Fetch profile mappings for @mentions
+        let mappingLookup = {};
+        try {
+          const mappingResult = await callDiscordAcoApi('get-profile-mappings', { licenseKey });
+          if (mappingResult.mappings) {
+            for (const m of mappingResult.mappings) {
+              mappingLookup[m.profile_name] = m.discord_user_id;
+            }
+          }
+        } catch (e) {
+          console.error('[ACO FORWARD] Failed to load profile mappings:', e.message);
+        }
+
+        console.log('[ACO FORWARD] Forwarding', convertedOrders.length, 'orders to webhook...');
+        let forwarded = 0;
+        for (const order of convertedOrders) {
+          const statusColor = order.status === 'confirmed' ? 0x22c55e : order.status === 'cancelled' ? 0xef4444 : 0xf59e0b;
+          const embed = {
+            title: order.item || 'Unknown Item',
+            color: statusColor,
+            fields: [
+              { name: 'Retailer', value: order.retailer || 'Unknown', inline: true },
+              { name: 'Amount', value: order.amount ? `$${order.amount.toFixed(2)}` : 'N/A', inline: true },
+              { name: 'Status', value: (order.status || 'unknown').charAt(0).toUpperCase() + (order.status || 'unknown').slice(1), inline: true },
+              { name: 'Profile', value: order.profileName || 'Unknown', inline: true },
+              { name: 'Order ID', value: order.orderId || 'N/A', inline: true }
+            ],
+            footer: { text: 'SOLUS Auto-Forward' },
+            timestamp: new Date().toISOString()
+          };
+          if (order.imageUrl && !order.imageUrl.startsWith('data:')) {
+            embed.thumbnail = { url: order.imageUrl };
+          }
+
+          const payload = { embeds: [embed] };
+          // Add @mention if profile is mapped
+          const discordUserId = mappingLookup[order.profileName];
+          if (discordUserId) {
+            payload.content = `<@${discordUserId}>`;
+          }
+
+          const result = await sendWebhookJson(webhookUrl, payload);
+          if (result.success) forwarded++;
+
+          // Throttle: 1 request per second to respect Discord rate limits
+          if (convertedOrders.indexOf(order) < convertedOrders.length - 1) {
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        }
+        console.log('[ACO FORWARD] Forwarded', forwarded, '/', convertedOrders.length, 'orders');
+      } catch (fwdError) {
+        console.error('[ACO FORWARD] Auto-forward error:', fwdError.message);
+      }
+    }
+
     console.log('[DISCORD ACO] Sync complete. Total added:', totalAdded);
     return { success: true, count: totalAdded, orders: convertedOrders };
   } catch (error) {
@@ -7534,6 +7628,74 @@ ipcMain.handle('relink-discord-images', async () => {
   }
 });
 
+// ==================== ACO PROFILE MAPPINGS ====================
+
+ipcMain.handle('get-profile-mappings', async () => {
+  try {
+    const licenseKey = getDiscordAcoLicenseKey();
+    if (!licenseKey) return { mappings: [] };
+    const result = await callDiscordAcoApi('get-profile-mappings', { licenseKey });
+    return result;
+  } catch (error) {
+    console.error('[ACO PANEL] get-profile-mappings error:', error);
+    return { mappings: [], error: error.message };
+  }
+});
+
+ipcMain.handle('save-profile-mapping', async (_, profileName, discordUserId, discordUsername) => {
+  try {
+    const licenseKey = getDiscordAcoLicenseKey();
+    if (!licenseKey) return { success: false, error: 'No active license' };
+    if (!profileName || !discordUserId) return { success: false, error: 'Profile name and Discord user ID required' };
+    if (!/^\d{17,20}$/.test(discordUserId)) return { success: false, error: 'Invalid Discord user ID (must be 17-20 digits)' };
+    const result = await callDiscordAcoApi('save-profile-mapping', { licenseKey, profileName, discordUserId, discordUsername: discordUsername || null });
+    return result;
+  } catch (error) {
+    console.error('[ACO PANEL] save-profile-mapping error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('delete-profile-mapping', async (_, profileName) => {
+  try {
+    const licenseKey = getDiscordAcoLicenseKey();
+    if (!licenseKey) return { success: false, error: 'No active license' };
+    const result = await callDiscordAcoApi('delete-profile-mapping', { licenseKey, profileName });
+    return result;
+  } catch (error) {
+    console.error('[ACO PANEL] delete-profile-mapping error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('set-auto-forward-enabled', async (_, enabled) => {
+  store.set('discordAco.autoForwardEnabled', !!enabled);
+  return { success: true };
+});
+
+// Helper: send a JSON payload to a Discord webhook URL
+async function sendWebhookJson(webhookUrl, payload) {
+  const https = require('https');
+  const urlObj = new URL(webhookUrl);
+  const body = JSON.stringify(payload);
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: urlObj.hostname,
+      path: urlObj.pathname,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => resolve({ success: res.statusCode >= 200 && res.statusCode < 300, statusCode: res.statusCode }));
+    });
+    req.on('error', (e) => resolve({ success: false, error: e.message }));
+    req.setTimeout(10000, () => { req.destroy(); resolve({ success: false, error: 'Timeout' }); });
+    req.write(body);
+    req.end();
+  });
+}
+
 // ==================== WINDOW ====================
 const { Menu } = require('electron');
 let mainWindow;
@@ -7637,7 +7799,7 @@ autoUpdater.on('error', (err) => {
   isCheckingForUpdate = false;
   isDownloading = false;
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('update-error', err.message);
+    mainWindow.webContents.send('update-error', 'Update check failed. Please try again later.');
   }
 });
 
@@ -7687,6 +7849,27 @@ ipcMain.handle('get-app-version', () => {
 // ==================== APP LIFECYCLE ====================
 
 app.whenReady().then(() => {
+  // ASAR integrity check — detect repack attacks
+  try {
+    const asarPath = path.join(process.resourcesPath, 'app.asar');
+    if (fs.existsSync(asarPath)) {
+      const asarHash = crypto.createHash('sha256').update(fs.readFileSync(asarPath)).digest('hex');
+      const expectedHash = store.get('_asarHash');
+      if (expectedHash && asarHash !== expectedHash) {
+        dialog.showErrorBox('Integrity Error', 'Application files have been modified. Please reinstall SOLUS.');
+        app.quit();
+        return;
+      }
+      // Store hash on first run / after update so future launches can verify
+      if (!expectedHash || store.get('_asarVersion') !== app.getVersion()) {
+        store.set('_asarHash', asarHash);
+        store.set('_asarVersion', app.getVersion());
+      }
+    }
+  } catch (err) {
+    console.error('[INTEGRITY] ASAR check failed:', err.message);
+  }
+
   // Load persisted sync debug log from previous session
   currentSyncDebugLog = store.get('syncDebugLog', []);
   // Set up telemetry error handlers

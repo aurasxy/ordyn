@@ -48,6 +48,12 @@ Deno.serve(async (req) => {
         return handleGetLinkStatus(licenseKey)
       case 'unlink':
         return handleUnlink(licenseKey)
+      case 'get-profile-mappings':
+        return handleGetProfileMappings(licenseKey)
+      case 'save-profile-mapping':
+        return handleSaveProfileMapping(licenseKey, body)
+      case 'delete-profile-mapping':
+        return handleDeleteProfileMapping(licenseKey, body)
       default:
         return errorResponse('Unknown action: ' + action, 404)
     }
@@ -231,6 +237,64 @@ async function handleUnlink(licenseKey: string) {
     .from('discord_links')
     .delete()
     .eq('license_key', licenseKey)
+
+  return jsonResponse({ success: true })
+}
+
+// ── get-profile-mappings: List all profile→Discord mappings for a license ──
+async function handleGetProfileMappings(licenseKey: string) {
+  const { data: mappings, error } = await supabase
+    .from('profile_discord_mappings')
+    .select('profile_name, discord_user_id, discord_username, created_at')
+    .eq('license_key', licenseKey)
+    .order('profile_name')
+
+  if (error) return errorResponse(error.message, 500)
+
+  return jsonResponse({ mappings: mappings || [] })
+}
+
+// ── save-profile-mapping: Upsert a profile→Discord mapping ──
+async function handleSaveProfileMapping(licenseKey: string, body: any) {
+  const { profileName, discordUserId, discordUsername } = body
+
+  if (!profileName || !discordUserId) {
+    return errorResponse('profileName and discordUserId are required')
+  }
+
+  if (!/^\d{17,20}$/.test(discordUserId)) {
+    return errorResponse('Invalid Discord user ID format')
+  }
+
+  const { error } = await supabase
+    .from('profile_discord_mappings')
+    .upsert({
+      license_key: licenseKey,
+      profile_name: profileName,
+      discord_user_id: discordUserId,
+      discord_username: discordUsername || null,
+    }, { onConflict: 'license_key,profile_name' })
+
+  if (error) return errorResponse(error.message, 500)
+
+  return jsonResponse({ success: true })
+}
+
+// ── delete-profile-mapping: Remove a profile mapping ──
+async function handleDeleteProfileMapping(licenseKey: string, body: any) {
+  const { profileName } = body
+
+  if (!profileName) {
+    return errorResponse('profileName is required')
+  }
+
+  const { error } = await supabase
+    .from('profile_discord_mappings')
+    .delete()
+    .eq('license_key', licenseKey)
+    .eq('profile_name', profileName)
+
+  if (error) return errorResponse(error.message, 500)
 
   return jsonResponse({ success: true })
 }

@@ -21,29 +21,38 @@ const getCachePath = () => {
   return path.join(userDataPath, '.license-cache');
 };
 
-function generateMachineId() {
-  const cpus = os.cpus();
-  const networkInterfaces = os.networkInterfaces();
+// HMAC signing key derived from machine-specific paths
+// Can't be extracted from the cache file itself
+function getCacheSecret() {
+  const seed = app.getPath('userData') + '|' + app.getPath('exe') + '|solus-cache-v1';
+  return crypto.createHash('sha256').update(seed).digest();
+}
 
-  const parts = [
-    os.hostname(),
-    os.platform(),
-    os.arch(),
-    cpus.length > 0 ? cpus[0].model : 'unknown-cpu',
-    os.totalmem().toString()
-  ];
+function signCacheData(data) {
+  const payload = JSON.stringify(data);
+  const sig = crypto.createHmac('sha256', getCacheSecret()).update(payload).digest('hex');
+  return { payload, sig };
+}
 
-  for (const [name, interfaces] of Object.entries(networkInterfaces)) {
-    for (const iface of interfaces) {
-      if (!iface.internal && iface.mac && iface.mac !== '00:00:00:00:00:00') {
-        parts.push(iface.mac);
-        break;
-      }
-    }
+function verifyCacheData(raw) {
+  if (!raw || !raw.sig || !raw.payload) return null;
+  const expected = crypto.createHmac('sha256', getCacheSecret()).update(raw.payload).digest('hex');
+  if (!crypto.timingSafeEqual(Buffer.from(raw.sig, 'hex'), Buffer.from(expected, 'hex'))) {
+    return null; // tampered
   }
+  return JSON.parse(raw.payload);
+}
 
-  const combined = parts.join('|');
-  return crypto.createHash('sha256').update(combined).digest('hex');
+function generateMachineId() {
+  const cachePath = getCachePath();
+  try {
+    if (fs.existsSync(cachePath)) {
+      const raw = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+      const cache = verifyCacheData(raw);
+      if (cache && cache.machineId) return cache.machineId;
+    }
+  } catch {}
+  return crypto.randomUUID();
 }
 
 function readCache() {
@@ -51,7 +60,20 @@ function readCache() {
     const cachePath = getCachePath();
     if (fs.existsSync(cachePath)) {
       const data = fs.readFileSync(cachePath, 'utf8');
-      return JSON.parse(data);
+      const raw = JSON.parse(data);
+      // Support signed format
+      if (raw.sig && raw.payload) {
+        const verified = verifyCacheData(raw);
+        if (!verified) {
+          console.error('License cache signature invalid — clearing');
+          clearCache();
+          return null;
+        }
+        return verified;
+      }
+      // Legacy unsigned cache — migrate it by re-writing signed
+      writeCache(raw);
+      return raw;
     }
   } catch (err) {
     console.error('Failed to read license cache:', err);
@@ -62,7 +84,8 @@ function readCache() {
 function writeCache(data) {
   try {
     const cachePath = getCachePath();
-    fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
+    const { payload, sig } = signCacheData(data);
+    fs.writeFileSync(cachePath, JSON.stringify({ payload, sig }));
   } catch (err) {
     console.error('Failed to write license cache:', err);
   }

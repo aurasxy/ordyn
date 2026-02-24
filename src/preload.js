@@ -213,6 +213,12 @@ contextBridge.exposeInMainWorld('api', {
   saveSkuOverride: (productName, sku) => ipcRenderer.invoke('save-sku-override', productName, sku),
   deleteSkuOverride: (productName) => ipcRenderer.invoke('delete-sku-override', productName),
 
+  // ACO Profile Mappings
+  getProfileMappings: () => ipcRenderer.invoke('get-profile-mappings'),
+  saveProfileMapping: (profileName, discordUserId, discordUsername) => ipcRenderer.invoke('save-profile-mapping', profileName, discordUserId, discordUsername),
+  deleteProfileMapping: (profileName) => ipcRenderer.invoke('delete-profile-mapping', profileName),
+  setAutoForwardEnabled: (enabled) => ipcRenderer.invoke('set-auto-forward-enabled', enabled),
+
   // Data Mode
   getDataMode: () => ipcRenderer.invoke('get-data-mode'),
   setDataMode: (mode) => ipcRenderer.invoke('set-data-mode', mode),

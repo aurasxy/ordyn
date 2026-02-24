@@ -3977,6 +3977,7 @@
           <a class="nav-item" data-page="accountstats"><span class="nav-icon">📈</span><span class="nav-label">Account Stats</span></a>
           <a class="nav-item" data-page="accounts"><span class="nav-icon">📧</span><span class="nav-label">IMAP</span></a>
           <a class="nav-item" data-page="discord"><span class="nav-icon">💬</span><span class="nav-label">Discord</span></a>
+          <a class="nav-item" data-page="aco-panel" id="navAcoPanel" style="display:none"><span class="nav-icon">🔗</span><span class="nav-label">ACO Panel</span></a>
           <a class="nav-item" data-page="reports"><span class="nav-icon">📋</span><span class="nav-label">Reports</span></a>
           <a class="nav-item" data-page="inventory"><span class="nav-icon">💎</span><span class="nav-label">Inventory</span><span class="nav-badge" id="navInventoryCount">0</span></a>
           <a class="nav-item" data-page="tcgtracker"><span class="nav-icon">📊</span><span class="nav-label">TCG Tracker</span><span class="nav-badge" id="navTCGCount">0</span></a>
@@ -4462,9 +4463,12 @@
                 </div>
               </div>
             </div>
-            <div class="modal-footer">
-              <button class="btn btn-secondary" onclick="hideAccountStatsAdvancedFilter()">Close</button>
-              <button class="btn btn-primary" onclick="applyAccountStatsAdvancedFilter()">Apply Filters</button>
+            <div class="modal-footer" style="justify-content:space-between;">
+              <button class="btn btn-secondary" onclick="clearAllAccountStatsFilters()" style="color:#ff6b6b;">Clear All</button>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-secondary" onclick="hideAccountStatsAdvancedFilter()">Close</button>
+                <button class="btn btn-primary" onclick="applyAccountStatsAdvancedFilter()">Apply Filters</button>
+              </div>
             </div>
           </div>
         </div>
@@ -4703,6 +4707,81 @@
                 <span id="discordLastSync" style="font-size:12px;color:var(--text-muted);">Last synced: Never</span>
               </div>
 
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ACO Panel Page -->
+      <div id="page-aco-panel" class="page">
+        <div class="page-header"><h1>🔗 ACO Panel</h1></div>
+        <div class="page-body">
+
+          <!-- Auto-Forward Settings -->
+          <div class="card" style="margin-bottom:20px">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+              <h3 style="margin:0;font-size:15px">Auto-Forward Settings</h3>
+              <label class="toggle-switch" style="margin:0">
+                <input type="checkbox" id="acoAutoForwardToggle" onchange="toggleAcoAutoForward()">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="card-body" style="padding:12px 16px">
+              <p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px 0">When enabled, new orders will be sent to your webhook after each sync. Mapped profiles will include an @mention.</p>
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                <span style="color:var(--text-secondary)">Webhook:</span>
+                <span id="acoWebhookDisplay" style="color:var(--text-primary);font-family:monospace;font-size:11px">Not configured</span>
+                <button class="btn btn-sm" onclick="showPage('settings')" style="font-size:11px;padding:2px 8px">Change</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Profile Mappings -->
+          <div class="card" style="margin-bottom:20px">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+              <h3 style="margin:0;font-size:15px">Profile → Discord Mappings</h3>
+              <button class="btn btn-primary btn-sm" onclick="showAddMappingForm()" style="font-size:11px;padding:4px 12px">+ Add Mapping</button>
+            </div>
+            <div class="card-body" style="padding:0">
+              <!-- Add/Edit form (hidden by default) -->
+              <div id="acoMappingForm" style="display:none;padding:12px 16px;border-bottom:1px solid var(--border-color);background:rgba(139,92,246,0.05)">
+                <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+                  <div style="flex:1;min-width:150px">
+                    <label style="display:block;font-size:11px;color:var(--text-secondary);margin-bottom:4px">Profile Name</label>
+                    <input type="text" id="acoMappingProfileName" class="input" placeholder="e.g. MyProfile1" style="width:100%;font-size:12px;padding:6px 10px">
+                  </div>
+                  <div style="flex:1;min-width:150px">
+                    <label style="display:block;font-size:11px;color:var(--text-secondary);margin-bottom:4px">Discord User ID</label>
+                    <input type="text" id="acoMappingDiscordId" class="input" placeholder="e.g. 123456789012345678" style="width:100%;font-size:12px;padding:6px 10px">
+                  </div>
+                  <div style="flex:1;min-width:120px">
+                    <label style="display:block;font-size:11px;color:var(--text-secondary);margin-bottom:4px">Discord Username <span style="color:var(--text-tertiary)">(optional)</span></label>
+                    <input type="text" id="acoMappingDiscordUsername" class="input" placeholder="e.g. user#1234" style="width:100%;font-size:12px;padding:6px 10px">
+                  </div>
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-primary btn-sm" onclick="saveAcoMapping()" style="font-size:11px;padding:5px 14px">Save</button>
+                    <button class="btn btn-sm" onclick="hideAddMappingForm()" style="font-size:11px;padding:5px 10px">Cancel</button>
+                  </div>
+                </div>
+                <div id="acoMappingError" style="display:none;color:#ef4444;font-size:11px;margin-top:6px"></div>
+              </div>
+              <!-- Mappings list -->
+              <div id="acoMappingsList" style="padding:8px 0">
+                <div style="padding:20px;text-align:center;color:var(--text-secondary);font-size:13px">Loading...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Unmapped Profiles -->
+          <div class="card">
+            <div class="card-header">
+              <h3 style="margin:0;font-size:15px">Unmapped Profiles</h3>
+            </div>
+            <div class="card-body" style="padding:0">
+              <div id="acoUnmappedList" style="padding:8px 0">
+                <div style="padding:20px;text-align:center;color:var(--text-secondary);font-size:13px">Loading...</div>
+              </div>
             </div>
           </div>
 
@@ -7494,6 +7573,7 @@ function showPage(page) {
     const warningEl = document.getElementById('discordModeWarning');
     if (warningEl) warningEl.style.display = currentDataMode === 'discord' ? 'none' : 'block';
   }
+  if (page === 'aco-panel') loadAcoPanel();
   // Defer retailer page rendering using requestAnimationFrame for better performance
   if (['walmart','target','pokecenter','samsclub','costco','bestbuy'].includes(page)) {
     requestAnimationFrame(() => renderRetailerPage(page));
@@ -7750,6 +7830,9 @@ function applyDataModeUI() {
   // Show/hide Discord nav item (opposite of IMAP)
   const discordNav = document.querySelector('[data-page="discord"]');
   if (discordNav) discordNav.style.display = currentDataMode === 'discord' ? '' : 'none';
+  // Show/hide ACO Panel nav item (Discord mode only)
+  const acoPanelNav = document.getElementById('navAcoPanel');
+  if (acoPanelNav) acoPanelNav.style.display = currentDataMode === 'discord' ? '' : 'none';
   // Hide Deliveries in Discord mode (no tracking data)
   const deliveriesNav = document.querySelector('[data-page="deliveries"]');
   if (deliveriesNav) deliveriesNav.style.display = currentDataMode === 'discord' ? 'none' : '';
@@ -13550,6 +13633,37 @@ function clearAccountStatsDateRange() {
   if (dateTo) dateTo.value = '';
 }
 
+function clearAllAccountStatsFilters() {
+  // Reset all filter state
+  accountStatsTier = 'all';
+  accountStatsMinStickRate = 0;
+  accountStatsMinOrders = 0;
+  accountStatsDateFrom = null;
+  accountStatsDateTo = null;
+
+  // Reset tier buttons
+  document.querySelectorAll('#accountStatsAdvancedFilterModal .filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tier === 'all');
+  });
+
+  // Reset date inputs
+  const dateFrom = $('accountStatsDateFrom');
+  const dateTo = $('accountStatsDateTo');
+  if (dateFrom) dateFrom.value = '';
+  if (dateTo) dateTo.value = '';
+
+  // Reset sliders
+  const stickSlider = $('accountStatsMinStickRateSlider');
+  const ordersSlider = $('accountStatsMinOrdersSlider');
+  if (stickSlider) { stickSlider.value = 0; $('accountStatsMinStickRateLabel').textContent = '0%'; }
+  if (ordersSlider) { ordersSlider.value = 0; $('accountStatsMinOrdersLabel').textContent = '0'; }
+
+  // Close modal, update badge, re-render
+  hideAccountStatsAdvancedFilter();
+  updateAdvancedFilterBadge();
+  renderAccountStats();
+}
+
 function updateAdvancedFilterBadge() {
   const btn = $('accountStatsAdvancedFilterBtn');
   if (!btn) return;
@@ -13691,11 +13805,12 @@ function showFlexModal(retailer, dropDate) {
     }
   });
 
-  // Render images (up to 3) with quantity badges
-  const imagesHtml = displayItems.map((item, idx) => {
-    const sizeClass = displayItems.length === 1 ? 'single' : '';
+  // Render images (up to 3) with quantity badges — skip items with no image
+  const itemsWithImages = displayItems.filter(item => item.image);
+  const imagesHtml = itemsWithImages.map((item, idx) => {
+    const sizeClass = itemsWithImages.length === 1 ? 'single' : '';
     const qtyBadge = item.qty > 0 ? `<span class="img-qty-badge">${item.qty}</span>` : '';
-    return `<div class="flex-modal-image-wrapper ${sizeClass}"><img class="flex-modal-image ${sizeClass}" src="${escapeHtml(item.image || '')}" onerror="this.style.display='none'" alt="">${qtyBadge}</div>`;
+    return `<div class="flex-modal-image-wrapper ${sizeClass}"><img class="flex-modal-image ${sizeClass}" src="${escapeHtml(item.image)}" onerror="this.parentElement.style.display='none'" alt="">${qtyBadge}</div>`;
   }).join('');
   $('flexModalImages').innerHTML = imagesHtml || '<div style="color:var(--text-muted);padding:20px;">No image available</div>';
 
@@ -17853,6 +17968,176 @@ async function clearDiscordOrders() {
   } catch (err) {
     toast('Failed to clear Discord orders', 'error');
   }
+}
+
+// ==================== ACO PANEL ====================
+
+let acoMappingsCache = [];
+
+async function loadAcoPanel() {
+  // Load auto-forward state
+  try {
+    const settings = await window.api.getDiscordAcoSettings();
+    const toggle = document.getElementById('acoAutoForwardToggle');
+    if (toggle) toggle.checked = !!(settings && settings.autoForwardEnabled);
+  } catch {}
+
+  // Display current webhook URL
+  try {
+    const url = await window.api.getDiscordWebhook();
+    const display = document.getElementById('acoWebhookDisplay');
+    if (display) {
+      if (url) {
+        const masked = url.substring(0, 45) + '...';
+        display.textContent = masked;
+        display.style.color = 'var(--text-primary)';
+      } else {
+        display.textContent = 'Not configured';
+        display.style.color = 'var(--text-secondary)';
+      }
+    }
+  } catch {}
+
+  // Load profile mappings
+  await loadAcoMappings();
+  // Load unmapped profiles
+  loadUnmappedProfiles();
+}
+
+async function loadAcoMappings() {
+  const listEl = document.getElementById('acoMappingsList');
+  if (!listEl) return;
+  try {
+    const result = await window.api.getProfileMappings();
+    acoMappingsCache = result.mappings || [];
+    renderAcoMappings();
+  } catch (err) {
+    listEl.innerHTML = '<div style="padding:16px;text-align:center;color:#ef4444;font-size:12px">Failed to load mappings</div>';
+  }
+}
+
+function renderAcoMappings() {
+  const listEl = document.getElementById('acoMappingsList');
+  if (!listEl) return;
+  if (acoMappingsCache.length === 0) {
+    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);font-size:13px">No profile mappings yet. Click "+ Add Mapping" to link a profile to a Discord user.</div>';
+    return;
+  }
+  let html = '';
+  for (const m of acoMappingsCache) {
+    const safeName = escapeHtml(m.profile_name).replace(/'/g, '&#39;');
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid var(--border-color)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-weight:600;font-size:13px;color:var(--text-primary)">${escapeHtml(m.profile_name)}</span>
+        <span style="color:var(--text-secondary);font-size:12px">→</span>
+        <span style="font-size:12px;color:#8b5cf6;font-family:monospace">${escapeHtml(m.discord_username || m.discord_user_id)}</span>
+        ${m.discord_username ? `<span style="font-size:11px;color:var(--text-tertiary)">(${escapeHtml(m.discord_user_id)})</span>` : ''}
+      </div>
+      <button class="btn btn-sm" onclick="deleteAcoMapping('${safeName}')" style="font-size:11px;padding:3px 10px;color:#ef4444;border-color:rgba(239,68,68,0.3)">Delete</button>
+    </div>`;
+  }
+  listEl.innerHTML = html;
+}
+
+function showAddMappingForm(profileName) {
+  const form = document.getElementById('acoMappingForm');
+  if (form) form.style.display = 'block';
+  const nameInput = document.getElementById('acoMappingProfileName');
+  const idInput = document.getElementById('acoMappingDiscordId');
+  const usernameInput = document.getElementById('acoMappingDiscordUsername');
+  const errorEl = document.getElementById('acoMappingError');
+  if (nameInput) nameInput.value = profileName || '';
+  if (idInput) idInput.value = '';
+  if (usernameInput) usernameInput.value = '';
+  if (errorEl) errorEl.style.display = 'none';
+  if (profileName && idInput) idInput.focus();
+  else if (nameInput) nameInput.focus();
+}
+
+function hideAddMappingForm() {
+  const form = document.getElementById('acoMappingForm');
+  if (form) form.style.display = 'none';
+}
+
+async function saveAcoMapping() {
+  const profileName = document.getElementById('acoMappingProfileName')?.value?.trim();
+  const discordId = document.getElementById('acoMappingDiscordId')?.value?.trim();
+  const discordUsername = document.getElementById('acoMappingDiscordUsername')?.value?.trim();
+  const errorEl = document.getElementById('acoMappingError');
+
+  if (!profileName) {
+    if (errorEl) { errorEl.textContent = 'Profile name is required'; errorEl.style.display = 'block'; }
+    return;
+  }
+  if (!discordId || !/^\d{17,20}$/.test(discordId)) {
+    if (errorEl) { errorEl.textContent = 'Discord User ID must be 17-20 digits'; errorEl.style.display = 'block'; }
+    return;
+  }
+
+  try {
+    const result = await window.api.saveProfileMapping(profileName, discordId, discordUsername || null);
+    if (result.success) {
+      toast('Mapping saved for ' + profileName, 'success');
+      hideAddMappingForm();
+      await loadAcoMappings();
+      loadUnmappedProfiles();
+    } else {
+      if (errorEl) { errorEl.textContent = result.error || 'Failed to save'; errorEl.style.display = 'block'; }
+    }
+  } catch (err) {
+    if (errorEl) { errorEl.textContent = 'Failed to save mapping'; errorEl.style.display = 'block'; }
+  }
+}
+
+async function deleteAcoMapping(profileName) {
+  const confirmed = await customConfirm('Delete Mapping', `Remove the Discord mapping for profile "${profileName}"?`, 'Delete', true);
+  if (!confirmed) return;
+  try {
+    const result = await window.api.deleteProfileMapping(profileName);
+    if (result.success) {
+      toast('Mapping deleted', 'success');
+      await loadAcoMappings();
+      loadUnmappedProfiles();
+    } else {
+      toast(result.error || 'Failed to delete', 'error');
+    }
+  } catch (err) {
+    toast('Failed to delete mapping', 'error');
+  }
+}
+
+function toggleAcoAutoForward() {
+  const toggle = document.getElementById('acoAutoForwardToggle');
+  const enabled = toggle ? toggle.checked : false;
+  window.api.setAutoForwardEnabled(enabled);
+  toast(enabled ? 'Auto-forward enabled' : 'Auto-forward disabled', 'success');
+}
+
+function loadUnmappedProfiles() {
+  const listEl = document.getElementById('acoUnmappedList');
+  if (!listEl) return;
+  const mappedNames = new Set(acoMappingsCache.map(m => m.profile_name));
+  const profileNames = new Set();
+  const orders = computeOrderStatuses();
+  for (const order of orders) {
+    if (order.source === 'discord' && order.profileName && !mappedNames.has(order.profileName)) {
+      profileNames.add(order.profileName);
+    }
+  }
+  if (profileNames.size === 0) {
+    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);font-size:13px">All synced profiles are mapped!</div>';
+    return;
+  }
+  const sorted = [...profileNames].sort();
+  let html = '';
+  for (const name of sorted) {
+    const safeName = escapeHtml(name).replace(/'/g, '&#39;');
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid var(--border-color)">
+      <span style="font-size:13px;color:var(--text-primary)">${escapeHtml(name)}</span>
+      <button class="btn btn-sm btn-primary" onclick="showAddMappingForm('${safeName}')" style="font-size:11px;padding:3px 10px">Link</button>
+    </div>`;
+  }
+  listEl.innerHTML = html;
 }
 
 function syncExportDate(field, value) {

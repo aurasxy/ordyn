@@ -191,8 +191,7 @@ async function submitFeedback(type, message, contact = null, imageDataUrl = null
         contact,
         image_url: imageUrl,
         debug_log: debugLogData ? JSON.stringify(debugLogData) : null,
-        app_version: getAppVersion(),
-        os_info: getOsInfo()
+        app_version: getAppVersion()
       }
     });
 
@@ -219,10 +218,8 @@ async function reportError(error, context = null) {
       method: 'POST',
       body: {
         error_message: error.message || String(error),
-        error_stack: error.stack || null,
         context,
-        app_version: getAppVersion(),
-        os_info: getOsInfo()
+        app_version: getAppVersion()
       }
     });
   } catch (err) {
@@ -264,8 +261,7 @@ async function trackEvent(eventName, eventData = null) {
       body: {
         event_name: eventName,
         event_data: eventData,
-        app_version: getAppVersion(),
-        os_info: getOsInfo()
+        app_version: getAppVersion()
       }
     });
   } catch (err) {

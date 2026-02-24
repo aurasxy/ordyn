@@ -4162,6 +4162,14 @@
             </div>
             <div class="lt-filter-bar" id="liveTrackFilterBar" style="display:none;">
               <div class="lt-filter-pills" id="liveTrackPills"></div>
+              <select id="liveTrackSortSelect" class="filter-dropdown" style="min-width:180px;padding:6px 28px 6px 10px;font-size:var(--text-xs);border-radius:20px;" onchange="setLiveTrackSort(this.value)">
+                <option value="eta-asc">ETA (Soonest)</option>
+                <option value="eta-desc">ETA (Latest)</option>
+                <option value="status">Status</option>
+                <option value="retailer">Retailer</option>
+                <option value="date-desc">Order Date (Newest)</option>
+                <option value="date-asc">Order Date (Oldest)</option>
+              </select>
             </div>
             <div id="liveTrackContent"></div>
             <div id="liveTrackEmpty" class="live-track-empty">
@@ -4370,7 +4378,7 @@
                 </div>
 
                 <!-- Advanced Filter Button -->
-                <button class="btn btn-sm" style="background:var(--accent);color:white;border-color:var(--accent);" onclick="showAccountStatsAdvancedFilter()">
+                <button class="btn btn-sm" id="accountStatsAdvancedFilterBtn" style="background:var(--accent);color:white;border-color:var(--accent);" onclick="showAccountStatsAdvancedFilter()">
                   🔧 Advanced Filter
                 </button>
                 <!-- Export Perfect Accounts -->
@@ -4430,6 +4438,28 @@
                   </div>
                 </div>
                 <button class="btn btn-sm btn-secondary" style="margin-top:8px;width:100%;" onclick="clearAccountStatsDateRange()">Clear Date Range</button>
+              </div>
+
+              <!-- Minimum Stick Rate -->
+              <div class="filter-section">
+                <div class="filter-section-title">Minimum Stick Rate: <span id="accountStatsMinStickRateLabel" style="color:var(--accent);font-weight:700;">0%</span></div>
+                <input type="range" id="accountStatsMinStickRateSlider" min="0" max="100" step="5" value="0"
+                  style="width:100%;accent-color:var(--accent);cursor:pointer;"
+                  oninput="document.getElementById('accountStatsMinStickRateLabel').textContent=this.value+'%'">
+                <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:2px;">
+                  <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+                </div>
+              </div>
+
+              <!-- Minimum Orders -->
+              <div class="filter-section">
+                <div class="filter-section-title">Minimum Orders: <span id="accountStatsMinOrdersLabel" style="color:var(--accent);font-weight:700;">0</span></div>
+                <input type="range" id="accountStatsMinOrdersSlider" min="0" max="50" step="1" value="0"
+                  style="width:100%;accent-color:var(--accent);cursor:pointer;"
+                  oninput="document.getElementById('accountStatsMinOrdersLabel').textContent=this.value">
+                <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:2px;">
+                  <span>0</span><span>10</span><span>20</span><span>30</span><span>40</span><span>50</span>
+                </div>
               </div>
             </div>
             <div class="modal-footer">
@@ -5937,6 +5967,8 @@ let accountStatsData = [];             // Aggregated account/profile data
 let accountStatsViewMode = 'list';     // View mode: 'grid' or 'list'
 let accountStatsDateFrom = null;       // Custom date range start
 let accountStatsDateTo = null;         // Custom date range end
+let accountStatsMinStickRate = 0;      // Minimum stick rate filter (0-100)
+let accountStatsMinOrders = 0;         // Minimum order count filter
 let expandedVariantOrders = new Set(); // Track which variants have orders expanded (key: "baseAddress|fullAddress")
 let expandedAccountOrders = new Set(); // Track which accounts have orders expanded (key: "email|retailer")
 
@@ -13095,6 +13127,16 @@ async function renderAccountStats() {
     });
   }
 
+  // Apply minimum stick rate filter
+  if (accountStatsMinStickRate > 0) {
+    aggregatedData = aggregatedData.filter(item => item.stickRate >= accountStatsMinStickRate);
+  }
+
+  // Apply minimum orders filter
+  if (accountStatsMinOrders > 0) {
+    aggregatedData = aggregatedData.filter(item => item.totalOrders >= accountStatsMinOrders);
+  }
+
   // Sort data
   const sortedData = sortAccountStats(aggregatedData, accountStatsSort);
 
@@ -13116,9 +13158,15 @@ async function renderAccountStats() {
   }
 
   // Show/hide empty state
+  // Only show the full empty state (hiding content) when there's genuinely no data.
+  // If user is searching or filtering, keep the search bar and filters visible.
   const emptyEl = $('accountStatsEmpty');
   const contentEl = $('accountStatsContent');
-  if (aggregatedData.length === 0) {
+  const hasActiveFilters = searchTerm || accountStatsTier !== 'all' || accountStatsMinStickRate > 0 ||
+    accountStatsMinOrders > 0 || accountStatsDateFrom || accountStatsDateTo;
+
+  if (aggregatedData.length === 0 && !hasActiveFilters) {
+    // No data at all — show full empty state
     if (emptyEl) emptyEl.style.display = 'block';
     if (contentEl) contentEl.style.display = 'none';
     if (currentDataMode === 'discord') {
@@ -13130,6 +13178,7 @@ async function renderAccountStats() {
       if (emptyBtn) { emptyBtn.textContent = 'Go to Discord'; emptyBtn.onclick = function() { showPage('discord'); }; }
     }
   } else {
+    // Has data or active filters — always keep content visible
     if (emptyEl) emptyEl.style.display = 'none';
     if (contentEl) contentEl.style.display = 'block';
   }
@@ -13437,6 +13486,12 @@ function showAccountStatsAdvancedFilter() {
   if (dateFrom) dateFrom.value = accountStatsDateFrom || '';
   if (dateTo) dateTo.value = accountStatsDateTo || '';
 
+  // Populate slider values
+  const stickSlider = $('accountStatsMinStickRateSlider');
+  const ordersSlider = $('accountStatsMinOrdersSlider');
+  if (stickSlider) { stickSlider.value = accountStatsMinStickRate; $('accountStatsMinStickRateLabel').textContent = accountStatsMinStickRate + '%'; }
+  if (ordersSlider) { ordersSlider.value = accountStatsMinOrders; $('accountStatsMinOrdersLabel').textContent = accountStatsMinOrders; }
+
   // Move modal to body level to ensure proper fixed positioning
   if (modal.parentElement !== document.body) {
     document.body.appendChild(modal);
@@ -13464,6 +13519,12 @@ function applyAccountStatsAdvancedFilter() {
   accountStatsDateFrom = dateFrom || null;
   accountStatsDateTo = dateTo || null;
 
+  // Get slider values
+  const stickSlider = $('accountStatsMinStickRateSlider');
+  const ordersSlider = $('accountStatsMinOrdersSlider');
+  accountStatsMinStickRate = stickSlider ? parseInt(stickSlider.value, 10) : 0;
+  accountStatsMinOrders = ordersSlider ? parseInt(ordersSlider.value, 10) : 0;
+
   // If custom date range is set, override period selector
   if (accountStatsDateFrom || accountStatsDateTo) {
     accountStatsPeriod = 'custom';
@@ -13475,6 +13536,7 @@ function applyAccountStatsAdvancedFilter() {
 
   // Close modal and re-render
   hideAccountStatsAdvancedFilter();
+  updateAdvancedFilterBadge();
   renderAccountStats();
 }
 
@@ -13486,6 +13548,18 @@ function clearAccountStatsDateRange() {
   const dateTo = $('accountStatsDateTo');
   if (dateFrom) dateFrom.value = '';
   if (dateTo) dateTo.value = '';
+}
+
+function updateAdvancedFilterBadge() {
+  const btn = $('accountStatsAdvancedFilterBtn');
+  if (!btn) return;
+  const activeCount = (accountStatsMinStickRate > 0 ? 1 : 0) + (accountStatsMinOrders > 0 ? 1 : 0) +
+    (accountStatsDateFrom || accountStatsDateTo ? 1 : 0) + (accountStatsTier !== 'all' ? 1 : 0);
+  if (activeCount > 0) {
+    btn.innerHTML = `🔧 Advanced Filter <span style="background:white;color:var(--accent);font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:4px;">${activeCount}</span>`;
+  } else {
+    btn.textContent = '🔧 Advanced Filter';
+  }
 }
 
 function showFlexModal(retailer, dropDate) {
@@ -13730,6 +13804,7 @@ async function resyncDrop(retailer, date) {
 let liveTrackingData = {};
 let liveTrackExpandedSet = new Set();
 let liveTrackStatusFilter = 'all';
+let liveTrackSort = 'eta-asc';
 let liveTrackFedexOrders = []; // cached after fetch so filters don't re-fetch
 
 function renderLiveTracking() {
@@ -13844,6 +13919,50 @@ function setLiveTrackFilter(status) {
   applyLiveTrackFilters();
 }
 
+function setLiveTrackSort(sortBy) {
+  liveTrackSort = sortBy;
+  applyLiveTrackFilters();
+}
+
+function sortLiveTrackOrders(orders) {
+  const statusMap = { IN_TRANSIT: 'in-transit', OUT_FOR_DELIVERY: 'out-for-delivery', DELIVERED: 'delivered', EXCEPTION: 'exception', PENDING: 'pending', ERROR: 'error' };
+  const statusPriority = { 'exception': 0, 'out-for-delivery': 1, 'in-transit': 2, 'pending': 3, 'delivered': 4, 'error': 5 };
+
+  return [...orders].sort((a, b) => {
+    const tdA = liveTrackingData[a.tracking];
+    const tdB = liveTrackingData[b.tracking];
+
+    switch (liveTrackSort) {
+      case 'eta-asc': {
+        const etaA = tdA?.estimatedDelivery ? new Date(tdA.estimatedDelivery).getTime() : Infinity;
+        const etaB = tdB?.estimatedDelivery ? new Date(tdB.estimatedDelivery).getTime() : Infinity;
+        return etaA - etaB;
+      }
+      case 'eta-desc': {
+        const etaA = tdA?.estimatedDelivery ? new Date(tdA.estimatedDelivery).getTime() : 0;
+        const etaB = tdB?.estimatedDelivery ? new Date(tdB.estimatedDelivery).getTime() : 0;
+        return etaB - etaA;
+      }
+      case 'status': {
+        const sA = tdA ? (statusMap[tdA.status] || 'in-transit') : 'pending';
+        const sB = tdB ? (statusMap[tdB.status] || 'in-transit') : 'pending';
+        return (statusPriority[sA] ?? 99) - (statusPriority[sB] ?? 99);
+      }
+      case 'retailer': {
+        return (a.retailer || '').localeCompare(b.retailer || '');
+      }
+      case 'date-desc': {
+        return (b.date || '').localeCompare(a.date || '');
+      }
+      case 'date-asc': {
+        return (a.date || '').localeCompare(b.date || '');
+      }
+      default:
+        return 0;
+    }
+  });
+}
+
 function applyLiveTrackFilters() {
   const content = $('liveTrackContent');
   const statusMap = { IN_TRANSIT: 'in-transit', OUT_FOR_DELIVERY: 'out-for-delivery', DELIVERED: 'delivered', EXCEPTION: 'exception', PENDING: 'pending', ERROR: 'error' };
@@ -13858,6 +13977,9 @@ function applyLiveTrackFilters() {
       return s === liveTrackStatusFilter;
     });
   }
+
+  // Sort
+  filtered = sortLiveTrackOrders(filtered);
 
   $('liveTrackSubtitle').textContent = `${filtered.length} of ${liveTrackFedexOrders.length} shipment${liveTrackFedexOrders.length !== 1 ? 's' : ''}`;
 

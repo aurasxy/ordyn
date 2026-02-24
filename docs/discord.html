@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord Bot Integration — SOLUS</title>
+  <meta name="description" content="Automatically capture orders from Discord ACO bots. Multi-bot support, server-side storage, and scheduled auto-sync.">
+  <meta name="theme-color" content="#0a0a0b">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <a href="index.html" class="nav-brand">
+      <img src="icon.png" alt="SOLUS">
+      <span>SOLUS</span>
+    </a>
+    <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="discord.html" class="active">Discord</a>
+      <a href="analytics.html">Analytics</a>
+      <a href="tracking.html">Tracking</a>
+      <a href="accounts.html">Accounts</a>
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener" class="btn-primary">
+        <span class="icon-discord"></span> Join Discord
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="page-hero hero-discord">
+    <div class="page-icon">&#128172;</div>
+    <h1>Automated Order Capture<br><span class="gradient">from Discord</span></h1>
+    <p>Connect your ACO bots and let SOLUS capture every checkout automatically. Server-side storage means you never miss an order.</p>
+  </section>
+
+  <!-- Features -->
+  <section>
+    <div class="section-label">Capabilities</div>
+    <h2 class="section-title">Built for ACO workflows</h2>
+    <p class="section-desc">SOLUS monitors your Discord channels for order drops and syncs them into your dashboard automatically.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon fi-blue">&#129302;</div>
+        <h3>Multi-Bot Support</h3>
+        <p>Works with Shikari, Stellara, Tohru, Kodai, Refract, and other popular ACO bots out of the box.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-purple">&#9729;&#65039;</div>
+        <h3>Server-Side Storage</h3>
+        <p>Orders are captured and stored on the server even when SOLUS isn't running. Open the app later and everything syncs in.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-green">&#128259;</div>
+        <h3>Scheduled Auto-Sync</h3>
+        <p>Set your sync interval from every 5 minutes to every hour. SOLUS fetches new orders on schedule so your dashboard stays current.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-orange">&#128269;</div>
+        <h3>/scan Bulk Import</h3>
+        <p>Use the /scan command to import historical messages from any channel. Backfill your order history in seconds.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-cyan">&#128200;</div>
+        <h3>Stick Rate per Drop</h3>
+        <p>See exactly how each drop performed. Track confirmed vs. cancelled orders per release to identify patterns.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-red">&#128276;</div>
+        <h3>Real-Time Monitoring</h3>
+        <p>SOLUS watches configured channels in real time and captures new orders the moment they're posted.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detail: How it connects -->
+  <section class="detail-section">
+    <div class="detail-row">
+      <div class="detail-text">
+        <div class="detail-label">Integration</div>
+        <h3>Connects to your existing setup</h3>
+        <p>No need to change your ACO workflow. SOLUS reads order messages from the channels your bots already post to.</p>
+        <ul>
+          <li>Add your Discord bot token</li>
+          <li>Select channels to monitor</li>
+          <li>Orders auto-parse and appear in your dashboard</li>
+          <li>Works alongside email sync for complete coverage</li>
+        </ul>
+      </div>
+      <div class="detail-visual">
+        <div class="visual-icon">&#128279;</div>
+      </div>
+    </div>
+
+    <div class="detail-row reverse">
+      <div class="detail-text">
+        <div class="detail-label">History</div>
+        <h3>Backfill months of orders instantly</h3>
+        <p>The /scan command lets you import historical order messages from any channel. Select a date range and SOLUS parses every order it finds.</p>
+        <ul>
+          <li>Scan specific channels or all configured ones</li>
+          <li>Custom date range selection</li>
+          <li>Deduplicates against existing orders</li>
+          <li>Progress tracking during import</li>
+        </ul>
+      </div>
+      <div class="detail-visual">
+        <div class="visual-icon">&#128218;</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="cta-box">
+      <h2>Ready to automate your order tracking?</h2>
+      <p>Join our Discord to get SOLUS and start capturing orders from your bots today.</p>
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener" class="btn-primary">
+        <span class="icon-discord"></span> Join Discord
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-links">
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener">Discord</a>
+      <a href="https://github.com/aurasxy/ordyn" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <p>&copy; 2026 SOLUS. All rights reserved.</p>
+  </footer>
+
+  <script>
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+
+</body>
+</html>

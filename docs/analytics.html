@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics & Dashboard — SOLUS</title>
+  <meta name="description" content="Interactive spending charts, retailer comparisons, stick rate analytics, and ordering pattern insights.">
+  <meta name="theme-color" content="#0a0a0b">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <a href="index.html" class="nav-brand">
+      <img src="icon.png" alt="SOLUS">
+      <span>SOLUS</span>
+    </a>
+    <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="discord.html">Discord</a>
+      <a href="analytics.html" class="active">Analytics</a>
+      <a href="tracking.html">Tracking</a>
+      <a href="accounts.html">Accounts</a>
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener" class="btn-primary">
+        <span class="icon-discord"></span> Join Discord
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="page-hero hero-analytics">
+    <div class="page-icon">&#128202;</div>
+    <h1>Know exactly where<br><span class="gradient">your money goes</span></h1>
+    <p>Interactive charts, spending breakdowns, and performance analytics give you full visibility into every dollar spent.</p>
+  </section>
+
+  <!-- Quick Stats -->
+  <section>
+    <div class="section-label">At a Glance</div>
+    <h2 class="section-title">Your orders, summarized</h2>
+    <p class="section-desc">Quick stat cards give you an instant snapshot of your order pipeline — from confirmed to delivered.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon fi-green">&#9989;</div>
+        <h3>Order Status Breakdown</h3>
+        <p>See counts for confirmed, shipped, delivered, and cancelled orders at a glance. Quickly spot where things stand.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-purple">&#128176;</div>
+        <h3>Total Spending</h3>
+        <p>Track exactly how much you've spent across all retailers. Filter by time range to see weekly, monthly, or all-time totals.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-orange">&#128197;</div>
+        <h3>Time Range Filters</h3>
+        <p>Switch between 7-day, 30-day, 90-day, and all-time views. Every chart and stat updates instantly.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Charts & Insights -->
+  <section>
+    <div class="section-label">Deep Insights</div>
+    <h2 class="section-title">Charts that tell the full story</h2>
+    <p class="section-desc">Go beyond totals with interactive visualizations that reveal trends, patterns, and opportunities.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon fi-blue">&#128200;</div>
+        <h3>Spending Over Time</h3>
+        <p>Line and bar charts showing your spending trajectory. Spot trends, identify big weeks, and track your budget over time.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-red">&#127919;</div>
+        <h3>Retailer Comparison</h3>
+        <p>Compare stick rates, order volume, and spending across retailers. Know which stores perform best for you.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-cyan">&#128200;</div>
+        <h3>Order Volume & Cancel Rates</h3>
+        <p>Track how many orders you're placing and what percentage gets cancelled. Identify problem areas quickly.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-amber">&#128293;</div>
+        <h3>Ordering Patterns Heatmap</h3>
+        <p>Visualize when you order most — by day of week and time of day. See your ordering habits at a glance.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-green">&#128666;</div>
+        <h3>Carrier Performance</h3>
+        <p>Analytics on delivery speed and reliability by carrier. Know which shipping methods actually deliver on time.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-indigo">&#128260;</div>
+        <h3>Period-over-Period</h3>
+        <p>Compare this week vs. last week, this month vs. last month. See if your metrics are trending up or down.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detail: Dashboard -->
+  <section class="detail-section">
+    <div class="detail-row">
+      <div class="detail-text">
+        <div class="detail-label">Dashboard</div>
+        <h3>Everything on one screen</h3>
+        <p>The analytics dashboard brings all your data together into a single, scrollable view. No clicking through tabs or menus.</p>
+        <ul>
+          <li>Quick stats bar with live order counts</li>
+          <li>Interactive charts with hover tooltips</li>
+          <li>Retailer breakdown with color-coded bars</li>
+          <li>One-click time range switching</li>
+        </ul>
+      </div>
+      <div class="detail-visual">
+        <div class="visual-icon">&#128200;</div>
+      </div>
+    </div>
+
+    <div class="detail-row reverse">
+      <div class="detail-text">
+        <div class="detail-label">Stick Rates</div>
+        <h3>Measure what actually ships</h3>
+        <p>Stick rate is the percentage of confirmed orders that actually ship and deliver. SOLUS calculates this per retailer, per account, and overall.</p>
+        <ul>
+          <li>Overall stick rate across all retailers</li>
+          <li>Per-retailer stick rate comparison</li>
+          <li>Trend charts showing stick rate over time</li>
+          <li>Identify which retailers cancel most often</li>
+        </ul>
+      </div>
+      <div class="detail-visual">
+        <div class="visual-icon">&#127919;</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="cta-box">
+      <h2>Ready to see your numbers?</h2>
+      <p>Join our Discord to get SOLUS and unlock full analytics on your order history.</p>
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener" class="btn-primary">
+        <span class="icon-discord"></span> Join Discord
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-links">
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener">Discord</a>
+      <a href="https://github.com/aurasxy/ordyn" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <p>&copy; 2026 SOLUS. All rights reserved.</p>
+  </footer>
+
+  <script>
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+
+</body>
+</html>

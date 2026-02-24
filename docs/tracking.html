@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Tracking & Calendar — SOLUS</title>
+  <meta name="description" content="Real-time FedEx delivery tracking with ETAs, interactive delivery calendar, and smart sorting.">
+  <meta name="theme-color" content="#0a0a0b">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <a href="index.html" class="nav-brand">
+      <img src="icon.png" alt="SOLUS">
+      <span>SOLUS</span>
+    </a>
+    <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="discord.html">Discord</a>
+      <a href="analytics.html">Analytics</a>
+      <a href="tracking.html" class="active">Tracking</a>
+      <a href="accounts.html">Accounts</a>
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener" class="btn-primary">
+        <span class="icon-discord"></span> Join Discord
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="page-hero hero-tracking">
+    <div class="page-icon">&#128666;</div>
+    <h1>Real-time<br><span class="gradient">delivery tracking</span></h1>
+    <p>Live FedEx tracking with estimated arrival times, interactive calendar views, and smart sorting to keep you on top of every package.</p>
+  </section>
+
+  <!-- Features -->
+  <section>
+    <div class="section-label">Live Track</div>
+    <h2 class="section-title">Every package, tracked in real time</h2>
+    <p class="section-desc">SOLUS pulls live tracking data so you always know where your packages are and when they'll arrive.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon fi-green">&#128205;</div>
+        <h3>FedEx Live Tracking</h3>
+        <p>Real-time status updates with estimated delivery dates pulled directly from FedEx. See in-transit, out for delivery, and delivered statuses.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-purple">&#128344;</div>
+        <h3>Sort by ETA</h3>
+        <p>Sort your active shipments by estimated arrival, status, retailer, or order date. Find what matters most to you instantly.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-blue">&#128269;</div>
+        <h3>Manual Date Range Search</h3>
+        <p>Search shipments by custom date range instead of auto-fetching everything. Saves API credits and gives you control.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-orange">&#128203;</div>
+        <h3>Status Filtering</h3>
+        <p>Filter your shipments by status — in transit, out for delivery, delivered, or exceptions. Zero in on what needs attention.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-cyan">&#128190;</div>
+        <h3>Smart Caching</h3>
+        <p>Tracking results are cached locally so repeated views load instantly without burning API calls. Clear cache anytime.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-amber">&#128230;</div>
+        <h3>Batch Tracking</h3>
+        <p>Track dozens of packages at once. SOLUS batches API requests efficiently so even large order volumes are handled smoothly.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detail: Calendar -->
+  <section class="detail-section">
+    <div class="detail-row">
+      <div class="detail-text">
+        <div class="detail-label">Calendar</div>
+        <h3>See your deliveries on a calendar</h3>
+        <p>The interactive monthly calendar shows exactly which days have deliveries scheduled. Click any day to see the full list of orders arriving.</p>
+        <ul>
+          <li>Monthly calendar with delivery indicators</li>
+          <li>Click a day to expand order details</li>
+          <li>Color-coded by retailer</li>
+          <li>Navigate between months easily</li>
+        </ul>
+      </div>
+      <div class="detail-visual">
+        <div class="visual-icon">&#128197;</div>
+      </div>
+    </div>
+
+    <div class="detail-row reverse">
+      <div class="detail-text">
+        <div class="detail-label">Control</div>
+        <h3>Track on your terms</h3>
+        <p>Unlike dashboards that auto-fetch on every page load, SOLUS gives you manual control. Set a date range, hit search, and only track what you need.</p>
+        <ul>
+          <li>Default 30-day search window</li>
+          <li>Custom date range picker</li>
+          <li>No wasted API calls on old shipments</li>
+          <li>Results persist until you search again</li>
+        </ul>
+      </div>
+      <div class="detail-visual">
+        <div class="visual-icon">&#127918;</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="cta-box">
+      <h2>Never miss a delivery again</h2>
+      <p>Join our Discord to get SOLUS and start tracking all your packages in one place.</p>
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener" class="btn-primary">
+        <span class="icon-discord"></span> Join Discord
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-links">
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener">Discord</a>
+      <a href="https://github.com/aurasxy/ordyn" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <p>&copy; 2026 SOLUS. All rights reserved.</p>
+  </footer>
+
+  <script>
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+
+</body>
+</html>

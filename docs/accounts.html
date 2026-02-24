@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Stats — SOLUS</title>
+  <meta name="description" content="Track every account's stick rate, tier, and performance. Filter, group, and export your best accounts.">
+  <meta name="theme-color" content="#0a0a0b">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <a href="index.html" class="nav-brand">
+      <img src="icon.png" alt="SOLUS">
+      <span>SOLUS</span>
+    </a>
+    <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="discord.html">Discord</a>
+      <a href="analytics.html">Analytics</a>
+      <a href="tracking.html">Tracking</a>
+      <a href="accounts.html" class="active">Accounts</a>
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener" class="btn-primary">
+        <span class="icon-discord"></span> Join Discord
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="page-hero hero-accounts">
+    <div class="page-icon">&#128100;</div>
+    <h1>Track every account's<br><span class="gradient">performance</span></h1>
+    <p>Per-account stick rates, tier rankings, and address grouping let you identify your best accounts and retire the rest.</p>
+  </section>
+
+  <!-- Features -->
+  <section>
+    <div class="section-label">Account Analytics</div>
+    <h2 class="section-title">Know which accounts perform</h2>
+    <p class="section-desc">SOLUS scores every account based on order history and assigns performance tiers so you can make data-driven decisions.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon fi-amber">&#127942;</div>
+        <h3>Tier System</h3>
+        <p>Accounts are ranked into four tiers based on stick rate: Perfect (&ge;80%), Good (60&ndash;79%), Okay (40&ndash;59%), and At Risk (&lt;40%).</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-green">&#128200;</div>
+        <h3>Per-Account Stick Rate</h3>
+        <p>See the exact stick rate, score, and total order count for every individual account. No more guessing which ones are working.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-purple">&#127968;</div>
+        <h3>Address Grouping</h3>
+        <p>Group accounts by address or profile to see aggregate stats at the household level. Identify which addresses get flagged.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-blue">&#128295;</div>
+        <h3>Advanced Filtering</h3>
+        <p>Filter by tier, date range, minimum stick rate, and minimum order count. Narrow down to exactly the accounts you care about.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-cyan">&#128451;</div>
+        <h3>Grid & List View</h3>
+        <p>Toggle between a card grid for visual overview or a compact list for scanning through large account sets quickly.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon fi-orange">&#128229;</div>
+        <h3>Export Perfect Accounts</h3>
+        <p>One-click export of your top-performing accounts. Quickly pull your perfect-tier accounts for reuse or sharing.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detail: Tiers -->
+  <section class="detail-section">
+    <div class="detail-row">
+      <div class="detail-text">
+        <div class="detail-label">Tiers</div>
+        <h3>Performance at a glance</h3>
+        <p>The tier system gives you an instant read on account health. Each tier has a distinct color so you can scan your account list and spot problems immediately.</p>
+        <ul>
+          <li>Perfect (&ge;80%) — your best accounts</li>
+          <li>Good (60&ndash;79%) — solid performers</li>
+          <li>Okay (40&ndash;59%) — needs attention</li>
+          <li>At Risk (&lt;40%) — consider retiring</li>
+        </ul>
+      </div>
+      <div class="detail-visual">
+        <div class="visual-icon">&#127942;</div>
+      </div>
+    </div>
+
+    <div class="detail-row reverse">
+      <div class="detail-text">
+        <div class="detail-label">Profiles</div>
+        <h3>Group by address for the big picture</h3>
+        <p>Multiple accounts at the same address? SOLUS groups them into profiles so you can see combined performance and identify addresses with consistently high or low stick rates.</p>
+        <ul>
+          <li>Automatic address detection and grouping</li>
+          <li>Profile-level stick rate and order count</li>
+          <li>Expand profiles to see individual accounts</li>
+          <li>Sort profiles by performance</li>
+        </ul>
+      </div>
+      <div class="detail-visual">
+        <div class="visual-icon">&#128101;</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="cta-box">
+      <h2>Start optimizing your accounts</h2>
+      <p>Join our Discord to get SOLUS and unlock detailed account analytics.</p>
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener" class="btn-primary">
+        <span class="icon-discord"></span> Join Discord
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-links">
+      <a href="https://discord.gg/yY3JU4TjgH" target="_blank" rel="noopener">Discord</a>
+      <a href="https://github.com/aurasxy/ordyn" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <p>&copy; 2026 SOLUS. All rights reserved.</p>
+  </footer>
+
+  <script>
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+
+</body>
+</html>

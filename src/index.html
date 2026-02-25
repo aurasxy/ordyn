@@ -4382,9 +4382,9 @@
                 <button class="btn btn-sm" id="accountStatsAdvancedFilterBtn" style="background:var(--accent);color:white;border-color:var(--accent);" onclick="showAccountStatsAdvancedFilter()">
                   🔧 Advanced Filter
                 </button>
-                <!-- Export Perfect Accounts -->
-                <button class="btn btn-sm btn-outline" onclick="exportPerfectAccounts()">
-                  Export Perfect Accounts
+                <!-- Export Accounts -->
+                <button class="btn btn-sm btn-outline" onclick="showExportAccountsModal()">
+                  Export Accounts
                 </button>
               </div>
 
@@ -4469,6 +4469,83 @@
                 <button class="btn btn-secondary" onclick="hideAccountStatsAdvancedFilter()">Close</button>
                 <button class="btn btn-primary" onclick="applyAccountStatsAdvancedFilter()">Apply Filters</button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Export Accounts Modal -->
+        <div id="accountStatsExportModal" class="modal-overlay" onclick="if(event.target===this) hideExportAccountsModal()">
+          <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header">
+              <h2>Export Accounts</h2>
+              <button class="modal-close" onclick="hideExportAccountsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+              <!-- Performance Tier Filter -->
+              <div class="filter-section">
+                <div class="filter-section-title">Performance Tier</div>
+                <div class="filter-group" style="flex-wrap:wrap;">
+                  <button class="filter-btn" data-export-tier="all" onclick="setExportTier('all')">All</button>
+                  <button class="filter-btn active" data-export-tier="perfect" onclick="setExportTier('perfect')">Perfect (&ge;80%)</button>
+                  <button class="filter-btn" data-export-tier="good" onclick="setExportTier('good')">Good (60-79%)</button>
+                  <button class="filter-btn" data-export-tier="okay" onclick="setExportTier('okay')">Okay (40-59%)</button>
+                  <button class="filter-btn" data-export-tier="at-risk" onclick="setExportTier('at-risk')">At Risk (&lt;40%)</button>
+                </div>
+              </div>
+
+              <!-- Stick Rate Range -->
+              <div class="filter-section">
+                <div class="filter-section-title">Stick Rate Range (%)</div>
+                <div style="display:flex;gap:12px;align-items:center;">
+                  <div style="flex:1;">
+                    <label style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px;">Min</label>
+                    <input type="number" id="exportMinStickRate" class="filter-input" min="0" max="100" step="1" value="" placeholder="0"
+                      style="width:100%;" oninput="updateExportPreview()">
+                  </div>
+                  <span style="color:var(--text-muted);margin-top:16px;">-</span>
+                  <div style="flex:1;">
+                    <label style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px;">Max</label>
+                    <input type="number" id="exportMaxStickRate" class="filter-input" min="0" max="100" step="1" value="" placeholder="100"
+                      style="width:100%;" oninput="updateExportPreview()">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Orders Range -->
+              <div class="filter-section">
+                <div class="filter-section-title">Orders Range</div>
+                <div style="display:flex;gap:12px;align-items:center;">
+                  <div style="flex:1;">
+                    <label style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px;">Min</label>
+                    <input type="number" id="exportMinOrders" class="filter-input" min="0" step="1" value="" placeholder="0"
+                      style="width:100%;" oninput="updateExportPreview()">
+                  </div>
+                  <span style="color:var(--text-muted);margin-top:16px;">-</span>
+                  <div style="flex:1;">
+                    <label style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px;">Max</label>
+                    <input type="number" id="exportMaxOrders" class="filter-input" min="0" step="1" value="" placeholder="No limit"
+                      style="width:100%;" oninput="updateExportPreview()">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Export Format -->
+              <div class="filter-section">
+                <div class="filter-section-title">Export Format</div>
+                <div class="filter-group">
+                  <button class="filter-btn active" data-export-format="txt" onclick="setExportFormat('txt')">TXT (emails only)</button>
+                  <button class="filter-btn" data-export-format="csv" onclick="setExportFormat('csv')">CSV (with details)</button>
+                </div>
+              </div>
+
+              <!-- Preview Count -->
+              <div style="padding:12px 16px;background:var(--surface-2);border-radius:8px;text-align:center;margin-top:8px;">
+                <span id="exportPreviewCount" style="font-size:14px;font-weight:600;color:var(--text-primary);">0 accounts match</span>
+              </div>
+            </div>
+            <div class="modal-footer" style="justify-content:flex-end;">
+              <button class="btn btn-secondary" onclick="hideExportAccountsModal()">Cancel</button>
+              <button class="btn btn-primary" id="exportAccountsBtn" onclick="executeExportAccounts()">Export</button>
             </div>
           </div>
         </div>
@@ -13338,8 +13415,55 @@ function setAccountStatsView(mode) {
   renderAccountStats();
 }
 
-async function exportPerfectAccounts() {
-  // Re-aggregate fresh data respecting current period/date filters
+// ==================== EXPORT ACCOUNTS MODAL ====================
+
+let exportTier = 'perfect';
+let exportFormat = 'txt';
+
+function setExportFormat(fmt) {
+  exportFormat = fmt;
+  document.querySelectorAll('#accountStatsExportModal [data-export-format]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-export-format') === fmt);
+  });
+}
+
+function setExportTier(tier) {
+  exportTier = tier;
+  document.querySelectorAll('#accountStatsExportModal [data-export-tier]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-export-tier') === tier);
+  });
+  updateExportPreview();
+}
+
+function showExportAccountsModal() {
+  exportTier = 'perfect';
+  const modal = $('accountStatsExportModal');
+  document.querySelectorAll('#accountStatsExportModal [data-export-tier]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-export-tier') === 'perfect');
+  });
+  $('exportMinStickRate').value = '';
+  $('exportMaxStickRate').value = '';
+  $('exportMinOrders').value = '';
+  $('exportMaxOrders').value = '';
+  exportFormat = 'txt';
+  document.querySelectorAll('#accountStatsExportModal [data-export-format]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-export-format') === 'txt');
+  });
+  document.body.appendChild(modal);
+  modal.classList.add('show');
+  updateExportPreview();
+}
+
+function hideExportAccountsModal() {
+  $('accountStatsExportModal').classList.remove('show');
+}
+
+async function getExportFilteredAccounts() {
+  const minRate = $('exportMinStickRate').value !== '' ? parseFloat($('exportMinStickRate').value) : null;
+  const maxRate = $('exportMaxStickRate').value !== '' ? parseFloat($('exportMaxStickRate').value) : null;
+  const minOrders = $('exportMinOrders').value !== '' ? parseInt($('exportMinOrders').value) : null;
+  const maxOrders = $('exportMaxOrders').value !== '' ? parseInt($('exportMaxOrders').value) : null;
+
   let allOrders = applySourceFilter(computeOrderStatuses());
   const period = accountStatsPeriod;
 
@@ -13365,60 +13489,130 @@ async function exportPerfectAccounts() {
     ? ['walmart', 'target', 'pokecenter', 'samsclub', 'costco']
     : [retailer];
 
-  const retailerLabels = {
-    walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center',
-    samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy'
-  };
-
-  let lines = [];
-  let totalPerfect = 0;
+  const currentDataMode = await window.api.getDataMode();
+  const results = []; // { retailer, accounts[] }
 
   for (const ret of retailers) {
     const retOrders = allOrders.filter(o => o.retailer === ret);
     if (retOrders.length === 0) continue;
 
     let accounts;
-    if (ret === 'pokecenter') {
+    if (currentDataMode === 'discord') {
+      accounts = aggregateProfileData(retOrders, ret);
+    } else if (ret === 'pokecenter') {
       accounts = await aggregatePKCProfiles(retOrders);
     } else {
       accounts = aggregateAccountData(retOrders, ret);
     }
 
-    const perfect = accounts.filter(a => a.tier === 'perfect');
-    if (perfect.length === 0) continue;
-    totalPerfect += perfect.length;
-
-    if (isAllRetailers) {
-      if (lines.length > 0) lines.push('');
-      lines.push(`=== ${retailerLabels[ret] || ret} (${perfect.length}) ===`);
+    // Apply export filters
+    let filtered = accounts;
+    if (exportTier !== 'all') {
+      filtered = filtered.filter(a => a.tier === exportTier);
+    }
+    if (minRate !== null) {
+      filtered = filtered.filter(a => a.stickRate >= minRate);
+    }
+    if (maxRate !== null) {
+      filtered = filtered.filter(a => a.stickRate <= maxRate);
+    }
+    if (minOrders !== null) {
+      filtered = filtered.filter(a => a.totalOrders >= minOrders);
+    }
+    if (maxOrders !== null) {
+      filtered = filtered.filter(a => a.totalOrders <= maxOrders);
     }
 
-    perfect.sort((a, b) => {
+    if (filtered.length > 0) {
+      results.push({ retailer: ret, accounts: filtered });
+    }
+  }
+
+  return results;
+}
+
+async function updateExportPreview() {
+  const results = await getExportFilteredAccounts();
+  const total = results.reduce((sum, r) => sum + r.accounts.length, 0);
+  $('exportPreviewCount').textContent = `${total} account${total !== 1 ? 's' : ''} match`;
+  $('exportAccountsBtn').disabled = total === 0;
+}
+
+async function executeExportAccounts() {
+  const results = await getExportFilteredAccounts();
+  const total = results.reduce((sum, r) => sum + r.accounts.length, 0);
+
+  if (total === 0) {
+    toast('No accounts match the selected filters', 'error');
+    return;
+  }
+
+  const retailerLabels = {
+    walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center',
+    samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy'
+  };
+
+  const minRate = $('exportMinStickRate').value !== '' ? parseFloat($('exportMinStickRate').value) : null;
+  const maxRate = $('exportMaxStickRate').value !== '' ? parseFloat($('exportMaxStickRate').value) : null;
+  const minOrders = $('exportMinOrders').value !== '' ? parseInt($('exportMinOrders').value) : null;
+  const maxOrders = $('exportMaxOrders').value !== '' ? parseInt($('exportMaxOrders').value) : null;
+  const retailer = accountStatsRetailer;
+  const isAllRetailers = retailer === 'all';
+  const period = accountStatsPeriod;
+
+  // Build header
+  const tierLabels = { all: 'All Tiers', perfect: '>= 80%', good: '60-79%', okay: '40-59%', 'at-risk': '< 40%' };
+  let filterParts = [];
+  if (exportTier !== 'all') filterParts.push(`Tier: ${tierLabels[exportTier]}`);
+  if (minRate !== null && maxRate !== null) filterParts.push(`Rate: ${minRate}-${maxRate}%`);
+  else if (minRate !== null) filterParts.push(`Min Rate: ${minRate}%`);
+  else if (maxRate !== null) filterParts.push(`Max Rate: ${maxRate}%`);
+  if (minOrders !== null && maxOrders !== null) filterParts.push(`Orders: ${minOrders}-${maxOrders}`);
+  else if (minOrders !== null) filterParts.push(`Min Orders: ${minOrders}`);
+  else if (maxOrders !== null) filterParts.push(`Max Orders: ${maxOrders}`);
+  const header = `Account Export${filterParts.length > 0 ? ' (' + filterParts.join(', ') + ')' : ''}`;
+  const filterInfo = `Retailer: ${isAllRetailers ? 'All' : retailerLabels[retailer] || retailer} | Period: ${period === 'all' ? 'All Time' : period === 'custom' ? 'Custom Range' : period + ' days'}`;
+
+  // Flatten and sort all accounts
+  const allAccounts = [];
+  for (const { retailer: ret, accounts } of results) {
+    accounts.sort((a, b) => {
       const aId = a.email || a.baseAddress || a.profileName || '';
       const bId = b.email || b.baseAddress || b.profileName || '';
       return aId.localeCompare(bId);
     });
-
-    for (const acc of perfect) {
-      const id = acc.email || acc.baseAddress || acc.profileName || 'Unknown';
-      const rate = acc.stickRate != null ? acc.stickRate.toFixed(1) : '0';
-      lines.push(`${id}  (${rate}% - ${acc.confirmed}/${acc.totalOrders})`);
+    for (const acc of accounts) {
+      allAccounts.push({ ...acc, _retailer: ret });
     }
   }
 
-  if (lines.length === 0) {
-    toast('No perfect accounts found with current filters', 'error');
-    return;
+  let content, fileName;
+
+  if (exportFormat === 'csv') {
+    // CSV with details
+    const csvLines = ['Account,Retailer,Stick Rate %,Confirmed,Cancelled,Total Orders,Total Spent,Avg Order Value,Last Order Date'];
+    for (const acc of allAccounts) {
+      const id = (acc.email || acc.baseAddress || acc.profileName || 'Unknown').replace(/"/g, '""');
+      const ret = retailerLabels[acc._retailer] || acc._retailer;
+      const rate = acc.stickRate != null ? acc.stickRate.toFixed(1) : '0';
+      const spent = acc.totalSpent != null ? acc.totalSpent.toFixed(2) : '0.00';
+      const avg = acc.avgOrderValue != null ? acc.avgOrderValue.toFixed(2) : '0.00';
+      const lastDate = acc.lastOrderDate || '';
+      csvLines.push(`"${id}","${ret}",${rate},${acc.confirmed || 0},${acc.cancelled || (acc.totalOrders - acc.confirmed) || 0},${acc.totalOrders || 0},${spent},${avg},${lastDate}`);
+    }
+    content = csvLines.join('\n') + '\n';
+    fileName = `accounts-export${isAllRetailers ? '-all' : '-' + retailer}-${localDateStr(new Date())}.csv`;
+  } else {
+    // TXT — emails/identifiers only, one per line
+    const lines = allAccounts.map(acc => acc.email || acc.baseAddress || acc.profileName || 'Unknown');
+    content = lines.join('\n') + '\n';
+    fileName = `accounts-export${isAllRetailers ? '-all' : '-' + retailer}-${localDateStr(new Date())}.txt`;
   }
 
-  const header = `Perfect Accounts Export (>= 80% stick rate)`;
-  const filterInfo = `Retailer: ${isAllRetailers ? 'All' : retailerLabels[retailer] || retailer} | Period: ${period === 'all' ? 'All Time' : period === 'custom' ? 'Custom Range' : period + ' days'}`;
-  const content = `${header}\n${filterInfo}\nExported: ${new Date().toLocaleString()}\n${'─'.repeat(50)}\n\n${lines.join('\n')}\n`;
-
-  const fileName = `perfect-accounts${isAllRetailers ? '-all' : '-' + retailer}-${localDateStr(new Date())}.txt`;
   const result = await window.api.saveTextFile(content, fileName);
   if (result.success) {
-    toast(`Exported ${totalPerfect} perfect accounts`, 'success');
+    toast(`Exported ${total} accounts (${exportFormat.toUpperCase()})`, 'success');
+    hideExportAccountsModal();
   } else if (!result.canceled) {
     toast('Export failed: ' + (result.error || 'Unknown error'), 'error');
   }

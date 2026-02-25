@@ -148,6 +148,10 @@ contextBridge.exposeInMainWorld('api', {
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  getPlatform: () => ipcRenderer.invoke('get-platform'),
+  downloadUpdateMac: (version) => ipcRenderer.invoke('download-update-mac', version),
+  revealUpdateFile: () => ipcRenderer.invoke('reveal-update-file'),
+  openUpdateFile: () => ipcRenderer.invoke('open-update-file'),
   onUpdateAvailable: (callback) => {
     ipcRenderer.removeAllListeners('update-available');
     ipcRenderer.on('update-available', (event, data) => callback(data));

@@ -7846,6 +7846,93 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
 
+ipcMain.handle('get-platform', () => {
+  return process.platform;
+});
+
+// Mac manual update: download DMG to ~/Downloads and reveal in Finder
+let macUpdateFilePath = null;
+
+ipcMain.handle('download-update-mac', async (_, version) => {
+  try {
+    const https = require('https');
+    const downloadsDir = app.getPath('downloads');
+    const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+    const fileName = `SOLUS-${version}-${arch}.dmg`;
+    const filePath = path.join(downloadsDir, fileName);
+    const releaseUrl = `https://github.com/aurasxy/ordyn/releases/download/v${version}/${fileName}`;
+
+    console.log(`[UPDATER] Mac manual download: ${releaseUrl}`);
+
+    return new Promise((resolve) => {
+      const follow = (url) => {
+        https.get(url, { headers: { 'User-Agent': 'SOLUS-Updater' } }, (res) => {
+          // Follow redirects (GitHub redirects to S3)
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            follow(res.headers.location);
+            return;
+          }
+          if (res.statusCode !== 200) {
+            resolve({ success: false, error: `Download failed: HTTP ${res.statusCode}` });
+            return;
+          }
+
+          const totalSize = parseInt(res.headers['content-length'], 10) || 0;
+          let downloaded = 0;
+          const file = fs.createWriteStream(filePath);
+
+          res.on('data', (chunk) => {
+            downloaded += chunk.length;
+            file.write(chunk);
+            if (totalSize > 0 && mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('update-progress', {
+                percent: (downloaded / totalSize) * 100,
+                transferred: downloaded,
+                total: totalSize
+              });
+            }
+          });
+
+          res.on('end', () => {
+            file.end();
+            macUpdateFilePath = filePath;
+            console.log(`[UPDATER] Mac DMG downloaded to: ${filePath}`);
+            resolve({ success: true, filePath });
+          });
+
+          res.on('error', (err) => {
+            file.end();
+            resolve({ success: false, error: err.message });
+          });
+        }).on('error', (err) => {
+          resolve({ success: false, error: err.message });
+        });
+      };
+      follow(releaseUrl);
+    });
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('reveal-update-file', () => {
+  if (macUpdateFilePath && fs.existsSync(macUpdateFilePath)) {
+    const { shell } = require('electron');
+    shell.showItemInFolder(macUpdateFilePath);
+    return { success: true };
+  }
+  return { success: false, error: 'File not found' };
+});
+
+ipcMain.handle('open-update-file', () => {
+  if (macUpdateFilePath && fs.existsSync(macUpdateFilePath)) {
+    const { shell } = require('electron');
+    shell.openPath(macUpdateFilePath);
+    return { success: true };
+  }
+  return { success: false, error: 'File not found' };
+});
+
 // ==================== APP LIFECYCLE ====================
 
 app.whenReady().then(() => {

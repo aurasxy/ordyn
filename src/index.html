@@ -18799,6 +18799,10 @@ function hideUpdateChecking() {
 // Show update modal
 function showUpdateModal(version) {
   $('updateModalVersion').textContent = `Version ${version} is ready to install`;
+  const btn = $('updateModalBtn');
+  btn.textContent = isMacPlatform ? 'Open Update' : 'Restart & Update';
+  btn.disabled = false;
+  btn.onclick = installUpdate;
   $('updateModalOverlay').classList.add('show');
   $('updateModal').classList.add('show');
 }
@@ -18810,7 +18814,12 @@ function dismissUpdateModal() {
 }
 
 // Setup update event listeners
+let isMacPlatform = false;
+
 function setupUpdateListeners() {
+  // Detect platform
+  window.api.getPlatform?.().then(p => { isMacPlatform = p === 'darwin'; });
+
   // Fetch and display current app version
   window.api.getAppVersion?.().then(version => {
     if (version) {
@@ -18820,7 +18829,7 @@ function setupUpdateListeners() {
       $('appVersion').onclick = checkForUpdates;
     }
   });
-  
+
   // Update available - start downloading
   window.api.onUpdateAvailable?.((data) => {
     console.log('[UPDATE] Available:', data.version);
@@ -18831,39 +18840,56 @@ function setupUpdateListeners() {
     $('updateBannerBtn').style.display = 'none';
     $('updateBanner').classList.add('show');
 
-    // Start the download (since autoDownload is disabled)
-    window.api.downloadUpdate?.().catch(err => {
-      console.error('[UPDATE] Download failed:', err);
-    });
+    if (isMacPlatform) {
+      // Mac: download DMG to ~/Downloads manually
+      window.api.downloadUpdateMac?.(data.version).then(result => {
+        if (result.success) {
+          updateDownloaded = true;
+          $('updateBanner').classList.remove('show');
+          showUpdateModal(data.version);
+        } else {
+          $('updateBannerText').textContent = `❌ Download failed`;
+          $('updateBannerProgress').textContent = '';
+          console.error('[UPDATE] Mac download failed:', result.error);
+        }
+      }).catch(err => {
+        console.error('[UPDATE] Mac download failed:', err);
+      });
+    } else {
+      // Windows: use electron-updater auto-download
+      window.api.downloadUpdate?.().catch(err => {
+        console.error('[UPDATE] Download failed:', err);
+      });
+    }
   });
-  
-  // Download progress
+
+  // Download progress (works for both - Mac sends progress via IPC too)
   window.api.onUpdateProgress?.((data) => {
     const percent = Math.round(data.percent);
     $('updateBannerProgress').textContent = `${percent}%`;
   });
-  
-  // Update downloaded and ready
+
+  // Update downloaded and ready (Windows only - Mac handles above)
   window.api.onUpdateDownloaded?.((data) => {
     console.log('[UPDATE] Downloaded:', data.version);
     hideUpdateChecking();
     updateDownloaded = true;
     updateVersion = data.version;
     $('appVersion').title = `v${data.version} ready - click to install`;
-    
+
     // Hide download banner
     $('updateBanner').classList.remove('show');
-    
+
     // Show update modal
     showUpdateModal(data.version);
   });
-  
+
   // Listen for update check result - no update available
   window.api.onUpdateNotAvailable?.(() => {
     console.log('[UPDATE] Already on latest version');
     hideUpdateChecking();
     $('appVersion').title = 'You are on the latest version';
-    
+
     // Only show toast if user manually checked
     if (updateCheckShown) {
       $('updateToastText').textContent = '✓ You\'re up to date!';
@@ -18873,7 +18899,7 @@ function setupUpdateListeners() {
       }, 2000);
     }
   });
-  
+
   window.api.onUpdateError?.((error) => {
     console.log('[UPDATE] Error:', error);
     hideUpdateChecking();
@@ -18882,7 +18908,19 @@ function setupUpdateListeners() {
 }
 
 function installUpdate() {
-  if (updateDownloaded) {
+  if (!updateDownloaded) return;
+  if (isMacPlatform) {
+    // Mac: open the downloaded DMG
+    $('updateModalBtn').textContent = 'Opening...';
+    $('updateModalBtn').disabled = true;
+    window.api.openUpdateFile?.().then(() => {
+      $('updateModalVersion').textContent = 'DMG opened — drag SOLUS to Applications to update';
+      $('updateModalBtn').textContent = 'Show in Finder';
+      $('updateModalBtn').disabled = false;
+      $('updateModalBtn').onclick = () => window.api.revealUpdateFile?.();
+    });
+  } else {
+    // Windows: auto-install
     $('updateModalBtn').textContent = 'Installing...';
     $('updateModalBtn').disabled = true;
     window.api.installUpdate();

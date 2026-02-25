@@ -102,9 +102,45 @@ function normalizeOrderId(orderId) {
 }
 
 // ==================== PASSWORD ENCRYPTION HELPERS ====================
-// Encrypt password using Electron's safeStorage API
+
+// On macOS without a Developer cert, safeStorage triggers repeated Keychain prompts.
+// Use our own AES-256-GCM encryption with a machine-derived key on Mac instead.
+const isMac = process.platform === 'darwin';
+
+function getPasswordKey() {
+  const seed = app.getPath('userData') + '|' + app.getPath('exe') + '|solus-pw-v1';
+  return crypto.createHash('sha256').update(seed).digest();
+}
+
+function encryptPasswordLocal(password) {
+  const key = getPasswordKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  let encrypted = cipher.update(password, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const tag = cipher.getAuthTag();
+  // Format: local:iv:tag:ciphertext (prefixed so we know it's local encryption)
+  return 'local:' + iv.toString('hex') + ':' + tag.toString('hex') + ':' + encrypted;
+}
+
+function decryptPasswordLocal(stored) {
+  const parts = stored.split(':');
+  if (parts.length !== 4 || parts[0] !== 'local') return null;
+  const key = getPasswordKey();
+  const iv = Buffer.from(parts[1], 'hex');
+  const tag = Buffer.from(parts[2], 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+  let decrypted = decipher.update(parts[3], 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+}
+
 function encryptPassword(password) {
   if (!password) return null;
+  if (isMac) {
+    return encryptPasswordLocal(password);
+  }
   if (!safeStorage.isEncryptionAvailable()) {
     throw new Error('System keychain not available. Cannot securely store passwords. On Linux, install gnome-keyring or kwallet.');
   }
@@ -117,15 +153,22 @@ function encryptPassword(password) {
   }
 }
 
-// Decrypt password using Electron's safeStorage API
 function decryptPassword(encryptedPassword) {
   if (!encryptedPassword) return null;
+  // Handle local encryption (Mac)
+  if (encryptedPassword.startsWith('local:')) {
+    try {
+      return decryptPasswordLocal(encryptedPassword);
+    } catch (err) {
+      console.warn('[SECURITY] Local decryption failed:', err.message);
+      return encryptedPassword;
+    }
+  }
+  // Handle safeStorage (Windows/Linux)
   if (!safeStorage.isEncryptionAvailable()) {
-    // If encryption wasn't available, password is stored in plain text
     return encryptedPassword;
   }
   try {
-    // Check if it looks like a base64 encrypted string
     const buffer = Buffer.from(encryptedPassword, 'base64');
     return safeStorage.decryptString(buffer);
   } catch (err) {

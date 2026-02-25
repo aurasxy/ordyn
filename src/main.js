@@ -844,6 +844,13 @@ function saveOrdersBatch(newOrders) {
   const orders = store.get('orders', []);
   let added = 0;
 
+  // Build lookup map for O(1) matching instead of O(n) findIndex per order
+  const orderIndex = new Map();
+  for (let i = 0; i < orders.length; i++) {
+    const key = `${orders[i].retailer}-${normalizeOrderId(orders[i].orderId)}`;
+    orderIndex.set(key, i);
+  }
+
   for (const order of merged) {
     // Tag source if not already set
     if (!order.source) {
@@ -851,7 +858,8 @@ function saveOrdersBatch(newOrders) {
     }
     // Match by retailer + normalized orderId (strips hyphens for consistent matching)
     const nid = normalizeOrderId(order.orderId);
-    const existingIdx = orders.findIndex(o => normalizeOrderId(o.orderId) === nid && o.retailer === order.retailer);
+    const lookupKey = `${order.retailer}-${nid}`;
+    const existingIdx = orderIndex.has(lookupKey) ? orderIndex.get(lookupKey) : -1;
     if (existingIdx >= 0) {
       const existing = orders[existingIdx];
       // Normalize the stored orderId to prevent future mismatches
@@ -893,7 +901,9 @@ function saveOrdersBatch(newOrders) {
       if (order.accountId && !existing.accountId) existing.accountId = order.accountId;
       orders[existingIdx] = existing;
     } else {
+      const newIdx = orders.length;
       orders.push(order);
+      orderIndex.set(lookupKey, newIdx);
       added++;
     }
   }
@@ -7347,19 +7357,21 @@ ipcMain.handle('sync-discord-orders', async () => {
       }
     });
 
-    // Group by retailer and save in batches
-    const byRetailer = {};
-    for (const order of convertedOrders) {
-      const key = order.retailer || 'unknown';
-      if (!byRetailer[key]) byRetailer[key] = [];
-      byRetailer[key].push(order);
-    }
-
+    // Save in chunks to avoid blocking the main process on large imports
+    const CHUNK_SIZE = 50;
     let totalAdded = 0;
-    for (const [retailer, orders] of Object.entries(byRetailer)) {
-      const added = saveOrdersBatch(orders);
+    for (let i = 0; i < convertedOrders.length; i += CHUNK_SIZE) {
+      const chunk = convertedOrders.slice(i, i + CHUNK_SIZE);
+      const added = saveOrdersBatch(chunk);
       totalAdded += added;
-      console.log('[DISCORD ACO] Saved', added, 'orders for retailer:', retailer);
+      console.log(`[DISCORD ACO] Saved chunk ${Math.floor(i / CHUNK_SIZE) + 1}: ${added} new (${i + chunk.length}/${convertedOrders.length})`);
+      // Yield to event loop between chunks to keep app responsive
+      if (i + CHUNK_SIZE < convertedOrders.length) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('sync-progress', { message: `Importing orders... ${i + chunk.length}/${convertedOrders.length}` });
+        }
+        await new Promise(r => setImmediate(r));
+      }
     }
 
     // Edge function already deleted fetched rows from relay

@@ -1,0 +1,46 @@
+{
+  "$schema": "SOLUS Performance Budgets",
+  "version": 1,
+  "thresholds": {
+    "startup": {
+      "appReady_ms": 8000,
+      "dashboardRender_ms": 3000,
+      "description": "Time from launch to dashboard visible"
+    },
+    "navigation": {
+      "pageSwitch_ms": 1500,
+      "description": "Time to navigate and render any page"
+    },
+    "search": {
+      "filterLatency_ms": 500,
+      "description": "Time to filter orders by search term (25 orders)"
+    },
+    "charts": {
+      "analyticsRender_ms": 3000,
+      "description": "Time to render all analytics charts"
+    },
+    "memory": {
+      "baselineHeap_mb": 200,
+      "afterNavigationLoop_mb": 300,
+      "description": "Heap usage limits"
+    },
+    "computeOrderStatuses": {
+      "maxCallsPerNavigation": 5,
+      "description": "Max times computeOrderStatuses can be called per page switch"
+    }
+  },
+  "datasets": {
+    "smoke": {
+      "orders": 25,
+      "inventory": 20
+    },
+    "medium": {
+      "orders": 500,
+      "inventory": 100
+    },
+    "large": {
+      "orders": 5000,
+      "inventory": 500
+    }
+  }
+}

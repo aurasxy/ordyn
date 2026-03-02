@@ -44,3 +44,9 @@ temp_script.js
 !assets/*.png
 !product-images/*.jpg
 supabase/.temp/
+
+# IMAP diagnostics — isolated test data and private artifacts
+.test-user-data/
+artifacts/private/
+artifacts/logs/
+artifacts/perf/

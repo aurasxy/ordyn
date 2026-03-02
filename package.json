@@ -1,6 +1,6 @@
 {
   "name": "ordyn",
-  "version": "2.2.5",
+  "version": "2.3.0",
   "description": "SOLUS - Order Analytics for Walmart, Target, Pokemon Center & more",
   "main": "src-protected/main.js",
   "scripts": {
@@ -17,7 +17,13 @@
     "obfuscate": "node build-obfuscated.js",
     "restore": "node build-obfuscated.js --restore",
     "pack": "electron-builder --dir",
-    "genkeys": "node generate-keys.js"
+    "genkeys": "node generate-keys.js",
+    "verify": "node tests/run-verify.js",
+    "verify:imap": "node scripts/verify-imap.js",
+    "verify:imap:import": "node scripts/verify-imap.js --import",
+    "verify:imap:bench": "node scripts/verify-imap-bench.js",
+    "verify:imap:live": "npx playwright test --config=playwright.config.js tests/e2e/verify-imap-live.spec.js",
+    "test": "npx playwright test --config=playwright.config.js"
   },
   "author": "SOLUS",
   "license": "UNLICENSED",
@@ -31,9 +37,11 @@
     "uuid": "^9.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "electron": "^28.1.0",
     "electron-builder": "^24.9.1",
-    "javascript-obfuscator": "^4.1.0"
+    "javascript-obfuscator": "^4.1.0",
+    "playwright": "^1.58.2"
   },
   "build": {
     "appId": "com.solus.app",

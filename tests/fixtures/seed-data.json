@@ -1,0 +1,314 @@
+{
+  "license": {
+    "key": "TEST-LICENSE-KEY-00000",
+    "valid": true,
+    "email": "test@solus.dev",
+    "activatedAt": "2026-01-01T00:00:00.000Z"
+  },
+  "accounts": [
+    {
+      "id": "acc-test-001",
+      "email": "testuser@gmail.com",
+      "password": "encrypted-placeholder",
+      "provider": "gmail",
+      "nickname": "Test Gmail",
+      "addedAt": "2026-01-15T10:00:00.000Z"
+    }
+  ],
+  "orders": [
+    {
+      "retailer": "walmart",
+      "orderId": "2001234567",
+      "date": "2026-02-01",
+      "item": "Pokemon TCG Prismatic Evolutions Booster Bundle",
+      "amount": 49.97,
+      "qty": 3,
+      "status": "confirmed",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "",
+      "carrier": "",
+      "image": ""
+    },
+    {
+      "retailer": "walmart",
+      "orderId": "2001234568",
+      "date": "2026-02-05",
+      "item": "Pokemon TCG Surging Sparks ETB",
+      "amount": 39.82,
+      "qty": 1,
+      "status": "shipped",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "1Z999AA10123456784",
+      "carrier": "UPS",
+      "image": ""
+    },
+    {
+      "retailer": "walmart",
+      "orderId": "2001234569",
+      "date": "2026-01-20",
+      "item": "Pokemon TCG Stellar Crown Booster Box",
+      "amount": 89.97,
+      "qty": 1,
+      "status": "delivered",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "9400111899223100001234",
+      "carrier": "USPS",
+      "image": ""
+    },
+    {
+      "retailer": "walmart",
+      "orderId": "2001234570",
+      "date": "2026-02-10",
+      "item": "Pokemon TCG Paldea Evolved Booster Box",
+      "amount": 89.97,
+      "qty": 1,
+      "status": "cancelled",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "",
+      "carrier": "",
+      "image": ""
+    },
+    {
+      "retailer": "target",
+      "orderId": "1029384756",
+      "date": "2026-02-03",
+      "item": "Pokemon TCG Prismatic Evolutions Elite Trainer Box",
+      "amount": 49.99,
+      "qty": 1,
+      "status": "confirmed",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "",
+      "carrier": "",
+      "image": ""
+    },
+    {
+      "retailer": "target",
+      "orderId": "1029384757",
+      "date": "2026-02-08",
+      "item": "Pokemon TCG Surging Sparks Booster Bundle",
+      "amount": 24.99,
+      "qty": 2,
+      "status": "shipped",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "789456123012345678",
+      "carrier": "FedEx",
+      "image": ""
+    },
+    {
+      "retailer": "target",
+      "orderId": "1029384758",
+      "date": "2026-01-25",
+      "item": "Pokemon TCG Stellar Crown ETB",
+      "amount": 39.99,
+      "qty": 1,
+      "status": "delivered",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "789456123012345679",
+      "carrier": "FedEx",
+      "image": ""
+    },
+    {
+      "retailer": "pokecenter",
+      "orderId": "PC20260201001",
+      "date": "2026-02-01",
+      "item": "Pikachu VMAX Premium Collection",
+      "amount": 59.99,
+      "qty": 1,
+      "status": "confirmed",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "",
+      "carrier": "",
+      "image": ""
+    },
+    {
+      "retailer": "pokecenter",
+      "orderId": "PC20260210002",
+      "date": "2026-02-10",
+      "item": "Charizard ex Premium Collection",
+      "amount": 49.99,
+      "qty": 1,
+      "status": "shipped",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "794644790301",
+      "carrier": "FedEx",
+      "image": ""
+    },
+    {
+      "retailer": "samsclub",
+      "orderId": "SC90001234",
+      "date": "2026-02-04",
+      "item": "Pokemon TCG Prismatic Evolutions Collection Box",
+      "amount": 99.98,
+      "qty": 2,
+      "status": "confirmed",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "",
+      "carrier": "",
+      "image": ""
+    },
+    {
+      "retailer": "samsclub",
+      "orderId": "SC90001235",
+      "date": "2026-01-30",
+      "item": "Pokemon TCG Scarlet & Violet UPC",
+      "amount": 119.98,
+      "qty": 1,
+      "status": "delivered",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "1Z999BB20234567890",
+      "carrier": "UPS",
+      "image": ""
+    },
+    {
+      "retailer": "costco",
+      "orderId": "CO88001234",
+      "date": "2026-02-06",
+      "item": "Pokemon TCG Prismatic Evolutions Binder Collection",
+      "amount": 29.99,
+      "qty": 1,
+      "status": "shipped",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "9261290100130735811497",
+      "carrier": "USPS",
+      "image": ""
+    },
+    {
+      "retailer": "costco",
+      "orderId": "CO88001235",
+      "date": "2026-01-22",
+      "item": "Pokemon TCG Battle Academy",
+      "amount": 19.99,
+      "qty": 1,
+      "status": "delivered",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "9261290100130735811498",
+      "carrier": "USPS",
+      "image": ""
+    },
+    {
+      "retailer": "bestbuy",
+      "orderId": "BBY01-806123456",
+      "date": "2026-02-07",
+      "item": "Pokemon TCG Prismatic Evolutions Surprise Box",
+      "amount": 34.99,
+      "qty": 1,
+      "status": "confirmed",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "",
+      "carrier": "",
+      "image": ""
+    },
+    {
+      "retailer": "bestbuy",
+      "orderId": "BBY01-806123457",
+      "date": "2026-02-12",
+      "item": "Pokemon TCG Surging Sparks Booster Box",
+      "amount": 143.99,
+      "qty": 1,
+      "status": "shipped",
+      "source": "email",
+      "email": "testuser@gmail.com",
+      "tracking": "794644790302",
+      "carrier": "FedEx",
+      "image": ""
+    }
+  ],
+  "inventory": [
+    {
+      "id": "inv-001",
+      "name": "Prismatic Evolutions ETB",
+      "setName": "Prismatic Evolutions",
+      "sku": "PE-ETB-001",
+      "qty": 5,
+      "costPerUnit": 49.99,
+      "marketPrice": 89.99,
+      "addedAt": "2026-02-01T12:00:00.000Z",
+      "image": "",
+      "type": "sealed",
+      "tcgPlayerUrl": ""
+    },
+    {
+      "id": "inv-002",
+      "name": "Surging Sparks Booster Box",
+      "setName": "Surging Sparks",
+      "sku": "SS-BB-001",
+      "qty": 3,
+      "costPerUnit": 89.97,
+      "marketPrice": 120.00,
+      "addedAt": "2026-02-05T12:00:00.000Z",
+      "image": "",
+      "type": "sealed",
+      "tcgPlayerUrl": ""
+    },
+    {
+      "id": "inv-003",
+      "name": "Charizard ex 223/197",
+      "setName": "Obsidian Flames",
+      "sku": "OF-223",
+      "qty": 2,
+      "costPerUnit": 25.00,
+      "marketPrice": 45.00,
+      "addedAt": "2026-02-10T12:00:00.000Z",
+      "image": "",
+      "type": "single",
+      "tcgPlayerUrl": "https://www.tcgplayer.com/product/12345"
+    }
+  ],
+  "salesLog": [
+    {
+      "id": "sale-001",
+      "inventoryItemId": "inv-001",
+      "itemName": "Prismatic Evolutions ETB",
+      "qty": 1,
+      "salePrice": 89.99,
+      "costBasis": 49.99,
+      "platform": "eBay",
+      "buyer": "buyer123",
+      "date": "2026-02-15T10:00:00.000Z",
+      "notes": "Sold on eBay"
+    }
+  ],
+  "syncSettings": {
+    "autoSync": false,
+    "autoSyncInterval": 30,
+    "syncRetailers": ["walmart", "target", "pokecenter", "samsclub", "costco", "bestbuy"]
+  },
+  "emailNicknames": {
+    "testuser@gmail.com": "Main Account"
+  },
+  "dataVersion": 3,
+  "ordersMerged": true,
+  "dataMode": "imap",
+  "theme": "dark",
+  "discordAco": {
+    "enabled": false,
+    "autoForwardEnabled": false,
+    "forwardDeclinedEnabled": true
+  },
+  "profileMappings": [],
+  "skuOverrides": {},
+  "jigSettings": {
+    "enabled": false,
+    "rules": []
+  },
+  "proxyLists": {},
+  "inventorySettings": {
+    "autoRefresh": false,
+    "refreshInterval": 60
+  },
+  "addressLinks": {}
+}

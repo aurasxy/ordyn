@@ -195,6 +195,7 @@ contextBridge.exposeInMainWorld('api', {
   // Live Tracking
   fetchLiveTracking: (trackingNumbers) => ipcRenderer.invoke('fetch-live-tracking', trackingNumbers),
   clearLiveTrackingCache: () => ipcRenderer.invoke('clear-live-tracking-cache'),
+  updateOrdersFromTracking: (updates) => ipcRenderer.invoke('update-orders-from-tracking', updates),
 
   // Discord Webhooks
   saveDiscordWebhook: (url) => ipcRenderer.invoke('save-discord-webhook', url),
@@ -222,10 +223,15 @@ contextBridge.exposeInMainWorld('api', {
   saveProfileMapping: (profileName, discordUserId, discordUsername) => ipcRenderer.invoke('save-profile-mapping', profileName, discordUserId, discordUsername),
   deleteProfileMapping: (profileName) => ipcRenderer.invoke('delete-profile-mapping', profileName),
   setAutoForwardEnabled: (enabled) => ipcRenderer.invoke('set-auto-forward-enabled', enabled),
+  setForwardDeclinedEnabled: (enabled) => ipcRenderer.invoke('set-forward-declined-enabled', enabled),
+  getForwardDeclinedEnabled: () => ipcRenderer.invoke('get-forward-declined-enabled'),
 
   // Data Mode
   getDataMode: () => ipcRenderer.invoke('get-data-mode'),
   setDataMode: (mode) => ipcRenderer.invoke('set-data-mode', mode),
+
+  // Test Mode
+  getTestMode: () => ipcRenderer.invoke('get-test-mode'),
 });
 
 console.log('API exposed to window');

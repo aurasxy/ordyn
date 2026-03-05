@@ -111,7 +111,6 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Notify Discord
-        if: ${{ vars.DISCORD_WEBHOOK_URL != '' || secrets.DISCORD_WEBHOOK_URL != '' }}
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           VERSION: ${{ steps.version.outputs.version }}

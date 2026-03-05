@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
 
 const SUPABASE_URL = 'https://lmbpctkoxxdhbmududzx.supabase.co';
 const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/license-api`;
@@ -21,9 +22,68 @@ const getCachePath = () => {
   return path.join(userDataPath, '.license-cache');
 };
 
-// HMAC signing key derived from machine-specific paths
-// Can't be extracted from the cache file itself
+// ── Stable machine ID from hardware ──
+// Persists across updates, reinstalls, and app path changes
+let _cachedHwId = null;
+
+function getHardwareMachineId() {
+  if (_cachedHwId) return _cachedHwId;
+
+  try {
+    const platform = os.platform();
+    if (platform === 'win32') {
+      // Windows: Get hardware UUID via PowerShell CIM (stable across updates/reinstalls)
+      const output = execSync(
+        'powershell -NoProfile -Command "(Get-CimInstance -Class Win32_ComputerSystemProduct).UUID"',
+        { encoding: 'utf8', timeout: 10000, windowsHide: true }
+      );
+      const uuid = output.trim();
+      if (uuid && uuid.length >= 16 && uuid !== 'FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF') {
+        _cachedHwId = uuid;
+        return _cachedHwId;
+      }
+    } else if (platform === 'darwin') {
+      // macOS: IOPlatformUUID (hardware UUID, never changes)
+      const output = execSync(
+        "ioreg -rd1 -c IOPlatformExpertDevice | awk '/IOPlatformUUID/{print $3}'",
+        { encoding: 'utf8', timeout: 5000 }
+      );
+      const cleaned = output.trim().replace(/"/g, '');
+      if (cleaned.length >= 16) {
+        _cachedHwId = cleaned;
+        return _cachedHwId;
+      }
+    } else {
+      // Linux: /etc/machine-id (stable per install)
+      if (fs.existsSync('/etc/machine-id')) {
+        const mid = fs.readFileSync('/etc/machine-id', 'utf8').trim();
+        if (mid.length >= 16) {
+          _cachedHwId = mid;
+          return _cachedHwId;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[License] Hardware ID lookup failed:', err.message);
+  }
+
+  // Fallback: derive from hostname + user + cpus (stable but less unique)
+  const fallback = `${os.hostname()}|${os.userInfo().username}|${os.cpus()[0]?.model || ''}|${os.totalmem()}`;
+  _cachedHwId = crypto.createHash('sha256').update(fallback).digest('hex').substring(0, 36);
+  console.log('[License] Using fallback machine ID from system info');
+  return _cachedHwId;
+}
+
+// ── HMAC cache signing ──
+// Key is derived from userData path + hardware ID (both stable across updates)
+// Does NOT use app.getPath('exe') which changes on every update
 function getCacheSecret() {
+  const seed = app.getPath('userData') + '|' + getHardwareMachineId() + '|solus-cache-v2';
+  return crypto.createHash('sha256').update(seed).digest();
+}
+
+// Legacy secret (v1) — used for migration from old signed caches
+function getLegacyCacheSecret() {
   const seed = app.getPath('userData') + '|' + app.getPath('exe') + '|solus-cache-v1';
   return crypto.createHash('sha256').update(seed).digest();
 }
@@ -36,23 +96,34 @@ function signCacheData(data) {
 
 function verifyCacheData(raw) {
   if (!raw || !raw.sig || !raw.payload) return null;
+
+  // Try current v2 secret first
   const expected = crypto.createHmac('sha256', getCacheSecret()).update(raw.payload).digest('hex');
-  if (!crypto.timingSafeEqual(Buffer.from(raw.sig, 'hex'), Buffer.from(expected, 'hex'))) {
-    return null; // tampered
-  }
-  return JSON.parse(raw.payload);
+  try {
+    if (crypto.timingSafeEqual(Buffer.from(raw.sig, 'hex'), Buffer.from(expected, 'hex'))) {
+      return JSON.parse(raw.payload);
+    }
+  } catch {}
+
+  // Try legacy v1 secret (migration path from old exe-based signing)
+  try {
+    const legacyExpected = crypto.createHmac('sha256', getLegacyCacheSecret()).update(raw.payload).digest('hex');
+    if (crypto.timingSafeEqual(Buffer.from(raw.sig, 'hex'), Buffer.from(legacyExpected, 'hex'))) {
+      console.log('[License] Migrating cache from v1 to v2 signing key');
+      const data = JSON.parse(raw.payload);
+      // Re-sign with new key and update machine ID
+      data.machineId = getHardwareMachineId();
+      writeCache(data);
+      return data;
+    }
+  } catch {}
+
+  return null; // tampered or unrecoverable
 }
 
 function generateMachineId() {
-  const cachePath = getCachePath();
-  try {
-    if (fs.existsSync(cachePath)) {
-      const raw = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
-      const cache = verifyCacheData(raw);
-      if (cache && cache.machineId) return cache.machineId;
-    }
-  } catch {}
-  return crypto.randomUUID();
+  // Always use hardware-based ID — stable across updates
+  return getHardwareMachineId();
 }
 
 function readCache() {
@@ -65,13 +136,25 @@ function readCache() {
       if (raw.sig && raw.payload) {
         const verified = verifyCacheData(raw);
         if (!verified) {
-          console.error('License cache signature invalid — clearing');
+          // Don't clear — try to recover the payload and re-sign
+          console.error('[License] Cache signature invalid — attempting recovery');
+          try {
+            const payload = JSON.parse(raw.payload);
+            if (payload && payload.licenseKey) {
+              console.log('[License] Recovered cache payload, re-signing with current key');
+              payload.machineId = getHardwareMachineId();
+              writeCache(payload);
+              return payload;
+            }
+          } catch {}
+          console.error('[License] Recovery failed — clearing cache');
           clearCache();
           return null;
         }
         return verified;
       }
       // Legacy unsigned cache — migrate it by re-writing signed
+      raw.machineId = getHardwareMachineId();
       writeCache(raw);
       return raw;
     }
@@ -140,6 +223,8 @@ async function activateLicense(licenseKey) {
     const appVersion = app.getVersion();
     const osInfo = `${os.platform()} ${os.release()}`;
 
+    console.log(`[License] Activating with machineId: ${machineId.substring(0, 8)}...`);
+
     const result = await callEdgeFunction('activate', {
       licenseKey,
       machineId,
@@ -174,6 +259,14 @@ async function checkLicense() {
 
   if (!cache || !cache.licenseKey) {
     return { valid: false, error: 'No license found' };
+  }
+
+  // Ensure machine ID is current hardware ID
+  const hwId = getHardwareMachineId();
+  if (cache.machineId !== hwId) {
+    console.log('[License] Updating cached machineId to current hardware ID');
+    cache.machineId = hwId;
+    writeCache(cache);
   }
 
   const now = Date.now();
@@ -261,6 +354,7 @@ function stopHeartbeat() {
 
 module.exports = {
   generateMachineId,
+  getHardwareMachineId,
   validateLicense,
   activateLicense,
   checkLicense,

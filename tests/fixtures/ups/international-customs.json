@@ -1,0 +1,52 @@
+{
+  "_description": "UPS fixture: International package with customs intake and clearance events",
+  "_trackingNumber": "1ZINTERNATIONAL01",
+  "trackResponse": {
+    "shipment": [{
+      "package": [{
+        "trackingNumber": "1ZINTERNATIONAL01",
+        "deliveryDate": [{ "type": "SDD", "date": "20260310" }],
+        "currentStatus": {
+          "type": "I",
+          "description": "Your package is in transit. We're updating plans to schedule your delivery.",
+          "code": "IT",
+          "simplifiedTextDescription": "In Transit - Customs Cleared",
+          "statusCode": "005"
+        },
+        "packageAddress": [{
+          "type": "DESTINATION",
+          "address": { "city": "LONDON", "stateProvince": "", "postalCode": "W1A 1AB", "country": "GB" }
+        }],
+        "weight": { "unitOfMeasurement": "KGS", "weight": "3.40" },
+        "service": { "code": "008", "description": "UPS Worldwide Expedited" },
+        "activity": [
+          {
+            "date": "20260306", "time": "140000",
+            "location": { "address": { "city": "EAST MIDLANDS", "stateProvince": "", "country": "GB" } },
+            "status": { "type": "I", "description": "Customs Clearance Completed", "code": "CC", "statusCode": "052" }
+          },
+          {
+            "date": "20260305", "time": "090000",
+            "location": { "address": { "city": "EAST MIDLANDS", "stateProvince": "", "country": "GB" } },
+            "status": { "type": "I", "description": "Package received by customs", "code": "CU", "statusCode": "050" }
+          },
+          {
+            "date": "20260304", "time": "210000",
+            "location": { "address": { "city": "LOUISVILLE", "stateProvince": "KY", "country": "US" } },
+            "status": { "type": "I", "description": "Departed from Facility", "code": "DP", "statusCode": "005" }
+          },
+          {
+            "date": "20260303", "time": "160000",
+            "location": { "address": { "city": "LOUISVILLE", "stateProvince": "KY", "country": "US" } },
+            "status": { "type": "I", "description": "Arrived at Facility", "code": "AR", "statusCode": "007" }
+          },
+          {
+            "date": "20260302", "time": "100000",
+            "location": { "address": { "city": "CHICAGO", "stateProvince": "IL", "country": "US" } },
+            "status": { "type": "M", "description": "Shipper created a label, UPS has not yet received the package", "code": "MP", "statusCode": "001" }
+          }
+        ]
+      }]
+    }]
+  }
+}

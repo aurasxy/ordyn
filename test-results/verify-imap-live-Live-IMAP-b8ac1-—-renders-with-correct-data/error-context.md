@@ -1,0 +1,490 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e6]: SOLUS
+        - button "Toggle light/dark mode" [ref=e7] [cursor=pointer]:
+          - img [ref=e9]
+      - navigation [ref=e15]:
+        - generic [ref=e16]:
+          - generic [ref=e17]: Menu
+          - generic [ref=e18] [cursor=pointer]:
+            - img [ref=e20]
+            - generic [ref=e23]: Dashboard
+          - generic [ref=e24] [cursor=pointer]:
+            - img [ref=e26]
+            - generic [ref=e30]: Deliveries
+            - generic [ref=e31]: "0"
+          - generic [ref=e32] [cursor=pointer]:
+            - img [ref=e34]
+            - generic [ref=e35]: Analytics
+          - generic [ref=e36] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e41]: Account Stats
+          - generic [ref=e42] [cursor=pointer]:
+            - img [ref=e44]
+            - generic [ref=e47]: IMAP
+          - generic [ref=e48] [cursor=pointer]:
+            - img [ref=e50]
+            - generic [ref=e53]: Reports
+          - generic [ref=e54] [cursor=pointer]:
+            - img [ref=e56]
+            - generic [ref=e62]: Portfolio
+            - generic [ref=e63]: "0"
+          - generic [ref=e64] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Settings
+        - generic [ref=e70]:
+          - generic [ref=e71]: Retailers
+          - generic [ref=e72] [cursor=pointer]:
+            - generic [ref=e75]: Walmart
+            - generic [ref=e76]: "0"
+          - generic [ref=e77] [cursor=pointer]:
+            - generic [ref=e80]: Target
+            - generic [ref=e81]: "0"
+          - generic [ref=e82] [cursor=pointer]:
+            - generic [ref=e85]: Pokemon Center
+            - generic [ref=e86]: "0"
+          - generic [ref=e87] [cursor=pointer]:
+            - generic [ref=e90]: Sam's Club
+            - generic [ref=e91]: "0"
+          - generic [ref=e92] [cursor=pointer]:
+            - generic [ref=e95]: Costco
+            - generic [ref=e96]: "0"
+          - generic [ref=e97] [cursor=pointer]:
+            - generic [ref=e100]: Best Buy
+            - generic [ref=e101]: "0"
+      - generic [ref=e102]:
+        - button "Check for Updates" [ref=e103] [cursor=pointer]:
+          - img [ref=e104]
+          - text: Check for Updates
+        - generic "Click to check for updates" [ref=e108] [cursor=pointer]: v28.3.3
+    - main [ref=e109]:
+      - generic [ref=e110]:
+        - generic [ref=e111]:
+          - heading "Walmart" [level=1] [ref=e112]:
+            - img [ref=e113]
+            - text: Walmart
+          - generic [ref=e115]:
+            - button "7D" [ref=e116] [cursor=pointer]
+            - button "30D" [ref=e117] [cursor=pointer]
+            - button "90D" [ref=e118] [cursor=pointer]
+            - button "All" [ref=e119] [cursor=pointer]
+        - generic [ref=e120]:
+          - generic [ref=e121] [cursor=pointer]: ← Back to Dashboard
+          - generic [ref=e122]: Showing all orders
+          - generic [ref=e123]:
+            - generic [ref=e124]:
+              - generic [ref=e125]: Confirmed
+              - generic [ref=e126]: "0"
+            - generic [ref=e127]:
+              - generic [ref=e128]: Cancelled
+              - generic [ref=e129]: "0"
+            - generic [ref=e130]:
+              - generic [ref=e131]: Shipped
+              - generic [ref=e132]: "0"
+            - generic [ref=e133]:
+              - generic [ref=e134]: Delivered
+              - generic [ref=e135]: "0"
+            - generic [ref=e136]:
+              - generic [ref=e137]: Total
+              - generic [ref=e138]: "0"
+            - generic [ref=e139]:
+              - generic [ref=e140]: Spent
+              - generic [ref=e141]: $0.00
+          - generic [ref=e143]:
+            - img [ref=e145]
+            - textbox "Search by item, order ID, email, address, tracking..." [ref=e148]
+            - generic [ref=e149]: /
+          - generic [ref=e150]:
+            - generic [ref=e151]:
+              - generic [ref=e152]: Drops(by order date)
+              - generic [ref=e153]: Hold Ctrl/Cmd to multi-select
+            - generic [ref=e155]:
+              - img [ref=e157]
+              - generic [ref=e159]: No drops yet
+          - generic [ref=e160]:
+            - generic [ref=e162]: Items(click to filter)
+            - generic [ref=e163]:
+              - img [ref=e165]
+              - generic [ref=e169]: No items
+          - generic [ref=e170]:
+            - generic [ref=e171]:
+              - generic [ref=e172]: Orders (0)
+              - generic [ref=e173]:
+                - generic [ref=e174]:
+                  - button "▦" [ref=e175] [cursor=pointer]
+                  - button "☰" [ref=e176] [cursor=pointer]
+                - button "Columns" [ref=e178] [cursor=pointer]:
+                  - img [ref=e179]
+                  - text: Columns
+              - generic [ref=e182]:
+                - button "All" [ref=e183] [cursor=pointer]
+                - button "Confirmed" [ref=e184] [cursor=pointer]
+                - button "Shipped" [ref=e185] [cursor=pointer]
+                - button "Delivered" [ref=e186] [cursor=pointer]
+                - button "Cancelled" [ref=e187] [cursor=pointer]
+                - button "Advanced" [ref=e188] [cursor=pointer]
+            - generic [ref=e189]:
+              - img [ref=e191]
+              - generic [ref=e194]: No orders
+    - generic [ref=e195]:
+      - generic "Packages currently in transit" [ref=e196] [cursor=pointer]:
+        - img [ref=e198]
+        - generic [ref=e203]: "0"
+        - generic [ref=e204]: in transit
+      - generic "Arriving today" [ref=e205] [cursor=pointer]:
+        - img [ref=e207]
+        - generic [ref=e210]: "0"
+        - generic [ref=e211]: arriving today
+      - generic "Spent this month" [ref=e212] [cursor=pointer]:
+        - img [ref=e214]
+        - generic [ref=e216]: $0
+        - generic [ref=e217]: this month
+      - generic "Recently delivered" [ref=e218] [cursor=pointer]:
+        - img [ref=e220]
+        - generic [ref=e223]: "0"
+        - generic [ref=e224]: delivered this week
+  - generic:
+    - generic:
+      - generic: Add Email Account
+      - generic:
+        - generic: Email Provider
+        - combobox:
+          - option "Gmail (Recommended)" [selected]
+          - option "Yahoo Mail"
+          - option "Outlook / Hotmail"
+          - option "iCloud"
+      - generic:
+        - generic: Email Address
+        - textbox "your-email@gmail.com"
+      - generic:
+        - generic: App Password
+        - textbox "xxxx xxxx xxxx xxxx"
+      - paragraph:
+        - text: Generate App Password at
+        - link "myaccount.google.com/apppasswords":
+          - /url: "#"
+      - generic:
+        - button "Cancel"
+        - button "Test":
+          - img
+          - text: Test
+        - button "Add Account"
+  - generic:
+    - generic:
+      - generic: Confirm
+      - paragraph: Are you sure?
+      - generic:
+        - button "Cancel"
+        - button "Confirm"
+  - generic:
+    - generic:
+      - generic: Set Nickname
+      - paragraph
+      - textbox "Enter a nickname..."
+      - generic:
+        - button "Cancel"
+        - button "Save"
+  - generic:
+    - generic:
+      - generic:
+        - generic: Sync Log
+        - button "×"
+      - generic:
+        - button "Clear Log"
+        - button "Close"
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - text: You COOKED!
+          - img
+      - generic:
+        - generic:
+          - generic: "0"
+          - generic: Confirmed Orders
+        - generic:
+          - generic: "0"
+          - generic: Total Quantity
+        - generic:
+          - generic: $0
+          - generic: Total Spent
+        - generic:
+          - generic: 0%
+          - generic: Stick Rate
+      - generic:
+        - button "Save PNG":
+          - img
+          - text: Save PNG
+        - button "Send to Discord":
+          - img
+          - text: Send to Discord
+        - button "Close"
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic: Item Name
+          - generic: Retailer • Total Orders
+        - button "×"
+      - generic:
+        - generic:
+          - generic: Price History
+        - generic:
+          - generic: Orders
+        - generic:
+          - generic: Accounts
+      - generic:
+        - button "Close"
+  - generic:
+    - generic:
+      - generic: "0"
+      - generic: selected
+    - generic:
+      - button "Select All"
+      - button "✓ Mark Delivered"
+      - button "Export CSV":
+        - img
+        - text: Export CSV
+      - button "✕ Clear"
+  - generic [ref=e226]: ✓
+  - generic [ref=e229]: Checking for updates...
+  - generic:
+    - generic:
+      - img
+    - generic: Update Available!
+    - generic: Version 1.1.0 is ready to install
+    - generic:
+      - button "Later"
+      - button "Restart & Update"
+  - generic [ref=e230]:
+    - generic [ref=e231]:
+      - img [ref=e232]
+      - text: Downloading update...
+    - button "✕" [ref=e235] [cursor=pointer]
+  - generic:
+    - generic:
+      - generic: Add Inventory Item
+      - generic:
+        - generic: TCGPlayer URL
+        - generic:
+          - textbox "https://tcgplayer.com/product/..."
+          - button "Fetch"
+      - generic:
+        - button "Cancel"
+        - button "Add to Inventory" [disabled]
+  - generic:
+    - generic:
+      - generic:
+        - img
+        - generic:
+          - generic: Product Name
+          - generic: Set Name
+          - generic: $0.00
+          - generic: "-"
+      - generic:
+        - generic:
+          - generic: "0"
+          - generic: Quantity
+        - generic:
+          - generic: $0
+          - generic: Total Cost
+        - generic:
+          - generic: $0
+          - generic: Market Value
+        - generic:
+          - generic: $0
+          - generic: Profit/Loss
+      - generic:
+        - generic:
+          - generic: Current Market Price
+          - generic: "-"
+      - generic:
+        - generic:
+          - generic: Price History
+      - generic:
+        - generic:
+          - generic: TCGPlayer Tracking
+          - button "Add Tracking":
+            - generic: Add Tracking
+      - generic:
+        - button "Log Sale":
+          - img
+          - text: Log Sale
+        - button "Refresh Price":
+          - img
+          - text: Refresh Price
+        - button "Edit":
+          - img
+          - text: Edit
+        - button "Delete":
+          - img
+          - text: Delete
+        - button "Close"
+  - generic:
+    - generic:
+      - generic:
+        - img
+        - text: Log Sale
+      - generic:
+        - generic:
+          - text: "Current inventory:"
+          - strong: "0"
+          - text: units
+      - generic:
+        - generic: Quantity Sold
+        - spinbutton: "1"
+      - generic:
+        - generic: Sale Price Per Unit ($)
+        - spinbutton: "0"
+      - generic:
+        - generic: Platform (Optional)
+        - combobox:
+          - option "Select platform..." [selected]
+          - option "eBay"
+          - option "TCGPlayer"
+          - option "Mercari"
+          - option "Facebook Marketplace"
+          - option "Local/In-Person"
+          - option "Other"
+      - generic:
+        - generic: Notes (Optional)
+        - textbox "Buyer name, tracking, etc."
+      - generic:
+        - generic:
+          - generic: "Sale Total:"
+          - strong: $0.00
+        - generic:
+          - generic: "Profit (vs cost):"
+          - strong: $0.00
+      - generic:
+        - button "Cancel"
+        - button "Log Sale"
+  - generic:
+    - generic:
+      - generic: Search TCGPlayer by Name
+      - generic:
+        - generic: Card Name
+        - textbox "e.g., Charizard ex"
+      - generic:
+        - generic: Set (Optional)
+        - textbox "e.g., Obsidian Flames"
+      - generic:
+        - button "Search"
+      - generic:
+        - button "Cancel"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Import from Delivered Orders" [level=2]:
+          - img
+          - text: Import from Delivered Orders
+        - button "×"
+      - generic:
+        - generic:
+          - generic: Select drops, then choose items to import. Only confirmed orders shown (cancelled excluded). Items already in inventory are highlighted.
+          - generic:
+            - button "Select All Items"
+            - button "Deselect All"
+            - button "Select New Only"
+            - generic:
+              - text: "Selected:"
+              - strong: "0"
+              - text: items
+        - generic:
+          - combobox:
+            - option "All Retailers" [selected]
+            - option "🔵 Walmart"
+            - option "🔴 Target"
+            - option "🟡 Pokemon Center"
+            - option "🟦 Sam's Club"
+            - option "🔻 Costco"
+          - textbox "Search items..."
+      - generic:
+        - button "Cancel"
+        - button "Import Items" [disabled]:
+          - text: Import
+          - text: Items
+  - generic:
+    - generic:
+      - generic:
+        - img
+        - text: Edit Sale
+      - generic:
+        - generic: Sale Date
+        - textbox
+      - generic:
+        - generic: Quantity Sold
+        - spinbutton: "1"
+      - generic:
+        - generic: Sale Price Per Unit ($)
+        - spinbutton: "0"
+      - generic:
+        - generic: Platform
+        - combobox:
+          - option "Select platform..." [selected]
+          - option "eBay"
+          - option "TCGPlayer"
+          - option "Mercari"
+          - option "Facebook Marketplace"
+          - option "Local/In-Person"
+          - option "Other"
+      - generic:
+        - generic: Fees ($)
+        - spinbutton: "0"
+      - generic:
+        - generic: Buyer
+        - textbox "Buyer name (optional)"
+      - generic:
+        - generic: Notes
+        - textbox "Sale notes (optional)"
+      - generic:
+        - button "Cancel"
+        - button "Save Changes"
+  - generic:
+    - generic:
+      - generic: Manage Proxy Lists
+      - generic:
+        - generic:
+          - generic: Create New List
+          - textbox "List name (e.g., Datacenter, Residential)"
+        - generic:
+          - generic: "Proxies (one per line: ip:port or ip:port:user:pass)"
+          - textbox "192.168.1.1:8080 10.0.0.1:3128:username:password":
+            - /placeholder: "192.168.1.1:8080\n10.0.0.1:3128:username:password"
+        - generic:
+          - button "Test First Proxy":
+            - img
+            - text: Test First Proxy
+          - button "Save List":
+            - img
+            - text: Save List
+      - generic:
+        - button "Close"
+  - generic:
+    - generic:
+      - generic: Edit Inventory Item
+      - generic:
+        - generic: Quantity
+        - spinbutton: "1"
+      - generic:
+        - generic: Cost Per Item ($)
+        - spinbutton: "0"
+      - generic:
+        - generic: Linked Retailer
+        - combobox:
+          - option "Not linked" [selected]
+          - option "🔵 Walmart"
+          - option "🔴 Target"
+          - option "🟡 Pokemon Center"
+          - option "🟦 Sam's Club"
+          - option "🔻 Costco"
+      - generic:
+        - button "Cancel"
+        - button "Save Changes"
+  - generic: TEST MODE
+```

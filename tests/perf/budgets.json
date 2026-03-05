@@ -27,6 +27,31 @@
     "computeOrderStatuses": {
       "maxCallsPerNavigation": 5,
       "description": "Max times computeOrderStatuses can be called per page switch"
+    },
+    "inventoryRender": {
+      "render500_ms": 2000,
+      "render500_hidden_ms": 3000,
+      "description": "Time to render portfolio page with 500 inventory items"
+    },
+    "inventorySearch": {
+      "filter500_ms": 500,
+      "filterWithDebounce_ms": 1000,
+      "description": "Time to filter 500 items by search term (includes 400ms debounce)"
+    },
+    "inventorySort": {
+      "sort500_ms": 500,
+      "sortWithRender_ms": 1000,
+      "description": "Time to sort and re-render 500 items"
+    },
+    "inventoryTabSwitch": {
+      "subTabSwitch_ms": 1000,
+      "subTabSwitchHidden_ms": 1500,
+      "description": "Time to switch between Stock/Sales/Insights sub-tabs"
+    },
+    "inventoryMemory": {
+      "heap500_mb": 250,
+      "modalCycleGrowth_mb": 30,
+      "description": "Heap limits with 500 inventory items loaded"
     }
   },
   "datasets": {

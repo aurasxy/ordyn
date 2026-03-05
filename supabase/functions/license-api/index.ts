@@ -191,12 +191,34 @@ async function activateLicense(supabase: any, body: any) {
 
   const { data: activeActivations } = await supabase
     .from('activations')
-    .select('id')
+    .select('id, machine_id, last_heartbeat')
     .eq('license_id', license.id)
     .eq('is_active', true)
+    .order('last_heartbeat', { ascending: true })
 
   if (activeActivations && activeActivations.length >= license.maxActivations) {
-    return { error: `Maximum activations reached (${license.maxActivations})` }
+    // Auto-deactivate stale activations (no heartbeat in 7+ days)
+    const STALE_THRESHOLD = 7 * 24 * 60 * 60 * 1000 // 7 days
+    const now = Date.now()
+    let freed = 0
+
+    for (const act of activeActivations) {
+      const lastBeat = act.last_heartbeat ? new Date(act.last_heartbeat).getTime() : 0
+      if ((now - lastBeat) > STALE_THRESHOLD) {
+        await supabase
+          .from('activations')
+          .update({ is_active: false })
+          .eq('id', act.id)
+        freed++
+        console.log(`[License] Auto-deactivated stale activation ${act.id} (last heartbeat: ${act.last_heartbeat})`)
+        // Only free enough slots for the new activation
+        if ((activeActivations.length - freed) < license.maxActivations) break
+      }
+    }
+
+    if ((activeActivations.length - freed) >= license.maxActivations) {
+      return { error: `Maximum activations reached (${license.maxActivations}). Please deactivate another device first.` }
+    }
   }
 
   const { data: newActivation, error } = await supabase

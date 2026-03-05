@@ -1,0 +1,42 @@
+{
+  "_description": "UPS fixture: Exception - delivery attempt failed (business closed)",
+  "_trackingNumber": "1ZEXCEPTION000001",
+  "trackResponse": {
+    "shipment": [{
+      "package": [{
+        "trackingNumber": "1ZEXCEPTION000001",
+        "deliveryDate": [{ "type": "SDD", "date": "20260228" }],
+        "currentStatus": {
+          "type": "X",
+          "description": "The package was not delivered due to the business being closed.",
+          "code": "A1",
+          "simplifiedTextDescription": "Delivery attempted - business closed",
+          "statusCode": "099"
+        },
+        "packageAddress": [{
+          "type": "DESTINATION",
+          "address": { "city": "NEW YORK", "stateProvince": "NY", "postalCode": "10001", "country": "US" }
+        }],
+        "weight": { "unitOfMeasurement": "LBS", "weight": "1.20" },
+        "service": { "code": "001", "description": "UPS Next Day Air" },
+        "activity": [
+          {
+            "date": "20260228", "time": "170000",
+            "location": { "address": { "city": "NEW YORK", "stateProvince": "NY", "country": "US" } },
+            "status": { "type": "X", "description": "A delivery attempt was made; the business was closed. A 2nd attempt will be made.", "code": "A1", "statusCode": "099" }
+          },
+          {
+            "date": "20260228", "time": "080000",
+            "location": { "address": { "city": "NEW YORK", "stateProvince": "NY", "country": "US" } },
+            "status": { "type": "I", "description": "Out For Delivery Today", "code": "OT", "statusCode": "021" }
+          },
+          {
+            "date": "20260227", "time": "220000",
+            "location": { "address": { "city": "SECAUCUS", "stateProvince": "NJ", "country": "US" } },
+            "status": { "type": "I", "description": "Arrived at Facility", "code": "AR", "statusCode": "007" }
+          }
+        ]
+      }]
+    }]
+  }
+}

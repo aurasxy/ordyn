@@ -1,0 +1,47 @@
+{
+  "_description": "UPS fixture: In-transit package with ETA and multiple scan events",
+  "_trackingNumber": "1Z999BB20234567890",
+  "trackResponse": {
+    "shipment": [{
+      "package": [{
+        "trackingNumber": "1Z999BB20234567890",
+        "deliveryDate": [{ "type": "SDD", "date": "20260305" }],
+        "currentStatus": {
+          "type": "I",
+          "description": "In Transit",
+          "code": "IT",
+          "simplifiedTextDescription": "In Transit",
+          "statusCode": "005"
+        },
+        "packageAddress": [{
+          "type": "DESTINATION",
+          "address": { "city": "SEATTLE", "stateProvince": "WA", "postalCode": "98101", "country": "US" }
+        }],
+        "weight": { "unitOfMeasurement": "LBS", "weight": "5.80" },
+        "service": { "code": "002", "description": "UPS 2nd Day Air" },
+        "activity": [
+          {
+            "date": "20260303", "time": "150000",
+            "location": { "address": { "city": "PHOENIX", "stateProvince": "AZ", "country": "US" } },
+            "status": { "type": "I", "description": "Departed from Facility", "code": "DP", "statusCode": "005" }
+          },
+          {
+            "date": "20260303", "time": "080000",
+            "location": { "address": { "city": "PHOENIX", "stateProvince": "AZ", "country": "US" } },
+            "status": { "type": "I", "description": "Arrived at Facility", "code": "AR", "statusCode": "007" }
+          },
+          {
+            "date": "20260302", "time": "190000",
+            "location": { "address": { "city": "LOS ANGELES", "stateProvince": "CA", "country": "US" } },
+            "status": { "type": "I", "description": "Origin Scan", "code": "OR", "statusCode": "003" }
+          },
+          {
+            "date": "20260302", "time": "120000",
+            "location": { "address": { "city": "LOS ANGELES", "stateProvince": "CA", "country": "US" } },
+            "status": { "type": "M", "description": "Shipper created a label, UPS has not yet received the package", "code": "MP", "statusCode": "001" }
+          }
+        ]
+      }]
+    }]
+  }
+}

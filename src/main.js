@@ -4,6 +4,11 @@ const fs = require('fs');
 const crypto = require('crypto');
 const Store = require('electron-store');
 
+// Suppress EPIPE errors on stdout/stderr to prevent crashes when the
+// pipe is closed (e.g. launching terminal closed, or spawned without tty).
+process.stdout?.on?.('error', (err) => { if (err.code !== 'EPIPE') throw err; });
+process.stderr?.on?.('error', (err) => { if (err.code !== 'EPIPE') throw err; });
+
 // ==================== TEST MODE ISOLATION ====================
 // When SOLUS_TEST_MODE is set, redirect userData to an isolated directory
 // so automated tests never touch real user data.
@@ -229,12 +234,28 @@ const store = new Store({
     dataVersion: 0,
     inventory: [],
     salesLog: [],
+    inventoryV2: [],
+    salesLogV2: [],
+    adjustments: [],
+    ledger: [],
     emailNicknames: {},
     proxyLists: {},
     inventorySettings: {
       activeProxyList: null,
       refreshInterval: 0,
-      lastRefresh: null
+      lastRefresh: null,
+      defaultCostMethod: 'wavg',
+      defaultCondition: 'NM',
+      autoDeleteSoldOut: false,
+      priceHistoryRetentionDays: 365,
+      dismissedInsights: [],
+      feePresets: {
+        eBay: { platformFeePercent: 13.25, paymentProcessingPercent: 0 },
+        TCGPlayer: { platformFeePercent: 10.25, paymentProcessingPercent: 2.5 },
+        Mercari: { platformFeePercent: 10, paymentProcessingPercent: 0 },
+        Facebook: { platformFeePercent: 0, paymentProcessingPercent: 0 },
+        Local: { platformFeePercent: 0, paymentProcessingPercent: 0 }
+      }
     },
     syncSettings: {
       autoTimeoutEnabled: false,
@@ -244,9 +265,14 @@ const store = new Store({
     pausedSyncs: {},  // accountId -> { remainingIds, processedCount, totalEmails, ordersFound, pausedAt, dateFrom, dateTo }
     discordAco: {
       lastSync: null,
+      lastSyncCount: 0,
       autoSyncEnabled: false,
-      autoSyncInterval: 60
+      autoSyncInterval: 60,
+      autoForwardEnabled: false,
+      forwardDeclinedEnabled: false
     },
+    discordWebhookUrl: '',
+    skuOverrides: {},
     dataMode: 'imap'
   }
 });
@@ -500,10 +526,211 @@ const storedVersion = store.get('dataVersion', 0);
 if (storedVersion < DATA_VERSION) {
   console.log(`Data version changed (${storedVersion} -> ${DATA_VERSION}), clearing old orders...`);
   store.set('orders', []);
+
+  // Migrate inventory/sales from v3 to v4 format
+  if (storedVersion < 4) {
+    migrateInventoryV3toV4();
+  }
+
   store.set('dataVersion', DATA_VERSION);
   const accounts = store.get('accounts', []);
   accounts.forEach(a => a.lastSynced = null);
   store.set('accounts', accounts);
+}
+
+/**
+ * Migration: Convert v3 inventory/salesLog to v4 format (inventoryV2/salesLogV2).
+ * - Each inventory item gets a single CostLot from its costPerItem/quantity
+ * - Category is inferred from tcgplayerId presence
+ * - priceHistory is converted to multi-field format
+ * - Each sale gets structured fees and lot allocations
+ * - Old inventory/salesLog keys are preserved for rollback
+ */
+function migrateInventoryV3toV4() {
+  console.log('[MIGRATION] Starting v3 -> v4 inventory migration...');
+  const now = new Date().toISOString();
+
+  // --- Migrate inventory items ---
+  const oldInventory = store.get('inventory', []);
+  const newInventory = oldInventory.map(item => {
+    const qty = item.quantity || item.qty || 0;
+    const cost = item.costPerItem || item.costPerUnit || 0;
+    const lotId = uuidv4();
+
+    // Determine category from tcgplayerId presence
+    let category = 'general';
+    if (item.tcgplayerId || item.productId) {
+      category = 'tcg_single';
+    }
+
+    // Convert priceHistory to multi-field format
+    let priceHistory = [];
+    if (Array.isArray(item.priceHistory)) {
+      priceHistory = item.priceHistory.map(entry => {
+        if (typeof entry === 'object' && entry !== null) {
+          return {
+            date: entry.date || localDateStr(entry.fetchedAt || now),
+            market: entry.market || entry.marketPrice || entry.price || null,
+            low: entry.low || entry.lowPrice || null,
+            high: entry.high || entry.highPrice || null
+          };
+        }
+        return { date: localDateStr(now), market: typeof entry === 'number' ? entry : null, low: null, high: null };
+      });
+      // Trim to 365 entries
+      if (priceHistory.length > 365) {
+        priceHistory = priceHistory.slice(priceHistory.length - 365);
+      }
+    }
+
+    return {
+      // CORE
+      id: item.id || uuidv4(),
+      name: item.name || '',
+      image: item.image || item.imageUrl || '',
+      category,
+      quantity: qty,
+      createdAt: item.createdAt || now,
+      updatedAt: now,
+
+      // COST BASIS
+      costPerItem: cost,
+      lots: qty > 0 || cost > 0 ? [{
+        id: lotId,
+        quantity: qty,
+        originalQuantity: qty,
+        costPerItem: cost,
+        acquiredAt: item.createdAt || now,
+        source: item.autoAdded ? 'order' : 'manual',
+        sourceRef: item.linkedOrderId || null,
+        notes: 'Migrated from v3'
+      }] : [],
+      costMethod: 'wavg',
+
+      // ATTRIBUTES
+      setName: item.setName || '',
+      sku: item.sku || '',
+      condition: '',
+      language: 'EN',
+      edition: '',
+      isFoil: false,
+      location: '',
+      tags: [],
+
+      // ORDER LINKING
+      linkedRetailer: item.linkedRetailer || item.retailer || '',
+      linkedDrop: item.linkedDrop || item.dropDate || '',
+      linkedItems: item.linkedItems || [],
+      linkedOrderId: item.linkedOrderId || '',
+      autoAdded: item.autoAdded || false,
+
+      // TCG PRICE TRACKING
+      tcgplayerId: item.tcgplayerId || item.productId || '',
+      tcgplayerUrl: item.tcgplayerUrl || item.url || '',
+      priceData: {
+        marketPrice: item.marketPrice || null,
+        lowPrice: item.lowPrice || null,
+        midPrice: item.midPrice || null,
+        highPrice: item.highPrice || null,
+        totalListings: item.listings || null,
+        fetchedAt: item.lastChecked || ''
+      },
+      priceHistory,
+      lastChecked: item.lastChecked || '',
+
+      // ANALYTICS
+      analytics: {
+        change1d: { amount: 0, percent: 0 },
+        change7d: { amount: 0, percent: 0 },
+        change30d: { amount: 0, percent: 0 },
+        volatility7d: 0,
+        spread: 0,
+        trend: 'flat',
+        signal: null,
+        signalReason: '',
+        lastComputed: ''
+      },
+
+      // MATCH METADATA
+      matchInfo: { method: item.tcgplayerId ? 'url' : 'none', confidence: item.tcgplayerId ? 100 : 0, candidateCount: 0 },
+
+      // REFRESH STATE
+      refreshState: { consecutiveErrors: 0, lastError: null, delisted: false, priority: 'normal' }
+    };
+  });
+
+  // --- Migrate sales log ---
+  const oldSales = store.get('salesLog', []);
+  const newSales = oldSales.map(sale => {
+    const grossRevenue = (sale.quantity || sale.qty || 0) * (sale.pricePerUnit || sale.salePrice || 0);
+    const oldFee = sale.fees || sale.fee || 0;
+
+    const fees = {
+      platformFeePercent: 0,
+      platformFeeAmount: 0,
+      paymentProcessingPercent: 0,
+      paymentProcessingAmount: 0,
+      shippingCost: 0,
+      shippingCharged: 0,
+      taxCollected: 0,
+      taxRemitted: 0,
+      flatFees: typeof oldFee === 'number' ? oldFee : 0,
+      totalFees: typeof oldFee === 'number' ? oldFee : 0
+    };
+
+    const netRevenue = grossRevenue - fees.totalFees;
+    const costBasis = sale.costBasis || ((sale.quantity || sale.qty || 0) * (sale.costPerItem || sale.costPerUnit || 0));
+    const profit = netRevenue - costBasis;
+
+    return {
+      id: sale.id || uuidv4(),
+      createdAt: sale.createdAt || now,
+      updatedAt: now,
+
+      date: sale.date || sale.createdAt || now,
+      inventoryItemId: sale.inventoryItemId || '',
+      itemName: sale.itemName || sale.item || '',
+      itemImage: sale.itemImage || sale.image || null,
+      retailer: sale.retailer || null,
+      quantity: sale.quantity || sale.qty || 0,
+      pricePerUnit: sale.pricePerUnit || sale.salePrice || 0,
+      grossRevenue,
+
+      costBasis,
+      costMethod: 'wavg',
+      lotAllocations: [],
+
+      fees,
+
+      netRevenue,
+      profit,
+
+      platform: sale.platform || '',
+      buyer: sale.buyer || '',
+      notes: sale.notes || '',
+      externalOrderId: sale.externalOrderId || '',
+
+      status: 'completed',
+      returnInfo: null
+    };
+  });
+
+  // Store migrated data
+  store.set('inventoryV2', newInventory);
+  store.set('salesLogV2', newSales);
+  store.set('adjustments', []);
+  store.set('ledger', [{
+    id: uuidv4(),
+    timestamp: now,
+    action: 'migration_v3_to_v4',
+    entityType: 'system',
+    entityId: 'migration',
+    parentId: '',
+    summary: `Migrated ${newInventory.length} inventory items and ${newSales.length} sales from v3 to v4 format`,
+    diff: null
+  }]);
+
+  console.log(`[MIGRATION] v3 -> v4 complete: ${newInventory.length} items, ${newSales.length} sales migrated`);
 }
 
 // Migration: Backfill source field for orders that don't have it (pre-v2.0.0 IMAP orders)
@@ -4950,11 +5177,15 @@ function clearAllData() {
   store.set('pausedSyncs', {});
   store.set('syncLogs', {});
   store.set('syncDebugLog', []);
-  store.set('discordAco', { lastSync: null, autoSyncEnabled: false, autoSyncInterval: 60 });
+  store.set('discordAco', { lastSync: null, lastSyncCount: 0, autoSyncEnabled: false, autoSyncInterval: 60, autoForwardEnabled: false, forwardDeclinedEnabled: false });
+  store.set('discordWebhookUrl', '');
+  store.set('savedWebhooks', []);
+  store.set('channelWebhooks', {});
   store.set('addressLinks', {});
   store.set('jigSettings', {});
   store.set('trackingCache', {});
   store.set('skuOverrides', {});
+  store.set('acoForwardLog', []);
   store.set('inventorySettings', { activeProxyList: null, refreshInterval: 0, lastRefresh: null });
   store.set('dataMode', 'imap');
   return { success: true };
@@ -5322,6 +5553,240 @@ function getMissingPokecenterImages() {
   return missing;
 }
 
+// Search Target.com for a product by name and return the scene7 image URL
+async function searchTargetProduct(itemName) {
+  if (!itemName || itemName === 'Unknown Item') {
+    return { success: false, error: 'No item name' };
+  }
+  try {
+    // Decode HTML entities (&#233; → é, &#8212; → —, &amp; → &, etc.)
+    let cleanName = decodeHtmlEntities(itemName);
+
+    // Keep letters (including accented), numbers, spaces — strip punctuation that breaks search
+    const simplified = cleanName
+      .replace(/[:\u2014\u2013\-\u2019\u201C\u201D"'()[\]{},;!@#$%^&*+=|\\/<>~`]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+
+    const searchTerm = encodeURIComponent(simplified);
+    const searchUrl = `https://www.target.com/s?searchTerm=${searchTerm}`;
+    console.log(`[TARGET] Searching for: "${simplified}" (original: "${itemName.substring(0, 60)}")`);
+
+    // Use a hidden BrowserWindow to load + render the page (Target is client-side rendered)
+    const { BrowserWindow } = require('electron');
+    const searchWin = new BrowserWindow({
+      show: false,
+      width: 1280,
+      height: 900,
+      webPreferences: { nodeIntegration: false, contextIsolation: true }
+    });
+
+    await searchWin.loadURL(searchUrl);
+
+    // Wait for Target's JS to render product cards
+    await new Promise(r => setTimeout(r, 4000));
+
+    // Extract product data from the fully-rendered DOM
+    const products = await searchWin.webContents.executeJavaScript(`
+      (() => {
+        const results = [];
+        const seen = new Set();
+
+        // Target product cards — try multiple selectors
+        const cards = document.querySelectorAll(
+          '[data-test="@web/site-top-of-funnel/ProductCardWrapper"], ' +
+          '[data-test="product-card"], ' +
+          'section[aria-label] a[href*="/p/"]'
+        );
+
+        for (const card of cards) {
+          // Find the primary product image
+          const img = card.querySelector('img[src*="scene7"], img[src*="GUEST_"], picture img');
+          if (!img || !img.src) continue;
+
+          const imgUrl = img.src.split('?')[0];
+          if (seen.has(imgUrl)) continue;
+          seen.add(imgUrl);
+
+          // Find product title
+          const titleEl = card.querySelector('[data-test="product-title"], a[href*="/p/"] div, h3, [class*="Title"]');
+          const title = titleEl?.textContent?.trim() || '';
+
+          results.push({ imageUrl: imgUrl, title });
+          if (results.length >= 12) break;
+        }
+
+        // Fallback: grab all scene7/GUEST product images with nearby text
+        if (results.length === 0) {
+          const imgs = document.querySelectorAll('img[src*="GUEST_"], img[src*="scene7"]');
+          for (const img of imgs) {
+            if (!img.src || img.width < 50) continue;
+            const imgUrl = img.src.split('?')[0];
+            if (seen.has(imgUrl)) continue;
+            seen.add(imgUrl);
+            // Walk up to find nearest text
+            const parent = img.closest('a, li, div[class]');
+            const title = parent?.textContent?.trim()?.substring(0, 120) || '';
+            results.push({ imageUrl: imgUrl, title });
+            if (results.length >= 12) break;
+          }
+        }
+
+        return results;
+      })()
+    `);
+
+    searchWin.close();
+
+    console.log(`[TARGET] BrowserWindow extracted ${products.length} products`);
+
+    // Build candidates
+    const candidates = [];
+    const seen = new Set();
+    for (const p of products) {
+      if (!p.imageUrl || seen.has(p.imageUrl)) continue;
+      seen.add(p.imageUrl);
+      const gid = p.imageUrl.match(/GUEST_[A-Za-z0-9_-]+/);
+      candidates.push({
+        imageUrl: p.imageUrl,
+        guestId: gid ? gid[0] : ('TGTPROD_' + candidates.length),
+        title: p.title || ''
+      });
+      if (candidates.length >= 8) break;
+    }
+
+    if (candidates.length > 0) {
+      return { success: true, candidates };
+    }
+    return { success: false, error: 'No product images found in search results' };
+  } catch (err) {
+    console.log(`[TARGET] Search error:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// Get items needing images for a Target drop
+function getTargetDropItemsNeedingImages(dropDate) {
+  const allOrders = store.get('orders', []);
+  const dropOrders = allOrders.filter(o =>
+    o.retailer === 'target' && (o.confirmedDate || o.date) === dropDate
+  );
+  const items = new Map();
+  for (const o of dropOrders) {
+    if (o.imageUrl) continue;
+    const name = o.item;
+    if (!name || name === 'Unknown Item') continue;
+    if (!items.has(name)) items.set(name, 0);
+    items.set(name, items.get(name) + 1);
+  }
+  return Array.from(items.entries()).map(([name, count]) => ({ name, count }));
+}
+
+// Helper: decode HTML entities in item names
+function decodeHtmlEntities(str) {
+  return (str || '')
+    .replace(/&#(\d+);/g, (_, c) => String.fromCharCode(parseInt(c)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, c) => String.fromCharCode(parseInt(c, 16)))
+    .replace(/&amp;/g, '&').replace(/&mdash;/g, '—').replace(/&ndash;/g, '–')
+    .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+}
+
+// Apply a chosen Target image to orders in ONE drop only (never overwrites existing images)
+async function applyTargetImage(itemName, imageUrl, guestId, dropDate) {
+  // Download and cache locally
+  const dl = await downloadProductImage(imageUrl, guestId, 'target');
+  if (!dl.success) {
+    return { success: false, error: dl.error };
+  }
+
+  const cleanTarget = decodeHtmlEntities(itemName).toLowerCase().trim();
+
+  const allOrders = store.get('orders', []);
+  let updated = 0;
+  for (let i = 0; i < allOrders.length; i++) {
+    const o = allOrders[i];
+    if (o.retailer !== 'target') continue;
+    if (o.imageUrl) continue; // NEVER overwrite
+    if ((o.confirmedDate || o.date) !== dropDate) continue; // this drop only
+    const cleanItem = decodeHtmlEntities(o.item).toLowerCase().trim();
+    if (cleanItem === cleanTarget) {
+      allOrders[i].imageUrl = imageUrl;
+      updated++;
+    }
+  }
+  store.set('orders', allOrders);
+  console.log(`[TARGET] Applied image ${guestId} to ${updated} orders in drop ${dropDate} matching "${itemName}"`);
+  return { success: true, updated, guestId };
+}
+
+// Spread fetched images to OTHER drops where ALL orders lack images (never overwrites)
+function spreadTargetImages() {
+  const allOrders = store.get('orders', []);
+  const targetOrders = allOrders.filter(o => o.retailer === 'target');
+
+  // Build a lookup: decoded item name → imageUrl (from orders that have images)
+  const imageByName = new Map();
+  for (const o of targetOrders) {
+    if (!o.imageUrl || !o.item) continue;
+    const clean = decodeHtmlEntities(o.item).toLowerCase().trim();
+    if (!imageByName.has(clean)) {
+      imageByName.set(clean, o.imageUrl);
+    }
+  }
+  console.log(`[TARGET] Spread lookup has ${imageByName.size} unique item→image mappings`);
+
+  // Group orders by drop date
+  const drops = new Map();
+  for (let i = 0; i < allOrders.length; i++) {
+    const o = allOrders[i];
+    if (o.retailer !== 'target') continue;
+    const d = o.confirmedDate || o.date || 'Unknown';
+    if (!drops.has(d)) drops.set(d, []);
+    drops.get(d).push(i);
+  }
+
+  let totalUpdated = 0;
+  for (const [dropDate, indices] of drops) {
+    // Only touch drops where EVERY order has no image
+    const allMissing = indices.every(i => !allOrders[i].imageUrl);
+    if (!allMissing) continue;
+
+    for (const i of indices) {
+      const o = allOrders[i];
+      if (o.imageUrl) continue; // safety: never overwrite
+      if (!o.item) continue;
+      const clean = decodeHtmlEntities(o.item).toLowerCase().trim();
+      const knownImg = imageByName.get(clean);
+      if (knownImg) {
+        allOrders[i].imageUrl = knownImg;
+        totalUpdated++;
+      }
+    }
+  }
+
+  if (totalUpdated > 0) {
+    store.set('orders', allOrders);
+  }
+  console.log(`[TARGET] Spread images to ${totalUpdated} orders across image-less drops`);
+  return { success: true, updated: totalUpdated };
+}
+
+// Clear a fetched Target image by drop date — sets imageUrl back to null for all orders in that drop
+function clearTargetDropImages(dropDate) {
+  const allOrders = store.get('orders', []);
+  let cleared = 0;
+  for (let i = 0; i < allOrders.length; i++) {
+    const o = allOrders[i];
+    if (o.retailer !== 'target') continue;
+    if ((o.confirmedDate || o.date) !== dropDate) continue;
+    if (!o.imageUrl) continue;
+    allOrders[i].imageUrl = null;
+    cleared++;
+  }
+  if (cleared > 0) store.set('orders', allOrders);
+  console.log(`[TARGET] Cleared images from ${cleared} orders in drop ${dropDate}`);
+  return { success: true, cleared };
+}
+
 // Fetch Pokemon Center product page directly by SKU
 // URL format: pokemoncenter.com/product/{SKU}
 async function fetchPokecenterProduct(sku) {
@@ -5437,7 +5902,10 @@ function parseProductPage(html, sku, productUrl) {
 }
 
 // Download image from URL and save to product-images folder
-async function downloadPokecenterImage(imageUrl, sku, maxRedirects = 5) {
+// retailer: 'pokecenter' | 'target' — used for log prefix and Referer header
+async function downloadProductImage(imageUrl, sku, retailer = 'pokecenter', maxRedirects = 5) {
+  const tag = retailer === 'target' ? 'TARGET' : 'POKECENTER';
+  const referer = retailer === 'target' ? 'https://www.target.com/' : 'https://www.pokemoncenter.com/';
   try {
     // Validate image URL domain
     const allowedDomains = ['pokemoncenter.com', 'pokemon.com', 'scene7.com', 'akamaized.net'];
@@ -5449,12 +5917,12 @@ async function downloadPokecenterImage(imageUrl, sku, maxRedirects = 5) {
     } catch {
       return { success: false, error: 'Invalid URL' };
     }
-    // Sanitize SKU to alphanumeric + dash only
-    if (!/^[a-zA-Z0-9\-]+$/.test(sku)) {
+    // Sanitize SKU to alphanumeric + dash + underscore only
+    if (!/^[a-zA-Z0-9_\-]+$/.test(sku)) {
       return { success: false, error: 'Invalid SKU format' };
     }
 
-    console.log(`[POKECENTER] Downloading image for SKU ${sku}: ${imageUrl}`);
+    console.log(`[${tag}] Downloading image for SKU ${sku}: ${imageUrl}`);
 
     const https = require('https');
     const http = require('http');
@@ -5470,7 +5938,7 @@ async function downloadPokecenterImage(imageUrl, sku, maxRedirects = 5) {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           'Accept': 'image/*',
-          'Referer': 'https://www.pokemoncenter.com/'
+          'Referer': referer
         }
       }, (res) => {
         // Handle redirects
@@ -5481,9 +5949,9 @@ async function downloadPokecenterImage(imageUrl, sku, maxRedirects = 5) {
               reject(new Error('Too many redirects'));
               return;
             }
-            console.log(`[POKECENTER] Following redirect to: ${redirectUrl}`);
+            console.log(`[${tag}] Following redirect to: ${redirectUrl}`);
             // Recursively follow redirect
-            downloadPokecenterImage(redirectUrl, sku, maxRedirects - 1).then(resolve).catch(reject);
+            downloadProductImage(redirectUrl, sku, retailer, maxRedirects - 1).then(resolve).catch(reject);
             return;
           }
         }
@@ -5509,13 +5977,13 @@ async function downloadPokecenterImage(imageUrl, sku, maxRedirects = 5) {
     // Validate the response is actually an image (not a block page)
     const dataStr = imageData.toString('utf8', 0, Math.min(500, imageData.length));
     if (dataStr.includes('<html') || dataStr.includes('<!DOCTYPE') || dataStr.includes('Incapsula')) {
-      console.log(`[POKECENTER] Blocked by CDN/bot protection for SKU ${sku}`);
+      console.log(`[${tag}] Blocked by CDN/bot protection for SKU ${sku}`);
       return { success: false, error: 'Blocked by CDN - try again later or use a different image source' };
     }
 
     // Check minimum size (real images are at least 1KB)
     if (imageData.length < 1000) {
-      console.log(`[POKECENTER] Image too small (${imageData.length} bytes) - likely invalid`);
+      console.log(`[${tag}] Image too small (${imageData.length} bytes) - likely invalid`);
       return { success: false, error: `Downloaded file too small (${imageData.length} bytes) - not a valid image` };
     }
 
@@ -5535,14 +6003,19 @@ async function downloadPokecenterImage(imageUrl, sku, maxRedirects = 5) {
     const filePath = path.join(productImagesPath, fileName);
 
     fs.writeFileSync(filePath, imageData);
-    console.log(`[POKECENTER] Saved image to: ${filePath} (${imageData.length} bytes)`);
+    console.log(`[${tag}] Saved image to: ${filePath} (${imageData.length} bytes)`);
 
     return { success: true, filePath, fileName, size: imageData.length };
 
   } catch (err) {
-    console.log(`[POKECENTER] Download error:`, err.message);
+    console.log(`[${tag}] Download error:`, err.message);
     return { success: false, error: err.message };
   }
+}
+
+// Legacy alias for Pokemon Center callers
+async function downloadPokecenterImage(imageUrl, sku, maxRedirects = 5) {
+  return downloadProductImage(imageUrl, sku, 'pokecenter', maxRedirects);
 }
 
 // ==================== IPC HANDLERS ====================
@@ -5775,7 +6248,478 @@ ipcMain.handle('test-connection', async (_, emailOrIdOrConfig, password, provide
   });
 });
 
-// Inventory management
+// ==================== INVENTORY V2 CORE ALGORITHMS ====================
+
+/**
+ * Escape HTML special characters to prevent XSS in error messages.
+ */
+function escapeHtml(str) {
+  if (typeof str !== 'string') return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+/**
+ * Allocate lots for a sale using FIFO, LIFO, or weighted average cost method.
+ * @param {Array} lots - Array of CostLot objects with quantity > 0
+ * @param {number} saleQty - Number of units to allocate
+ * @param {string} method - 'fifo' | 'lifo' | 'wavg'
+ * @returns {{ allocations: Array, costBasis: number }}
+ */
+function allocateLots(lots, saleQty, method) {
+  const available = lots.filter(l => l.quantity > 0);
+  const totalAvailable = available.reduce((sum, l) => sum + l.quantity, 0);
+  if (saleQty > totalAvailable) {
+    throw new Error(`Insufficient inventory: need ${saleQty}, have ${totalAvailable}`);
+  }
+
+  // Sort by method
+  if (method === 'fifo') {
+    available.sort((a, b) => new Date(a.acquiredAt) - new Date(b.acquiredAt));
+  }
+  if (method === 'lifo') {
+    available.sort((a, b) => new Date(b.acquiredAt) - new Date(a.acquiredAt));
+  }
+
+  if (method === 'wavg') {
+    const totalCost = available.reduce((s, l) => s + l.quantity * l.costPerItem, 0);
+    const avgCost = totalAvailable > 0 ? totalCost / totalAvailable : 0;
+    available.sort((a, b) => new Date(a.acquiredAt) - new Date(b.acquiredAt));
+    const allocations = [];
+    let remaining = saleQty;
+    for (const lot of available) {
+      if (remaining <= 0) break;
+      const take = Math.min(remaining, lot.quantity);
+      allocations.push({ lotId: lot.id, quantity: take, costPerItem: avgCost });
+      remaining -= take;
+    }
+    return { allocations, costBasis: saleQty * avgCost };
+  }
+
+  // FIFO/LIFO: individual lot costs
+  const allocations = [];
+  let remaining = saleQty;
+  for (const lot of available) {
+    if (remaining <= 0) break;
+    const take = Math.min(remaining, lot.quantity);
+    allocations.push({ lotId: lot.id, quantity: take, costPerItem: lot.costPerItem });
+    remaining -= take;
+  }
+  return { allocations, costBasis: allocations.reduce((s, a) => s + a.quantity * a.costPerItem, 0) };
+}
+
+/**
+ * Recompute weighted average costPerItem from an item's lots.
+ * @param {object} item - InventoryV2 item with lots array
+ * @returns {number} The new weighted average costPerItem
+ */
+function recomputeWeightedCost(item) {
+  const activeLots = (item.lots || []).filter(l => l.quantity > 0);
+  const totalQty = activeLots.reduce((s, l) => s + l.quantity, 0);
+  if (totalQty === 0) return 0;
+  const totalCost = activeLots.reduce((s, l) => s + l.quantity * l.costPerItem, 0);
+  return totalCost / totalQty;
+}
+
+/**
+ * Trim price history to maxEntries, keeping the most recent.
+ * @param {Array} history - Array of price history entries with date field
+ * @param {number} maxEntries - Maximum entries to keep (default 365)
+ * @returns {Array} Trimmed history array
+ */
+function aggregatePriceHistory(history, maxEntries = 365) {
+  if (!Array.isArray(history)) return [];
+  if (history.length <= maxEntries) return history;
+  return history.slice(history.length - maxEntries);
+}
+
+/**
+ * Append an entry to the ledger, trimming to 10,000 max (removes oldest 1,000 when exceeded).
+ * @param {object} entry - Ledger entry to append (id/timestamp auto-set if missing)
+ */
+function appendLedger(entry) {
+  const ledger = store.get('ledger', []);
+  entry.id = entry.id || uuidv4();
+  entry.timestamp = entry.timestamp || new Date().toISOString();
+  ledger.push(entry);
+  if (ledger.length > 10000) {
+    // Remove oldest 1,000 entries to avoid frequent trimming
+    ledger.splice(0, 1000);
+  }
+  store.set('ledger', ledger);
+}
+
+/**
+ * Compute structured fees from gross revenue and fee inputs.
+ * @param {number} grossRevenue - Total gross revenue
+ * @param {object} feeInputs - Fee input fields
+ * @returns {object} Structured fees object with totalFees
+ */
+function computeFees(grossRevenue, feeInputs) {
+  const platformFeePercent = parseFloat(feeInputs.platformFeePercent) || 0;
+  const paymentProcessingPercent = parseFloat(feeInputs.paymentProcessingPercent) || 0;
+  const shippingCost = parseFloat(feeInputs.shippingCost) || 0;
+  const shippingCharged = parseFloat(feeInputs.shippingCharged) || 0;
+  const taxCollected = parseFloat(feeInputs.taxCollected) || 0;
+  const taxRemitted = parseFloat(feeInputs.taxRemitted) || 0;
+  const flatFees = parseFloat(feeInputs.flatFees) || 0;
+
+  const platformFeeAmount = Math.round((grossRevenue * platformFeePercent / 100) * 100) / 100;
+  const paymentProcessingAmount = Math.round((grossRevenue * paymentProcessingPercent / 100) * 100) / 100;
+
+  // totalFees = seller-borne fees (platform + processing + shipping cost + tax remitted + flat fees)
+  const totalFees = Math.round((platformFeeAmount + paymentProcessingAmount + shippingCost + taxRemitted + flatFees) * 100) / 100;
+
+  return {
+    platformFeePercent,
+    platformFeeAmount,
+    paymentProcessingPercent,
+    paymentProcessingAmount,
+    shippingCost,
+    shippingCharged,
+    taxCollected,
+    taxRemitted,
+    flatFees,
+    totalFees
+  };
+}
+
+/**
+ * Process return logic: create return lot if full_return, update sale status, restore inventory qty.
+ * @param {object} sale - The original sale event
+ * @param {object} returnInfo - { type: 'full_return'|'partial_refund'|'full_refund_keep', refundAmount, quantityReturned, reason }
+ * @param {Array} inventoryV2 - The full inventoryV2 array (will be mutated)
+ * @returns {object} { updatedSale, updatedInventory, returnLotId }
+ */
+function processReturnLogic(sale, returnInfo, inventoryV2) {
+  const now = new Date().toISOString();
+  let returnLotId = null;
+
+  // Update sale status based on return type
+  const updatedSale = { ...sale, updatedAt: now };
+
+  if (returnInfo.type === 'full_return') {
+    updatedSale.status = 'returned';
+    updatedSale.returnInfo = {
+      date: now,
+      type: 'full_return',
+      refundAmount: returnInfo.refundAmount || sale.grossRevenue,
+      quantityReturned: sale.quantity,
+      restockedLotId: null,
+      reason: returnInfo.reason || ''
+    };
+
+    // Restore inventory: find the item and add a return lot
+    const item = inventoryV2.find(i => i.id === sale.inventoryItemId);
+    if (item) {
+      returnLotId = uuidv4();
+      const costPerUnit = sale.lotAllocations && sale.lotAllocations.length > 0
+        ? sale.costBasis / sale.quantity
+        : (sale.costBasis || 0) / (sale.quantity || 1);
+
+      item.lots.push({
+        id: returnLotId,
+        quantity: sale.quantity,
+        originalQuantity: sale.quantity,
+        costPerItem: costPerUnit,
+        acquiredAt: now,
+        source: 'return',
+        sourceRef: sale.id,
+        notes: `Return from sale ${sale.id}: ${returnInfo.reason || 'No reason provided'}`
+      });
+      item.quantity += sale.quantity;
+      item.costPerItem = recomputeWeightedCost(item);
+      item.updatedAt = now;
+      updatedSale.returnInfo.restockedLotId = returnLotId;
+    }
+  } else if (returnInfo.type === 'partial_refund') {
+    updatedSale.status = 'partially_refunded';
+    updatedSale.returnInfo = {
+      date: now,
+      type: 'partial_refund',
+      refundAmount: returnInfo.refundAmount || 0,
+      quantityReturned: 0,
+      restockedLotId: null,
+      reason: returnInfo.reason || ''
+    };
+    // No inventory change - buyer keeps items
+  } else if (returnInfo.type === 'full_refund_keep') {
+    updatedSale.status = 'returned';
+    updatedSale.returnInfo = {
+      date: now,
+      type: 'full_refund_keep',
+      refundAmount: returnInfo.refundAmount || sale.grossRevenue,
+      quantityReturned: 0,
+      restockedLotId: null,
+      reason: returnInfo.reason || ''
+    };
+    // No inventory change - buyer keeps items
+  }
+
+  return { updatedSale, updatedInventory: inventoryV2, returnLotId };
+}
+
+/**
+ * Compute Levenshtein distance between two strings.
+ * Simple iterative DP approach (no npm dependency).
+ */
+function levenshteinDistance(a, b) {
+  if (!a || !b) return Math.max((a || '').length, (b || '').length);
+  const m = a.length;
+  const n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
+    }
+  }
+  return dp[m][n];
+}
+
+/**
+ * Compute match confidence between a search query and a TCGPlayer candidate.
+ * Uses Levenshtein distance + token overlap + set name bonus.
+ * @param {string} query - User's search query
+ * @param {string} candidateName - Candidate product name
+ * @param {string} setName - Optional set name to match
+ * @returns {number} Confidence score 0-100
+ */
+function computeMatchConfidence(query, candidateName, setName) {
+  if (!query || !candidateName) return 0;
+  const qLower = query.toLowerCase().trim();
+  const cLower = candidateName.toLowerCase().trim();
+
+  // 1. Levenshtein distance normalized to similarity percentage
+  const maxLen = Math.max(qLower.length, cLower.length);
+  const distance = levenshteinDistance(qLower, cLower);
+  const levenshteinScore = maxLen > 0 ? ((1 - distance / maxLen) * 50) : 0;
+
+  // 2. Token overlap scoring
+  const qTokens = qLower.split(/[\s\-\/\.\,\:\;\(\)]+/).filter(t => t.length > 0);
+  const cTokens = cLower.split(/[\s\-\/\.\,\:\;\(\)]+/).filter(t => t.length > 0);
+  let matchedTokens = 0;
+  for (const qt of qTokens) {
+    for (const ct of cTokens) {
+      if (ct.includes(qt) || qt.includes(ct)) {
+        matchedTokens++;
+        break;
+      }
+    }
+  }
+  const tokenScore = qTokens.length > 0 ? (matchedTokens / qTokens.length) * 40 : 0;
+
+  // 3. Set name match bonus
+  let setBonus = 0;
+  if (setName && typeof setName === 'string' && setName.trim().length > 0) {
+    const sLower = setName.toLowerCase().trim();
+    // Check if any candidate token or the candidate name contains the set name
+    if (cLower.includes(sLower) || sLower.includes(cLower.split(' ')[0])) {
+      setBonus = 25;
+    }
+  }
+
+  // 4. Multi-word mismatch penalty
+  let penalty = 0;
+  if (qTokens.length >= 3 && matchedTokens < 2) {
+    penalty = 15;
+  }
+
+  // Final score capped 0-100
+  const raw = levenshteinScore + tokenScore + setBonus - penalty;
+  return Math.max(0, Math.min(100, Math.round(raw)));
+}
+
+/**
+ * Auto-match a newly added inventory item to TCGPlayer.
+ * Searches by name, auto-links if top result confidence >= 85.
+ * Fire-and-forget — does not block the add response.
+ */
+const _autoMatchQueue = [];
+let _autoMatchRunning = false;
+async function autoMatchTcgPlayer(itemId, name, setName) {
+  _autoMatchQueue.push({ itemId, name, setName });
+  if (_autoMatchRunning) return;
+  _autoMatchRunning = true;
+  while (_autoMatchQueue.length > 0) {
+    const job = _autoMatchQueue.shift();
+    await _doAutoMatch(job.itemId, job.name, job.setName);
+  }
+  _autoMatchRunning = false;
+}
+async function _doAutoMatch(itemId, name, setName) {
+  try {
+    if (testModeNetworkGuard('auto-match-tcgplayer')) return;
+
+    const https = require('https');
+    const searchQuery = name.trim();
+    if (!searchQuery) return;
+
+    const searchData = JSON.stringify({
+      algorithm: 'sales_synonym_v2',
+      from: 0, size: 5,
+      filters: { term: {}, range: {}, match: {} },
+      listingSearch: {
+        filters: {
+          term: { sellerStatus: 'Live', channelId: 0 },
+          range: { quantity: { gte: 1 } },
+          exclude: { channelExclusion: 0 }
+        }
+      },
+      context: { shippingCountry: 'US', cart: {} },
+      settings: { useFuzzySearch: true, didYouMean: {} },
+      sort: {}
+    });
+
+    const searchResult = await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: 'mp-search-api.tcgplayer.com',
+        port: 443,
+        path: `/v1/search/request?q=${encodeURIComponent(searchQuery)}&isList=false`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(searchData),
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+          'Origin': 'https://www.tcgplayer.com',
+          'Referer': 'https://www.tcgplayer.com/'
+        }
+      }, (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => resolve({ status: res.statusCode, body }));
+      });
+      req.on('error', reject);
+      req.setTimeout(15000, () => { req.destroy(); reject(new Error('Auto-match timeout')); });
+      req.write(searchData);
+      req.end();
+    });
+
+    if (searchResult.status !== 200) return;
+
+    const data = JSON.parse(searchResult.body);
+    let products = [];
+    if (data.results && data.results.length > 0) {
+      const firstResult = data.results[0];
+      if (firstResult.results && firstResult.results.length > 0) {
+        products = firstResult.results;
+      }
+    }
+    if (products.length === 0) return;
+
+    // Score top candidate
+    const p = products[0];
+    const candidateName = p.productName || p.name || '';
+    const candidateSet = p.setName || p.groupName || '';
+    const confidence = computeMatchConfidence(searchQuery, candidateName, setName || candidateSet);
+
+    if (confidence < 85) return; // Only auto-link high confidence
+
+    const productId = String(p.productId || p.id || '');
+    let image = p.imageUrl || p.image || p.photoUrl || '';
+    if (!image || image === 'null') {
+      image = `https://tcgplayer-cdn.tcgplayer.com/product/${productId}_200w.jpg`;
+    }
+    const tcgplayerUrl = `https://www.tcgplayer.com/product/${productId}`;
+
+    // Update item in store
+    const inventoryV2 = store.get('inventoryV2', []);
+    const item = inventoryV2.find(i => i.id === itemId);
+    if (!item || item.tcgplayerId) return; // Already linked or item removed
+
+    item.tcgplayerId = productId;
+    item.tcgplayerUrl = tcgplayerUrl;
+    item.priceData = {
+      marketPrice: p.marketPrice ? parseFloat(p.marketPrice) : null,
+      lowPrice: p.lowPrice ? parseFloat(p.lowPrice) : null,
+      midPrice: null, highPrice: null,
+      totalListings: p.totalListings || null,
+      fetchedAt: new Date().toISOString()
+    };
+    if (!item.image && image) item.image = image;
+    item.matchInfo = { method: 'auto', confidence, candidateCount: products.length };
+    store.set('inventoryV2', inventoryV2);
+
+    // Fetch full price data via refresh
+    try {
+      const result = await fetchTcgPlayerProduct(tcgplayerUrl);
+      if (result.success && result.data) {
+        const d = result.data;
+        const now = new Date().toISOString();
+        const today = localDateStr(new Date());
+        item.priceData = {
+          marketPrice: d.marketPrice || item.priceData.marketPrice,
+          lowPrice: d.lowPrice || item.priceData.lowPrice,
+          midPrice: d.listedMedian || null,
+          highPrice: d.highPrice || null,
+          totalListings: d.listings || item.priceData.totalListings,
+          fetchedAt: now
+        };
+        item.lastChecked = now;
+        if (!Array.isArray(item.priceHistory)) item.priceHistory = [];
+        const historyEntry = { date: today, market: d.marketPrice || null, low: d.lowPrice || null, high: d.highPrice || null };
+        const todayIdx = item.priceHistory.findIndex(h => h.date === today);
+        if (todayIdx >= 0) item.priceHistory[todayIdx] = historyEntry;
+        else item.priceHistory.push(historyEntry);
+        if (d.name && !item.name) item.name = d.name;
+        if (d.image && !item.image) item.image = d.image;
+        if (d.setName && !item.setName) item.setName = d.setName;
+        item.updatedAt = now;
+        store.set('inventoryV2', inventoryV2);
+      }
+    } catch (e) {
+      console.log('[Auto-match] Full price fetch failed (partial link ok):', e.message);
+    }
+
+    // Notify renderer
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('tcg-auto-linked', {
+        itemId,
+        itemName: name,
+        confidence,
+        tcgName: candidateName
+      });
+    }
+
+    console.log(`[Auto-match] Linked "${name}" -> "${candidateName}" (${confidence}% confidence)`);
+  } catch (err) {
+    console.log('[Auto-match] Error:', err.message);
+  }
+}
+
+/**
+ * Sort inventory items for priority-based refresh.
+ * Tier 1: high-value (market > $100)
+ * Tier 2: items with active alerts/signals
+ * Tier 3: normal items ($1-$100)
+ * Tier 4: low-value (< $1)
+ * Tier 5: items in exponential backoff (consecutiveErrors > 0)
+ * Tier 6: delisted items
+ */
+function sortForRefresh(items) {
+  return [...items].sort((a, b) => {
+    const tierA = getRefreshTier(a);
+    const tierB = getRefreshTier(b);
+    return tierA - tierB;
+  });
+}
+
+function getRefreshTier(item) {
+  if (item.refreshState && item.refreshState.delisted) return 6;
+  if (item.refreshState && item.refreshState.consecutiveErrors > 0) return 5;
+  const market = (item.priceData && item.priceData.marketPrice) || 0;
+  if (market > 100) return 1;
+  if (item.analytics && item.analytics.signal) return 2;
+  if (market >= 1) return 3;
+  return 4;
+}
+
+// Inventory management (v1 — kept for backward compatibility)
 ipcMain.handle('get-inventory', () => {
   const inventory = store.get('inventory', []);
   console.log('[INVENTORY] Getting inventory, count:', inventory.length);
@@ -5962,6 +6906,1633 @@ ipcMain.handle('refresh-all-inventory', async () => {
   
   console.log('[INVENTORY] Refresh complete:', updated, 'updated,', errors, 'errors');
   return { success: true, updated, errors };
+});
+
+// ==================== INVENTORY V2 IPC HANDLERS ====================
+
+// --- Inventory V2 CRUD ---
+
+ipcMain.handle('get-inventory-v2', async () => {
+  return store.get('inventoryV2', []);
+});
+
+ipcMain.handle('add-inventory-item-v2', async (_, item) => {
+  try {
+    if (!item || typeof item !== 'object') {
+      return { success: false, error: 'Invalid item data' };
+    }
+    if (!item.name || typeof item.name !== 'string' || item.name.trim().length === 0) {
+      return { success: false, error: 'Item name is required' };
+    }
+    const quantity = parseInt(item.quantity) || 0;
+    const costPerItem = parseFloat(item.costPerItem) || 0;
+    if (quantity < 0) {
+      return { success: false, error: 'Quantity cannot be negative' };
+    }
+    if (costPerItem < 0) {
+      return { success: false, error: 'Cost per item cannot be negative' };
+    }
+
+    const now = new Date().toISOString();
+    const itemId = uuidv4();
+    const lotId = uuidv4();
+    const settings = store.get('inventorySettings', {});
+
+    const newItem = {
+      id: itemId,
+      name: item.name.trim(),
+      image: item.image || '',
+      category: item.category || 'general',
+      quantity,
+      createdAt: now,
+      updatedAt: now,
+
+      costPerItem,
+      lots: quantity > 0 || costPerItem > 0 ? [{
+        id: lotId,
+        quantity,
+        originalQuantity: quantity,
+        costPerItem,
+        acquiredAt: now,
+        source: item.source || 'manual',
+        sourceRef: item.sourceRef || null,
+        notes: item.lotNotes || ''
+      }] : [],
+      costMethod: item.costMethod || settings.defaultCostMethod || 'wavg',
+
+      setName: item.setName || '',
+      sku: item.sku || '',
+      condition: item.condition || settings.defaultCondition || '',
+      language: item.language || 'EN',
+      edition: item.edition || '',
+      isFoil: !!item.isFoil,
+      location: item.location || '',
+      tags: Array.isArray(item.tags) ? item.tags : [],
+
+      linkedRetailer: item.linkedRetailer || '',
+      linkedDrop: item.linkedDrop || '',
+      linkedItems: Array.isArray(item.linkedItems) ? item.linkedItems : [],
+      linkedOrderId: item.linkedOrderId || '',
+      autoAdded: !!item.autoAdded,
+
+      tcgplayerId: item.tcgplayerId || '',
+      tcgplayerUrl: item.tcgplayerUrl || '',
+      priceData: {
+        marketPrice: null, lowPrice: null,
+        midPrice: null, highPrice: null,
+        totalListings: null, fetchedAt: ''
+      },
+      priceHistory: [],
+      lastChecked: '',
+
+      analytics: {
+        change1d: { amount: 0, percent: 0 },
+        change7d: { amount: 0, percent: 0 },
+        change30d: { amount: 0, percent: 0 },
+        volatility7d: 0, spread: 0, trend: 'flat',
+        signal: null, signalReason: '', lastComputed: ''
+      },
+
+      matchInfo: { method: 'none', confidence: 0, candidateCount: 0 },
+      refreshState: { consecutiveErrors: 0, lastError: null, delisted: false, priority: 'normal' }
+    };
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    inventoryV2.push(newItem);
+    store.set('inventoryV2', inventoryV2);
+
+    appendLedger({
+      action: 'item_created',
+      entityType: 'inventory',
+      entityId: itemId,
+      parentId: '',
+      summary: `Added "${escapeHtml(newItem.name)}" (qty: ${quantity}, cost: $${costPerItem.toFixed(2)})`,
+      diff: null
+    });
+
+    // Auto-match to TCGPlayer if no link provided (fire-and-forget)
+    if (!newItem.tcgplayerId && newItem.name) {
+      autoMatchTcgPlayer(newItem.id, newItem.name, newItem.setName).catch(() => {});
+    }
+
+    return { success: true, item: newItem };
+  } catch (error) {
+    console.error('add-inventory-item-v2 error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('update-inventory-item-v2', async (_, id, updates) => {
+  try {
+    if (!id || typeof id !== 'string') {
+      return { success: false, error: 'Invalid item ID' };
+    }
+    if (!updates || typeof updates !== 'object') {
+      return { success: false, error: 'Invalid updates' };
+    }
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    const idx = inventoryV2.findIndex(i => i.id === id);
+    if (idx < 0) {
+      return { success: false, error: 'Item not found' };
+    }
+
+    const oldItem = { ...inventoryV2[idx] };
+    const now = new Date().toISOString();
+
+    // Fields that can be updated directly
+    const allowedFields = [
+      'name', 'image', 'category', 'setName', 'sku', 'condition', 'language',
+      'edition', 'isFoil', 'location', 'tags', 'costMethod', 'linkedRetailer',
+      'linkedDrop', 'linkedItems', 'linkedOrderId', 'tcgplayerId', 'tcgplayerUrl',
+      'priceData', 'matchInfo', 'refreshState'
+    ];
+
+    const diff = {};
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        const before = inventoryV2[idx][field];
+        inventoryV2[idx][field] = updates[field];
+        diff[field] = { before, after: updates[field] };
+      }
+    }
+
+    // If lots were updated, recompute weighted cost and quantity
+    if (updates.lots !== undefined) {
+      inventoryV2[idx].lots = updates.lots;
+      inventoryV2[idx].costPerItem = recomputeWeightedCost(inventoryV2[idx]);
+      inventoryV2[idx].quantity = (updates.lots || []).reduce((s, l) => s + (l.quantity || 0), 0);
+    }
+
+    // Allow explicit quantity/costPerItem overrides
+    if (updates.quantity !== undefined && updates.lots === undefined) {
+      const newQty = parseInt(updates.quantity) || 0;
+      const oldQty = inventoryV2[idx].quantity || 0;
+      inventoryV2[idx].quantity = newQty;
+
+      // Sync lots to match the new quantity so sale handler doesn't reject
+      const lots = inventoryV2[idx].lots || [];
+      if (lots.length > 0) {
+        const lotTotal = lots.reduce((s, l) => s + (l.quantity || 0), 0);
+        const qtyDiff = newQty - lotTotal;
+        if (qtyDiff !== 0) {
+          // Apply difference to first lot (most common: single lot per item)
+          lots[0].quantity = Math.max(0, (lots[0].quantity || 0) + qtyDiff);
+          lots[0].originalQuantity = Math.max(lots[0].quantity, lots[0].originalQuantity || 0);
+        }
+      } else if (newQty > 0) {
+        // No lots exist — create one so sales can allocate from it
+        lots.push({
+          id: uuidv4(),
+          quantity: newQty,
+          originalQuantity: newQty,
+          costPerItem: inventoryV2[idx].costPerItem || 0,
+          acquiredAt: now,
+          source: 'manual-edit',
+          sourceRef: null,
+          notes: ''
+        });
+        inventoryV2[idx].lots = lots;
+      }
+    }
+    if (updates.costPerItem !== undefined && updates.lots === undefined) {
+      inventoryV2[idx].costPerItem = parseFloat(updates.costPerItem) || 0;
+    }
+
+    inventoryV2[idx].updatedAt = now;
+    store.set('inventoryV2', inventoryV2);
+
+    appendLedger({
+      action: 'item_updated',
+      entityType: 'inventory',
+      entityId: id,
+      parentId: '',
+      summary: `Updated "${escapeHtml(inventoryV2[idx].name)}"`,
+      diff: Object.keys(diff).length > 0 ? diff : null
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('update-inventory-item-v2 error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('delete-inventory-item-v2', async (_, id) => {
+  try {
+    if (!id || typeof id !== 'string') {
+      return { success: false, error: 'Invalid item ID' };
+    }
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    const idx = inventoryV2.findIndex(i => i.id === id);
+    if (idx < 0) {
+      return { success: false, error: 'Item not found' };
+    }
+
+    const deletedItem = inventoryV2[idx];
+    inventoryV2.splice(idx, 1);
+    store.set('inventoryV2', inventoryV2);
+
+    appendLedger({
+      action: 'item_deleted',
+      entityType: 'inventory',
+      entityId: id,
+      parentId: '',
+      summary: `Deleted "${escapeHtml(deletedItem.name)}" (had ${deletedItem.quantity} units)`,
+      diff: null
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('delete-inventory-item-v2 error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// --- Lot Management ---
+
+ipcMain.handle('add-lot', async (_, itemId, lot) => {
+  try {
+    if (!itemId || typeof itemId !== 'string') {
+      return { success: false, error: 'Invalid item ID' };
+    }
+    if (!lot || typeof lot !== 'object') {
+      return { success: false, error: 'Invalid lot data' };
+    }
+    const lotQty = parseInt(lot.quantity) || 0;
+    const lotCost = parseFloat(lot.costPerItem) || 0;
+    if (lotQty < 0) return { success: false, error: 'Lot quantity cannot be negative' };
+    if (lotCost < 0) return { success: false, error: 'Lot cost cannot be negative' };
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    const item = inventoryV2.find(i => i.id === itemId);
+    if (!item) {
+      return { success: false, error: 'Item not found' };
+    }
+
+    const now = new Date().toISOString();
+    const lotId = uuidv4();
+    const newLot = {
+      id: lotId,
+      quantity: lotQty,
+      originalQuantity: lotQty,
+      costPerItem: lotCost,
+      acquiredAt: lot.acquiredAt || now,
+      source: lot.source || 'manual',
+      sourceRef: lot.sourceRef || null,
+      notes: lot.notes || ''
+    };
+
+    if (!Array.isArray(item.lots)) item.lots = [];
+    item.lots.push(newLot);
+    item.quantity = item.lots.reduce((s, l) => s + (l.quantity || 0), 0);
+    item.costPerItem = recomputeWeightedCost(item);
+    item.updatedAt = now;
+    store.set('inventoryV2', inventoryV2);
+
+    appendLedger({
+      action: 'lot_added',
+      entityType: 'lot',
+      entityId: lotId,
+      parentId: itemId,
+      summary: `Added lot to "${escapeHtml(item.name)}": ${lotQty} units @ $${lotCost.toFixed(2)}`,
+      diff: null
+    });
+
+    return { success: true, lot: newLot };
+  } catch (error) {
+    console.error('add-lot error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('update-lot', async (_, itemId, lotId, updates) => {
+  try {
+    if (!itemId || typeof itemId !== 'string') return { success: false, error: 'Invalid item ID' };
+    if (!lotId || typeof lotId !== 'string') return { success: false, error: 'Invalid lot ID' };
+    if (!updates || typeof updates !== 'object') return { success: false, error: 'Invalid updates' };
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    const item = inventoryV2.find(i => i.id === itemId);
+    if (!item) return { success: false, error: 'Item not found' };
+
+    const lot = (item.lots || []).find(l => l.id === lotId);
+    if (!lot) return { success: false, error: 'Lot not found' };
+
+    const now = new Date().toISOString();
+    const diff = {};
+
+    if (updates.quantity !== undefined) {
+      const newQty = parseInt(updates.quantity) || 0;
+      if (newQty < 0) return { success: false, error: 'Quantity cannot be negative' };
+      diff.quantity = { before: lot.quantity, after: newQty };
+      lot.quantity = newQty;
+    }
+    if (updates.costPerItem !== undefined) {
+      const newCost = parseFloat(updates.costPerItem) || 0;
+      if (newCost < 0) return { success: false, error: 'Cost cannot be negative' };
+      diff.costPerItem = { before: lot.costPerItem, after: newCost };
+      lot.costPerItem = newCost;
+    }
+    if (updates.notes !== undefined) {
+      diff.notes = { before: lot.notes, after: updates.notes };
+      lot.notes = updates.notes;
+    }
+    if (updates.source !== undefined) {
+      diff.source = { before: lot.source, after: updates.source };
+      lot.source = updates.source;
+    }
+    if (updates.acquiredAt !== undefined) {
+      diff.acquiredAt = { before: lot.acquiredAt, after: updates.acquiredAt };
+      lot.acquiredAt = updates.acquiredAt;
+    }
+
+    item.quantity = item.lots.reduce((s, l) => s + (l.quantity || 0), 0);
+    item.costPerItem = recomputeWeightedCost(item);
+    item.updatedAt = now;
+    store.set('inventoryV2', inventoryV2);
+
+    appendLedger({
+      action: 'lot_updated',
+      entityType: 'lot',
+      entityId: lotId,
+      parentId: itemId,
+      summary: `Updated lot in "${escapeHtml(item.name)}"`,
+      diff: Object.keys(diff).length > 0 ? diff : null
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('update-lot error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('delete-lot', async (_, itemId, lotId) => {
+  try {
+    if (!itemId || typeof itemId !== 'string') return { success: false, error: 'Invalid item ID' };
+    if (!lotId || typeof lotId !== 'string') return { success: false, error: 'Invalid lot ID' };
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    const item = inventoryV2.find(i => i.id === itemId);
+    if (!item) return { success: false, error: 'Item not found' };
+
+    const lotIdx = (item.lots || []).findIndex(l => l.id === lotId);
+    if (lotIdx < 0) return { success: false, error: 'Lot not found' };
+
+    const deletedLot = item.lots[lotIdx];
+    item.lots.splice(lotIdx, 1);
+
+    item.quantity = item.lots.reduce((s, l) => s + (l.quantity || 0), 0);
+    item.costPerItem = recomputeWeightedCost(item);
+    item.updatedAt = new Date().toISOString();
+    store.set('inventoryV2', inventoryV2);
+
+    appendLedger({
+      action: 'lot_deleted',
+      entityType: 'lot',
+      entityId: lotId,
+      parentId: itemId,
+      summary: `Deleted lot from "${escapeHtml(item.name)}": ${deletedLot.quantity} units @ $${deletedLot.costPerItem.toFixed(2)}`,
+      diff: null
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('delete-lot error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// --- Sales V2 ---
+
+ipcMain.handle('get-sales-log-v2', async () => {
+  return store.get('salesLogV2', []);
+});
+
+ipcMain.handle('add-sale-v2', async (_, sale) => {
+  try {
+    if (!sale || typeof sale !== 'object') return { success: false, error: 'Invalid sale data' };
+    if (!sale.inventoryItemId || typeof sale.inventoryItemId !== 'string') {
+      return { success: false, error: 'Inventory item ID is required' };
+    }
+    const saleQty = parseInt(sale.quantity) || 0;
+    if (saleQty <= 0) return { success: false, error: 'Quantity must be positive' };
+    const pricePerUnit = parseFloat(sale.pricePerUnit) || 0;
+    if (pricePerUnit < 0) return { success: false, error: 'Price per unit cannot be negative' };
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    const item = inventoryV2.find(i => i.id === sale.inventoryItemId);
+    if (!item) return { success: false, error: 'Inventory item not found' };
+
+    // Check available inventory
+    const totalAvailable = (item.lots || []).reduce((s, l) => s + (l.quantity || 0), 0);
+    if (saleQty > totalAvailable) {
+      return { success: false, error: `Insufficient inventory: need ${saleQty}, have ${totalAvailable}` };
+    }
+
+    const costMethod = sale.costMethod || item.costMethod || 'wavg';
+    const { allocations, costBasis } = allocateLots(item.lots, saleQty, costMethod);
+
+    // Compute fees
+    const grossRevenue = saleQty * pricePerUnit;
+    const fees = computeFees(grossRevenue, sale.fees || {});
+
+    const netRevenue = Math.round((grossRevenue - fees.totalFees) * 100) / 100;
+    const profit = Math.round((netRevenue - costBasis) * 100) / 100;
+
+    const now = new Date().toISOString();
+    const saleId = uuidv4();
+
+    const newSale = {
+      id: saleId,
+      createdAt: now,
+      updatedAt: now,
+      date: sale.date || now,
+      inventoryItemId: sale.inventoryItemId,
+      itemName: item.name,
+      itemImage: item.image || null,
+      retailer: item.linkedRetailer || null,
+      quantity: saleQty,
+      pricePerUnit,
+      grossRevenue,
+      costBasis: Math.round(costBasis * 100) / 100,
+      costMethod,
+      lotAllocations: allocations,
+      fees,
+      netRevenue,
+      profit,
+      platform: sale.platform || '',
+      buyer: sale.buyer || '',
+      notes: sale.notes || '',
+      externalOrderId: sale.externalOrderId || '',
+      status: 'completed',
+      returnInfo: null
+    };
+
+    // Decrement lot quantities
+    for (const alloc of allocations) {
+      const lot = item.lots.find(l => l.id === alloc.lotId);
+      if (lot) {
+        lot.quantity -= alloc.quantity;
+      }
+    }
+    // Update item quantity and cost
+    item.quantity = item.lots.reduce((s, l) => s + (l.quantity || 0), 0);
+    item.costPerItem = recomputeWeightedCost(item);
+    item.updatedAt = now;
+    store.set('inventoryV2', inventoryV2);
+
+    const salesLogV2 = store.get('salesLogV2', []);
+    salesLogV2.push(newSale);
+    store.set('salesLogV2', salesLogV2);
+
+    appendLedger({
+      action: 'sale_created',
+      entityType: 'sale',
+      entityId: saleId,
+      parentId: sale.inventoryItemId,
+      summary: `Sold ${saleQty}x "${escapeHtml(item.name)}" for $${grossRevenue.toFixed(2)} (profit: $${profit.toFixed(2)})`,
+      diff: null
+    });
+
+    return { success: true, sale: newSale };
+  } catch (error) {
+    console.error('add-sale-v2 error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('update-sale-v2', async (_, id, updates) => {
+  try {
+    if (!id || typeof id !== 'string') return { success: false, error: 'Invalid sale ID' };
+    if (!updates || typeof updates !== 'object') return { success: false, error: 'Invalid updates' };
+
+    const salesLogV2 = store.get('salesLogV2', []);
+    const idx = salesLogV2.findIndex(s => s.id === id);
+    if (idx < 0) return { success: false, error: 'Sale not found' };
+
+    const now = new Date().toISOString();
+    const diff = {};
+    const allowedFields = ['date', 'platform', 'buyer', 'notes', 'externalOrderId', 'pricePerUnit', 'fees', 'quantity'];
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        diff[field] = { before: salesLogV2[idx][field], after: updates[field] };
+        salesLogV2[idx][field] = updates[field];
+      }
+    }
+
+    // Recompute profit if price, fees, or quantity changed
+    if (updates.pricePerUnit !== undefined || updates.fees !== undefined || updates.quantity !== undefined) {
+      const sale = salesLogV2[idx];
+      sale.grossRevenue = sale.quantity * sale.pricePerUnit;
+      if (updates.fees) {
+        sale.fees = computeFees(sale.grossRevenue, updates.fees);
+      }
+      const totalFees = (sale.fees && sale.fees.totalFees) ? sale.fees.totalFees : 0;
+      sale.netRevenue = Math.round((sale.grossRevenue - totalFees) * 100) / 100;
+      // Recompute cost basis if quantity changed
+      if (updates.quantity !== undefined && sale.costPerUnit) {
+        sale.costBasis = Math.round(sale.quantity * sale.costPerUnit * 100) / 100;
+      }
+      sale.profit = Math.round((sale.netRevenue - sale.costBasis) * 100) / 100;
+    }
+
+    salesLogV2[idx].updatedAt = now;
+    store.set('salesLogV2', salesLogV2);
+
+    appendLedger({
+      action: 'sale_updated',
+      entityType: 'sale',
+      entityId: id,
+      parentId: salesLogV2[idx].inventoryItemId,
+      summary: `Updated sale of "${escapeHtml(salesLogV2[idx].itemName)}"`,
+      diff: Object.keys(diff).length > 0 ? diff : null
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('update-sale-v2 error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('delete-sale-v2', async (_, id, restoreInventory) => {
+  try {
+    if (!id || typeof id !== 'string') return { success: false, error: 'Invalid sale ID' };
+
+    const salesLogV2 = store.get('salesLogV2', []);
+    const idx = salesLogV2.findIndex(s => s.id === id);
+    if (idx < 0) return { success: false, error: 'Sale not found' };
+
+    const deletedSale = salesLogV2[idx];
+    salesLogV2.splice(idx, 1);
+    store.set('salesLogV2', salesLogV2);
+
+    // Restore lot quantities if requested
+    if (restoreInventory && deletedSale.lotAllocations && deletedSale.lotAllocations.length > 0) {
+      const inventoryV2 = store.get('inventoryV2', []);
+      const item = inventoryV2.find(i => i.id === deletedSale.inventoryItemId);
+      if (item) {
+        for (const alloc of deletedSale.lotAllocations) {
+          const lot = (item.lots || []).find(l => l.id === alloc.lotId);
+          if (lot) {
+            lot.quantity += alloc.quantity;
+          }
+        }
+        item.quantity = item.lots.reduce((s, l) => s + (l.quantity || 0), 0);
+        item.costPerItem = recomputeWeightedCost(item);
+        item.updatedAt = new Date().toISOString();
+        store.set('inventoryV2', inventoryV2);
+      }
+    }
+
+    appendLedger({
+      action: 'sale_deleted',
+      entityType: 'sale',
+      entityId: id,
+      parentId: deletedSale.inventoryItemId,
+      summary: `Deleted sale of ${deletedSale.quantity}x "${escapeHtml(deletedSale.itemName)}"${restoreInventory ? ' (inventory restored)' : ''}`,
+      diff: null
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('delete-sale-v2 error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// --- Returns ---
+
+ipcMain.handle('process-return', async (_, saleId, returnInfo) => {
+  try {
+    if (!saleId || typeof saleId !== 'string') return { success: false, error: 'Invalid sale ID' };
+    if (!returnInfo || typeof returnInfo !== 'object') return { success: false, error: 'Invalid return info' };
+    if (!['full_return', 'partial_refund', 'full_refund_keep'].includes(returnInfo.type)) {
+      return { success: false, error: 'Invalid return type. Must be: full_return, partial_refund, or full_refund_keep' };
+    }
+
+    const salesLogV2 = store.get('salesLogV2', []);
+    const saleIdx = salesLogV2.findIndex(s => s.id === saleId);
+    if (saleIdx < 0) return { success: false, error: 'Sale not found' };
+
+    const sale = salesLogV2[saleIdx];
+    if (sale.status === 'returned' || sale.status === 'voided') {
+      return { success: false, error: 'Sale has already been returned or voided' };
+    }
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    const { updatedSale, updatedInventory, returnLotId } = processReturnLogic(sale, returnInfo, inventoryV2);
+
+    salesLogV2[saleIdx] = updatedSale;
+    store.set('salesLogV2', salesLogV2);
+    store.set('inventoryV2', updatedInventory);
+
+    appendLedger({
+      action: 'return_processed',
+      entityType: 'sale',
+      entityId: saleId,
+      parentId: sale.inventoryItemId,
+      summary: `${returnInfo.type} on "${escapeHtml(sale.itemName)}": refund $${(returnInfo.refundAmount || sale.grossRevenue).toFixed(2)}`,
+      diff: { status: { before: sale.status, after: updatedSale.status } }
+    });
+
+    return { success: true, sale: updatedSale, returnLotId };
+  } catch (error) {
+    console.error('process-return error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// --- Adjustments ---
+
+ipcMain.handle('add-adjustment', async (_, adjustment) => {
+  try {
+    if (!adjustment || typeof adjustment !== 'object') return { success: false, error: 'Invalid adjustment data' };
+    if (!adjustment.inventoryItemId || typeof adjustment.inventoryItemId !== 'string') {
+      return { success: false, error: 'Inventory item ID is required' };
+    }
+    const validTypes = ['recount', 'damage', 'write_off', 'transfer', 'correction'];
+    if (!validTypes.includes(adjustment.type)) {
+      return { success: false, error: `Invalid adjustment type. Must be one of: ${validTypes.join(', ')}` };
+    }
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    const item = inventoryV2.find(i => i.id === adjustment.inventoryItemId);
+    if (!item) return { success: false, error: 'Item not found' };
+
+    const quantityBefore = item.quantity;
+    const quantityAfter = parseInt(adjustment.quantityAfter);
+    if (isNaN(quantityAfter) || quantityAfter < 0) {
+      return { success: false, error: 'Quantity after must be a non-negative number' };
+    }
+
+    const quantityDelta = quantityAfter - quantityBefore;
+    const now = new Date().toISOString();
+    const adjId = uuidv4();
+
+    const adjustmentEntry = {
+      id: adjId,
+      date: now,
+      inventoryItemId: adjustment.inventoryItemId,
+      type: adjustment.type,
+      quantityBefore,
+      quantityAfter,
+      quantityDelta,
+      costImpact: parseFloat(adjustment.costImpact) || 0,
+      reason: adjustment.reason || ''
+    };
+
+    // Update item quantity
+    item.quantity = quantityAfter;
+
+    // If reducing quantity, reduce from lots proportionally or from newest
+    if (quantityDelta < 0) {
+      let toRemove = Math.abs(quantityDelta);
+      // Remove from lots in reverse order (newest first)
+      for (let i = item.lots.length - 1; i >= 0 && toRemove > 0; i--) {
+        const lot = item.lots[i];
+        const take = Math.min(toRemove, lot.quantity);
+        lot.quantity -= take;
+        toRemove -= take;
+      }
+    } else if (quantityDelta > 0) {
+      // If increasing, add an adjustment lot
+      item.lots.push({
+        id: uuidv4(),
+        quantity: quantityDelta,
+        originalQuantity: quantityDelta,
+        costPerItem: item.costPerItem || 0,
+        acquiredAt: now,
+        source: 'adjustment',
+        sourceRef: adjId,
+        notes: `${adjustment.type}: ${adjustment.reason || 'Inventory adjustment'}`
+      });
+    }
+
+    item.costPerItem = recomputeWeightedCost(item);
+    item.updatedAt = now;
+    store.set('inventoryV2', inventoryV2);
+
+    const adjustments = store.get('adjustments', []);
+    adjustments.push(adjustmentEntry);
+    store.set('adjustments', adjustments);
+
+    appendLedger({
+      action: 'adjustment_created',
+      entityType: 'adjustment',
+      entityId: adjId,
+      parentId: adjustment.inventoryItemId,
+      summary: `${adjustment.type} on "${escapeHtml(item.name)}": ${quantityBefore} -> ${quantityAfter} (${quantityDelta >= 0 ? '+' : ''}${quantityDelta})`,
+      diff: { quantity: { before: quantityBefore, after: quantityAfter } }
+    });
+
+    return { success: true, adjustment: adjustmentEntry };
+  } catch (error) {
+    console.error('add-adjustment error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-adjustments', async (_, itemId) => {
+  const adjustments = store.get('adjustments', []);
+  if (itemId && typeof itemId === 'string') {
+    return adjustments.filter(a => a.inventoryItemId === itemId);
+  }
+  return adjustments;
+});
+
+// --- Ledger ---
+
+ipcMain.handle('get-ledger', async (_, options) => {
+  const ledger = store.get('ledger', []);
+  let result = ledger;
+
+  if (options && typeof options === 'object') {
+    // Filter by entityId
+    if (options.entityId && typeof options.entityId === 'string') {
+      result = result.filter(e => e.entityId === options.entityId || e.parentId === options.entityId);
+    }
+
+    // Apply offset
+    const offset = parseInt(options.offset) || 0;
+    if (offset > 0) {
+      result = result.slice(offset);
+    }
+
+    // Apply limit
+    const limit = parseInt(options.limit) || 0;
+    if (limit > 0) {
+      result = result.slice(0, limit);
+    }
+  }
+
+  return result;
+});
+
+// --- Settings V2 ---
+
+ipcMain.handle('get-inventory-settings-v2', async () => {
+  return store.get('inventorySettings', {});
+});
+
+ipcMain.handle('update-inventory-settings-v2', async (_, settings) => {
+  try {
+    if (!settings || typeof settings !== 'object') return { success: false, error: 'Invalid settings' };
+    const current = store.get('inventorySettings', {});
+    const merged = { ...current, ...settings };
+    // Preserve nested objects that should be merged, not replaced
+    if (settings.feePresets && current.feePresets) {
+      merged.feePresets = { ...current.feePresets, ...settings.feePresets };
+    }
+    store.set('inventorySettings', merged);
+    return { success: true };
+  } catch (error) {
+    console.error('update-inventory-settings-v2 error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-fee-preset', async (_, platform) => {
+  if (!platform || typeof platform !== 'string') return { success: false, error: 'Platform name is required' };
+  const settings = store.get('inventorySettings', {});
+  const presets = settings.feePresets || {};
+  return { success: true, preset: presets[platform] || null };
+});
+
+ipcMain.handle('save-fee-preset', async (_, platform, preset) => {
+  try {
+    if (!platform || typeof platform !== 'string') return { success: false, error: 'Platform name is required' };
+    if (!preset || typeof preset !== 'object') return { success: false, error: 'Invalid preset data' };
+
+    const settings = store.get('inventorySettings', {});
+    if (!settings.feePresets) settings.feePresets = {};
+    settings.feePresets[platform] = {
+      platformFeePercent: parseFloat(preset.platformFeePercent) || 0,
+      paymentProcessingPercent: parseFloat(preset.paymentProcessingPercent) || 0
+    };
+    store.set('inventorySettings', settings);
+    return { success: true };
+  } catch (error) {
+    console.error('save-fee-preset error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// --- Cost Calculation Preview ---
+
+ipcMain.handle('calculate-cost-basis', async (_, itemId, quantity, method) => {
+  try {
+    if (!itemId || typeof itemId !== 'string') return { success: false, error: 'Invalid item ID' };
+    const qty = parseInt(quantity) || 0;
+    if (qty <= 0) return { success: false, error: 'Quantity must be positive' };
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    const item = inventoryV2.find(i => i.id === itemId);
+    if (!item) return { success: false, error: 'Item not found' };
+
+    const costMethod = method || item.costMethod || 'wavg';
+
+    // Preview only - do not consume lots
+    const { allocations, costBasis } = allocateLots(item.lots || [], qty, costMethod);
+    return { success: true, allocations, costBasis, costMethod };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// --- Analytics ---
+
+ipcMain.handle('get-inventory-analytics', async (_, options) => {
+  try {
+    const inventoryV2 = store.get('inventoryV2', []);
+    const salesLogV2 = store.get('salesLogV2', []);
+    const now = new Date();
+    const days = (options && parseInt(options.days)) || 30;
+
+    // Portfolio history: compute daily value snapshots for N days
+    const portfolioHistory = [];
+    for (let d = days - 1; d >= 0; d--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - d);
+      const dateStr = localDateStr(date);
+
+      let totalValue = 0;
+      let totalCost = 0;
+      for (const item of inventoryV2) {
+        const qty = item.quantity || 0;
+        const cost = item.costPerItem || 0;
+        totalCost += qty * cost;
+
+        // Use price history to find market value on this date, or fall back to current
+        const marketPrice = (item.priceData && item.priceData.marketPrice) || 0;
+        let priceOnDate = marketPrice;
+        if (item.priceHistory && item.priceHistory.length > 0) {
+          const historyEntry = item.priceHistory.find(h => h.date === dateStr);
+          if (historyEntry && historyEntry.market) {
+            priceOnDate = historyEntry.market;
+          }
+        }
+        totalValue += qty * (priceOnDate || cost);
+      }
+
+      portfolioHistory.push({
+        date: dateStr,
+        value: Math.round(totalValue * 100) / 100,
+        cost: Math.round(totalCost * 100) / 100
+      });
+    }
+
+    // Aging buckets: 0-30, 30-60, 60-90, 90+ days
+    const agingBuckets = { '0-30': { count: 0, value: 0 }, '30-60': { count: 0, value: 0 }, '60-90': { count: 0, value: 0 }, '90+': { count: 0, value: 0 } };
+    for (const item of inventoryV2) {
+      if (item.quantity <= 0) continue;
+      const age = Math.floor((now - new Date(item.createdAt)) / (1000 * 60 * 60 * 24));
+      const value = item.quantity * (item.costPerItem || 0);
+      if (age <= 30) { agingBuckets['0-30'].count++; agingBuckets['0-30'].value += value; }
+      else if (age <= 60) { agingBuckets['30-60'].count++; agingBuckets['30-60'].value += value; }
+      else if (age <= 90) { agingBuckets['60-90'].count++; agingBuckets['60-90'].value += value; }
+      else { agingBuckets['90+'].count++; agingBuckets['90+'].value += value; }
+    }
+
+    // Round values
+    for (const bucket of Object.values(agingBuckets)) {
+      bucket.value = Math.round(bucket.value * 100) / 100;
+    }
+
+    // Sell-through rate: items sold / (items sold + items in stock) over period
+    const periodStart = new Date(now);
+    periodStart.setDate(periodStart.getDate() - days);
+    const periodSales = salesLogV2.filter(s => new Date(s.date) >= periodStart && s.status === 'completed');
+    const totalSold = periodSales.reduce((s, sale) => s + (sale.quantity || 0), 0);
+    const totalInStock = inventoryV2.reduce((s, item) => s + (item.quantity || 0), 0);
+    const sellThroughRate = (totalSold + totalInStock) > 0
+      ? Math.round((totalSold / (totalSold + totalInStock)) * 10000) / 100
+      : 0;
+
+    return {
+      success: true,
+      portfolioHistory,
+      agingBuckets,
+      sellThroughRate,
+      totalSold,
+      totalInStock
+    };
+  } catch (error) {
+    console.error('get-inventory-analytics error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-inventory-insights', async () => {
+  try {
+    const inventoryV2 = store.get('inventoryV2', []);
+    const salesLogV2 = store.get('salesLogV2', []);
+    const settings = store.get('inventorySettings', {});
+    const dismissedInsights = settings.dismissedInsights || [];
+    const now = new Date();
+    const insights = [];
+
+    for (const item of inventoryV2) {
+      if (item.quantity <= 0) continue;
+
+      const age = Math.floor((now - new Date(item.createdAt)) / (1000 * 60 * 60 * 24));
+      const itemSales = salesLogV2.filter(s => s.inventoryItemId === item.id && s.status === 'completed');
+
+      // 1. Dead stock: 90+ days, no sales
+      if (age >= 90 && itemSales.length === 0) {
+        const key = `dead-stock:${item.id}`;
+        if (!dismissedInsights.includes(key)) {
+          insights.push({
+            type: 'dead_stock',
+            key,
+            itemId: item.id,
+            itemName: item.name,
+            severity: 'warning',
+            message: `"${item.name}" has been in stock for ${age} days with no sales`,
+            data: { age, quantity: item.quantity, value: item.quantity * item.costPerItem }
+          });
+        }
+      }
+
+      // 2. Price drop: >10% decline in 7 days (TCG items only)
+      if (item.priceHistory && item.priceHistory.length >= 2 && item.priceData && item.priceData.marketPrice) {
+        const currentPrice = item.priceData.marketPrice;
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const sevenDayStr = localDateStr(sevenDaysAgo);
+        const oldEntry = item.priceHistory.find(h => h.date <= sevenDayStr && h.market);
+        if (oldEntry && oldEntry.market > 0) {
+          const changePercent = ((currentPrice - oldEntry.market) / oldEntry.market) * 100;
+          if (changePercent < -10) {
+            const key = `price-drop:${item.id}`;
+            if (!dismissedInsights.includes(key)) {
+              insights.push({
+                type: 'price_drop',
+                key,
+                itemId: item.id,
+                itemName: item.name,
+                severity: 'danger',
+                message: `"${item.name}" price dropped ${Math.abs(Math.round(changePercent))}% in 7 days ($${oldEntry.market.toFixed(2)} -> $${currentPrice.toFixed(2)})`,
+                data: { changePercent: Math.round(changePercent * 100) / 100, oldPrice: oldEntry.market, newPrice: currentPrice }
+              });
+            }
+          }
+        }
+      }
+
+      // 3. Sell signal: market > cost * 1.2 and trending down
+      if (item.priceData && item.priceData.marketPrice && item.costPerItem > 0) {
+        const market = item.priceData.marketPrice;
+        const cost = item.costPerItem;
+        const trend = item.analytics && item.analytics.trend;
+        if (market > cost * 1.2 && trend === 'down') {
+          const key = `sell-signal:${item.id}`;
+          if (!dismissedInsights.includes(key)) {
+            const profitPerUnit = market - cost;
+            insights.push({
+              type: 'sell_signal',
+              key,
+              itemId: item.id,
+              itemName: item.name,
+              severity: 'info',
+              message: `"${item.name}" is profitable ($${profitPerUnit.toFixed(2)}/unit) but trending down - consider selling`,
+              data: { market, cost, profitPerUnit, trend }
+            });
+          }
+        }
+      }
+
+      // 4. Restock: qty <= 2, 3+ sales in 30 days
+      const thirtyDaysAgo = new Date(now);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const recentSales = itemSales.filter(s => new Date(s.date) >= thirtyDaysAgo);
+      if (item.quantity <= 2 && recentSales.length >= 3) {
+        const key = `restock:${item.id}`;
+        if (!dismissedInsights.includes(key)) {
+          insights.push({
+            type: 'restock',
+            key,
+            itemId: item.id,
+            itemName: item.name,
+            severity: 'info',
+            message: `"${item.name}" is low stock (${item.quantity} left) with ${recentSales.length} sales in 30 days - consider restocking`,
+            data: { quantity: item.quantity, recentSalesCount: recentSales.length }
+          });
+        }
+      }
+    }
+
+    return { success: true, insights };
+  } catch (error) {
+    console.error('get-inventory-insights error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('dismiss-insight', async (_, insightKey) => {
+  try {
+    if (!insightKey || typeof insightKey !== 'string') return { success: false, error: 'Invalid insight key' };
+    const settings = store.get('inventorySettings', {});
+    if (!Array.isArray(settings.dismissedInsights)) settings.dismissedInsights = [];
+    if (!settings.dismissedInsights.includes(insightKey)) {
+      settings.dismissedInsights.push(insightKey);
+    }
+    store.set('inventorySettings', settings);
+    return { success: true };
+  } catch (error) {
+    console.error('dismiss-insight error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// --- TCG Intelligence ---
+
+ipcMain.handle('search-tcgplayer', async (_, query, setName) => {
+  try {
+    if (testModeNetworkGuard('search-tcgplayer')) return { success: false, error: 'Network blocked in test mode' };
+    if (!query || typeof query !== 'string' || query.trim().length === 0) {
+      return { success: false, error: 'Search query is required' };
+    }
+
+    const searchQuery = query.trim();
+    const https = require('https');
+
+    const searchData = JSON.stringify({
+      algorithm: 'sales_synonym_v2',
+      from: 0,
+      size: 20,
+      filters: {
+        term: {},
+        range: {},
+        match: {}
+      },
+      listingSearch: {
+        filters: {
+          term: { sellerStatus: 'Live', channelId: 0 },
+          range: { quantity: { gte: 1 } },
+          exclude: { channelExclusion: 0 }
+        }
+      },
+      context: { shippingCountry: 'US', cart: {} },
+      settings: { useFuzzySearch: true, didYouMean: {} },
+      sort: {}
+    });
+
+    const searchResult = await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: 'mp-search-api.tcgplayer.com',
+        port: 443,
+        path: `/v1/search/request?q=${encodeURIComponent(searchQuery)}&isList=false`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(searchData),
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+          'Origin': 'https://www.tcgplayer.com',
+          'Referer': 'https://www.tcgplayer.com/'
+        }
+      }, (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => resolve({ status: res.statusCode, body }));
+      });
+      req.on('error', reject);
+      req.setTimeout(15000, () => { req.destroy(); reject(new Error('Search request timeout')); });
+      req.write(searchData);
+      req.end();
+    });
+
+    if (searchResult.status !== 200) {
+      return { success: false, error: `TCGPlayer API returned status ${searchResult.status}` };
+    }
+
+    const data = JSON.parse(searchResult.body);
+    let products = [];
+
+    // Extract products from nested response structure
+    if (data.results && data.results.length > 0) {
+      const firstResult = data.results[0];
+      if (firstResult.results && firstResult.results.length > 0) {
+        products = firstResult.results;
+      }
+    }
+
+    // Map and score candidates
+    const candidates = products.map(p => {
+      const candidateName = p.productName || p.name || '';
+      const candidateSet = p.setName || p.groupName || '';
+      const confidence = computeMatchConfidence(searchQuery, candidateName, setName || candidateSet);
+      const productId = p.productId || p.id || '';
+      let image = p.imageUrl || p.image || p.photoUrl || '';
+      if (!image || image === 'null') {
+        image = `https://tcgplayer-cdn.tcgplayer.com/product/${productId}_200w.jpg`;
+      }
+
+      return {
+        productId: String(productId),
+        name: candidateName,
+        setName: candidateSet,
+        image,
+        marketPrice: p.marketPrice ? parseFloat(p.marketPrice) : null,
+        lowPrice: p.lowPrice ? parseFloat(p.lowPrice) : null,
+        url: `https://www.tcgplayer.com/product/${productId}`,
+        confidence,
+        totalListings: p.totalListings || null
+      };
+    });
+
+    // Sort by confidence descending
+    candidates.sort((a, b) => b.confidence - a.confidence);
+
+    return { success: true, candidates: candidates.slice(0, 20) };
+  } catch (error) {
+    console.error('search-tcgplayer error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('compute-tcg-analytics', async () => {
+  try {
+    const inventoryV2 = store.get('inventoryV2', []);
+    const now = new Date();
+    let computed = 0;
+
+    for (const item of inventoryV2) {
+      if (!item.tcgplayerId || !item.priceHistory || item.priceHistory.length === 0) continue;
+
+      const history = item.priceHistory;
+      const currentPrice = (item.priceData && item.priceData.marketPrice) || null;
+      if (!currentPrice) continue;
+
+      // Compute 1D/7D/30D changes
+      const change1d = computePriceChange(history, currentPrice, 1);
+      const change7d = computePriceChange(history, currentPrice, 7);
+      const change30d = computePriceChange(history, currentPrice, 30);
+
+      // Compute 7-day volatility (standard deviation)
+      const recentPrices = history.slice(-7).map(h => h.market).filter(p => p != null && p > 0);
+      let volatility7d = 0;
+      if (recentPrices.length >= 2) {
+        const mean = recentPrices.reduce((s, p) => s + p, 0) / recentPrices.length;
+        const variance = recentPrices.reduce((s, p) => s + Math.pow(p - mean, 2), 0) / recentPrices.length;
+        volatility7d = Math.round(Math.sqrt(variance) * 100) / 100;
+      }
+
+      // Compute spread (low/high ratio)
+      const low = (item.priceData && item.priceData.lowPrice) || 0;
+      const high = (item.priceData && item.priceData.highPrice) || 0;
+      const spread = high > 0 ? Math.round((low / high) * 1000) / 1000 : 0;
+
+      // Determine trend
+      let trend = 'flat';
+      if (change7d.percent > 1) trend = 'up';
+      else if (change7d.percent < -1) trend = 'down';
+
+      // Compute signal
+      const signal = computeSignal(item, currentPrice, change7d, change30d, volatility7d, spread);
+
+      item.analytics = {
+        change1d,
+        change7d,
+        change30d,
+        volatility7d,
+        spread,
+        trend,
+        signal: signal.signal,
+        signalReason: signal.reason,
+        lastComputed: now.toISOString()
+      };
+
+      computed++;
+    }
+
+    store.set('inventoryV2', inventoryV2);
+    return { success: true, computed };
+  } catch (error) {
+    console.error('compute-tcg-analytics error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * Compute price change over N days from price history.
+ */
+function computePriceChange(history, currentPrice, days) {
+  if (!history || history.length === 0 || !currentPrice) return { amount: 0, percent: 0 };
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() - days);
+  const targetStr = localDateStr(targetDate);
+
+  // Find the closest entry at or before targetDate
+  let oldPrice = null;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].date <= targetStr && history[i].market) {
+      oldPrice = history[i].market;
+      break;
+    }
+  }
+
+  if (!oldPrice) return { amount: 0, percent: 0 };
+  const amount = Math.round((currentPrice - oldPrice) * 100) / 100;
+  const percent = Math.round((amount / oldPrice) * 10000) / 100;
+  return { amount, percent };
+}
+
+/**
+ * Compute trading signal based on spec rules.
+ * Priority: SELL NOW > RESTOCK > REPRICE > HOLD > ALERT
+ */
+function computeSignal(item, currentPrice, change7d, change30d, volatility7d, spread) {
+  const cost = item.costPerItem || 0;
+
+  // SELL NOW: market > cost * 1.5 AND 30D > +20%, OR market > cost * 2
+  if (cost > 0) {
+    if (currentPrice > cost * 2) {
+      return { signal: 'sell_now', reason: 'Price is 2x or more above cost basis - strong sell opportunity' };
+    }
+    if (currentPrice > cost * 1.5 && change30d.percent > 20) {
+      return { signal: 'sell_now', reason: `Strong uptrend +${change30d.percent}% 30D, significant profit opportunity` };
+    }
+  }
+
+  // RESTOCK: market < cost * 0.7 AND volatility > 2.0 AND qty < 5
+  if (cost > 0 && currentPrice < cost * 0.7 && volatility7d > 2.0 && (item.quantity || 0) < 5) {
+    return { signal: 'restock', reason: 'Price dropped below 70% of cost, high volatility, low stock' };
+  }
+
+  // REPRICE: spread < 0.6 AND volatility < 0.5 AND age > 90d
+  const age = Math.floor((new Date() - new Date(item.createdAt)) / (1000 * 60 * 60 * 24));
+  if (spread > 0 && spread < 0.6 && volatility7d < 0.5 && age > 90) {
+    return { signal: 'reprice', reason: 'Stable pricing with wide spread, consider adjusting listing' };
+  }
+
+  // HOLD: 7D > +1% AND cost < market < cost * 1.5
+  if (cost > 0 && change7d.percent > 1 && currentPrice > cost && currentPrice < cost * 1.5) {
+    return { signal: 'hold', reason: `Steady growth +${change7d.percent}% 7D, moderate profit` };
+  }
+
+  // ALERT: 10%+ change in 24 hours
+  if (item.analytics && item.analytics.change1d) {
+    const abs1d = Math.abs(item.analytics.change1d.percent || 0);
+    if (abs1d >= 10) {
+      return { signal: 'alert', reason: `Unusual price movement: ${item.analytics.change1d.percent > 0 ? '+' : ''}${item.analytics.change1d.percent}% in 24h` };
+    }
+  }
+
+  return { signal: null, reason: '' };
+}
+
+ipcMain.handle('batch-match-inventory', async () => {
+  try {
+    if (testModeNetworkGuard('batch-match-inventory')) return { success: false, error: 'Network blocked in test mode' };
+    const inventoryV2 = store.get('inventoryV2', []);
+    const unmatchedItems = inventoryV2.filter(i => !i.tcgplayerId && i.name);
+
+    const results = {};
+    for (const item of unmatchedItems) {
+      try {
+        // Call search-tcgplayer logic inline
+        const https = require('https');
+        const searchQuery = item.name.trim();
+        const searchData = JSON.stringify({
+          algorithm: 'sales_synonym_v2',
+          from: 0,
+          size: 5,
+          filters: { term: {}, range: {}, match: {} },
+          listingSearch: {
+            filters: {
+              term: { sellerStatus: 'Live', channelId: 0 },
+              range: { quantity: { gte: 1 } },
+              exclude: { channelExclusion: 0 }
+            }
+          },
+          context: { shippingCountry: 'US', cart: {} },
+          settings: { useFuzzySearch: true, didYouMean: {} },
+          sort: {}
+        });
+
+        const searchResult = await new Promise((resolve, reject) => {
+          const req = https.request({
+            hostname: 'mp-search-api.tcgplayer.com',
+            port: 443,
+            path: `/v1/search/request?q=${encodeURIComponent(searchQuery)}&isList=false`,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(searchData),
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'application/json',
+              'Origin': 'https://www.tcgplayer.com',
+              'Referer': 'https://www.tcgplayer.com/'
+            }
+          }, (res) => {
+            let body = '';
+            res.on('data', chunk => body += chunk);
+            res.on('end', () => resolve({ status: res.statusCode, body }));
+          });
+          req.on('error', reject);
+          req.setTimeout(15000, () => { req.destroy(); reject(new Error('Timeout')); });
+          req.write(searchData);
+          req.end();
+        });
+
+        if (searchResult.status === 200) {
+          const data = JSON.parse(searchResult.body);
+          let products = [];
+          if (data.results && data.results.length > 0) {
+            const firstResult = data.results[0];
+            if (firstResult.results && firstResult.results.length > 0) {
+              products = firstResult.results;
+            }
+          }
+
+          const candidates = products.map(p => {
+            const candidateName = p.productName || p.name || '';
+            const candidateSet = p.setName || p.groupName || '';
+            const confidence = computeMatchConfidence(searchQuery, candidateName, candidateSet);
+            const productId = p.productId || p.id || '';
+            let image = p.imageUrl || p.image || '';
+            if (!image || image === 'null') {
+              image = `https://tcgplayer-cdn.tcgplayer.com/product/${productId}_200w.jpg`;
+            }
+            return {
+              productId: String(productId),
+              name: candidateName,
+              setName: candidateSet,
+              image,
+              marketPrice: p.marketPrice ? parseFloat(p.marketPrice) : null,
+              url: `https://www.tcgplayer.com/product/${productId}`,
+              confidence
+            };
+          });
+
+          candidates.sort((a, b) => b.confidence - a.confidence);
+          results[item.id] = candidates.slice(0, 5);
+        } else {
+          results[item.id] = [];
+        }
+
+        // Rate limiting: delay between items
+        await new Promise(r => setTimeout(r, 1500));
+      } catch (err) {
+        results[item.id] = [];
+      }
+    }
+
+    return { success: true, results };
+  } catch (error) {
+    console.error('batch-match-inventory error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// --- Enhanced refresh-inventory-item (V2) ---
+// This modifies the existing handler behavior when item is in inventoryV2
+
+ipcMain.handle('refresh-inventory-item-v2', async (_, id) => {
+  try {
+    if (testModeNetworkGuard('refresh-inventory-item-v2')) return { success: false, error: 'Network blocked in test mode' };
+    if (!id || typeof id !== 'string') return { success: false, error: 'Invalid item ID' };
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    const item = inventoryV2.find(i => i.id === id);
+    if (!item) return { success: false, error: 'Item not found' };
+    if (!item.tcgplayerId && !item.tcgplayerUrl) return { success: false, error: 'Item has no TCGPlayer link' };
+
+    const url = item.tcgplayerUrl || `https://www.tcgplayer.com/product/${item.tcgplayerId}`;
+    const result = await fetchTcgPlayerProduct(url);
+
+    if (!result.success || !result.data) {
+      // Track consecutive errors
+      item.refreshState = item.refreshState || { consecutiveErrors: 0, lastError: null, delisted: false, priority: 'normal' };
+      item.refreshState.consecutiveErrors++;
+      item.refreshState.lastError = result.error || 'Unknown error';
+      if (result.error && result.error.includes('404')) {
+        item.refreshState.delisted = true;
+      }
+      store.set('inventoryV2', inventoryV2);
+      return { success: false, error: result.error || 'Failed to fetch price' };
+    }
+
+    const data = result.data;
+    const now = new Date().toISOString();
+    const today = localDateStr(new Date());
+
+    // Update price data with all 6 fields
+    item.priceData = {
+      marketPrice: data.marketPrice || null,
+      lowPrice: data.lowPrice || null,
+      midPrice: data.listedMedian || null,
+      highPrice: data.highPrice || null,
+      totalListings: data.listings || null,
+      fetchedAt: now
+    };
+    item.lastChecked = now;
+
+    // Append multi-field price history entry
+    if (!Array.isArray(item.priceHistory)) item.priceHistory = [];
+    // Check if we already have an entry for today and update it
+    const todayIdx = item.priceHistory.findIndex(h => h.date === today);
+    const historyEntry = {
+      date: today,
+      market: data.marketPrice || null,
+      low: data.lowPrice || null,
+      high: data.highPrice || null
+    };
+    if (todayIdx >= 0) {
+      item.priceHistory[todayIdx] = historyEntry;
+    } else {
+      item.priceHistory.push(historyEntry);
+    }
+    item.priceHistory = aggregatePriceHistory(item.priceHistory, 365);
+
+    // Update name/image if not set
+    if (data.name && !item.name) item.name = data.name;
+    if (data.image && !item.image) item.image = data.image;
+    if (data.setName && !item.setName) item.setName = data.setName;
+
+    // Reset error state on success
+    item.refreshState = item.refreshState || {};
+    item.refreshState.consecutiveErrors = 0;
+    item.refreshState.lastError = null;
+    item.refreshState.delisted = false;
+
+    // Compute analytics inline
+    if (item.priceHistory.length > 0 && data.marketPrice) {
+      const change1d = computePriceChange(item.priceHistory, data.marketPrice, 1);
+      const change7d = computePriceChange(item.priceHistory, data.marketPrice, 7);
+      const change30d = computePriceChange(item.priceHistory, data.marketPrice, 30);
+
+      const recentPrices = item.priceHistory.slice(-7).map(h => h.market).filter(p => p != null && p > 0);
+      let volatility7d = 0;
+      if (recentPrices.length >= 2) {
+        const mean = recentPrices.reduce((s, p) => s + p, 0) / recentPrices.length;
+        const variance = recentPrices.reduce((s, p) => s + Math.pow(p - mean, 2), 0) / recentPrices.length;
+        volatility7d = Math.round(Math.sqrt(variance) * 100) / 100;
+      }
+
+      const low = item.priceData.lowPrice || 0;
+      const high = item.priceData.highPrice || 0;
+      const spread = high > 0 ? Math.round((low / high) * 1000) / 1000 : 0;
+
+      let trend = 'flat';
+      if (change7d.percent > 1) trend = 'up';
+      else if (change7d.percent < -1) trend = 'down';
+
+      const signal = computeSignal(item, data.marketPrice, change7d, change30d, volatility7d, spread);
+
+      item.analytics = {
+        change1d, change7d, change30d,
+        volatility7d, spread, trend,
+        signal: signal.signal,
+        signalReason: signal.reason,
+        lastComputed: now
+      };
+    }
+
+    item.updatedAt = now;
+    store.set('inventoryV2', inventoryV2);
+
+    return { success: true, item };
+  } catch (error) {
+    console.error('refresh-inventory-item-v2 error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('refresh-all-inventory-v2', async () => {
+  try {
+    if (testModeNetworkGuard('refresh-all-inventory-v2')) return { success: false, error: 'Network blocked in test mode' };
+
+    const inventoryV2 = store.get('inventoryV2', []);
+    const tcgItems = inventoryV2.filter(item => item.tcgplayerId || item.tcgplayerUrl);
+
+    if (tcgItems.length === 0) {
+      return { success: true, updated: 0, errors: 0 };
+    }
+
+    // Priority-based sorting
+    const sortedItems = sortForRefresh(tcgItems);
+
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) {
+      win.webContents.send('inventory-refresh-start');
+    }
+
+    let updated = 0;
+    let errors = 0;
+
+    for (let i = 0; i < sortedItems.length; i++) {
+      const item = sortedItems[i];
+
+      if (win) {
+        win.webContents.send('inventory-refresh-progress', {
+          current: i + 1,
+          total: sortedItems.length,
+          item: item.name
+        });
+      }
+
+      // Exponential backoff for items with consecutive errors
+      const consecutiveErrors = (item.refreshState && item.refreshState.consecutiveErrors) || 0;
+      if (consecutiveErrors > 0) {
+        const backoffMs = Math.min(3000 * Math.pow(2, consecutiveErrors), 300000);
+        await new Promise(r => setTimeout(r, backoffMs));
+      }
+
+      const url = item.tcgplayerUrl || `https://www.tcgplayer.com/product/${item.tcgplayerId}`;
+      const result = await fetchTcgPlayerProduct(url);
+
+      // Find this item in the full inventory array
+      const fullItem = inventoryV2.find(inv => inv.id === item.id);
+      if (!fullItem) continue;
+
+      if (result.success && result.data) {
+        const data = result.data;
+        const now = new Date().toISOString();
+        const today = localDateStr(new Date());
+
+        fullItem.priceData = {
+          marketPrice: data.marketPrice || null,
+          lowPrice: data.lowPrice || null,
+          midPrice: data.listedMedian || null,
+          highPrice: data.highPrice || null,
+          totalListings: data.listings || null,
+          fetchedAt: now
+        };
+        fullItem.lastChecked = now;
+
+        if (!Array.isArray(fullItem.priceHistory)) fullItem.priceHistory = [];
+        const todayIdx = fullItem.priceHistory.findIndex(h => h.date === today);
+        const historyEntry = { date: today, market: data.marketPrice || null, low: data.lowPrice || null, high: data.highPrice || null };
+        if (todayIdx >= 0) {
+          fullItem.priceHistory[todayIdx] = historyEntry;
+        } else {
+          fullItem.priceHistory.push(historyEntry);
+        }
+        fullItem.priceHistory = aggregatePriceHistory(fullItem.priceHistory, 365);
+
+        // Reset error state
+        fullItem.refreshState = fullItem.refreshState || {};
+        fullItem.refreshState.consecutiveErrors = 0;
+        fullItem.refreshState.lastError = null;
+        fullItem.refreshState.delisted = false;
+        fullItem.updatedAt = now;
+
+        updated++;
+      } else {
+        // Track errors
+        fullItem.refreshState = fullItem.refreshState || { consecutiveErrors: 0, lastError: null, delisted: false, priority: 'normal' };
+        fullItem.refreshState.consecutiveErrors++;
+        fullItem.refreshState.lastError = result.error || 'Unknown error';
+
+        // Handle rate limiting
+        if (result.error && (result.error.includes('429') || result.error.includes('rate'))) {
+          // Pause 60 seconds on rate limit
+          if (win) {
+            win.webContents.send('inventory-refresh-progress', {
+              current: i + 1,
+              total: sortedItems.length,
+              item: 'Rate limited - pausing 60s...'
+            });
+          }
+          await new Promise(r => setTimeout(r, 60000));
+        }
+
+        if (result.error && result.error.includes('404')) {
+          fullItem.refreshState.delisted = true;
+        }
+
+        errors++;
+      }
+
+      // Standard delay between requests
+      if (i < sortedItems.length - 1) {
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+
+    store.set('inventoryV2', inventoryV2);
+
+    // Update last refresh time
+    const settings = store.get('inventorySettings', {});
+    settings.lastRefresh = new Date().toISOString();
+    store.set('inventorySettings', settings);
+
+    if (win) {
+      win.webContents.send('inventory-refresh-complete', { success: true, updated, errors });
+    }
+
+    return { success: true, updated, errors };
+  } catch (error) {
+    console.error('refresh-all-inventory-v2 error:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // Proxy Lists
@@ -6266,6 +8837,13 @@ ipcMain.handle('fetch-tcgplayer', async (_, url) => {
 ipcMain.handle('get-missing-pokecenter-images', () => getMissingPokecenterImages());
 ipcMain.handle('fetch-pokecenter-product', (_, sku) => fetchPokecenterProduct(sku));
 ipcMain.handle('download-pokecenter-image', (_, imageUrl, sku) => downloadPokecenterImage(imageUrl, sku));
+
+// Target image tools
+ipcMain.handle('search-target-product', (_, itemName) => searchTargetProduct(itemName));
+ipcMain.handle('get-target-drop-items-needing-images', (_, dropDate) => getTargetDropItemsNeedingImages(dropDate));
+ipcMain.handle('apply-target-image', (_, itemName, imageUrl, guestId, dropDate) => applyTargetImage(itemName, imageUrl, guestId, dropDate));
+ipcMain.handle('spread-target-images', () => spreadTargetImages());
+ipcMain.handle('clear-target-drop-images', (_, dropDate) => clearTargetDropImages(dropDate));
 
 ipcMain.handle('get-orders', (_, retailer) => getOrders(retailer));
 ipcMain.handle('mark-order-delivered', (_, retailer, orderId) => markOrderDelivered(retailer, orderId));
@@ -6886,6 +9464,154 @@ ipcMain.handle('test-discord-webhook', async (_, urlParam) => {
   }
 });
 
+// ==================== SAVED WEBHOOKS ====================
+ipcMain.handle('get-saved-webhooks', async () => {
+  return store.get('savedWebhooks', []);
+});
+
+ipcMain.handle('save-webhook', async (_, { id, name, url }) => {
+  if (!name || typeof name !== 'string' || name.trim().length === 0) return { success: false, error: 'Name is required' };
+  if (name.trim().length > 30) return { success: false, error: 'Name must be 30 characters or less' };
+  if (!isValidWebhookUrl(url)) return { success: false, error: 'Invalid Discord webhook URL' };
+
+  const webhooks = store.get('savedWebhooks', []);
+
+  if (id) {
+    // Update existing
+    const idx = webhooks.findIndex(w => w.id === id);
+    if (idx === -1) return { success: false, error: 'Webhook not found' };
+    // Check name uniqueness (excluding self)
+    if (webhooks.some((w, i) => i !== idx && w.name.toLowerCase() === name.trim().toLowerCase())) {
+      return { success: false, error: 'A webhook with this name already exists' };
+    }
+    webhooks[idx].name = name.trim();
+    webhooks[idx].url = url;
+  } else {
+    // Create new
+    if (webhooks.length >= 10) return { success: false, error: 'Maximum 10 webhooks allowed' };
+    if (webhooks.some(w => w.name.toLowerCase() === name.trim().toLowerCase())) {
+      return { success: false, error: 'A webhook with this name already exists' };
+    }
+    webhooks.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: name.trim(), url });
+  }
+
+  store.set('savedWebhooks', webhooks);
+  return { success: true };
+});
+
+ipcMain.handle('delete-webhook', async (_, id) => {
+  const webhooks = store.get('savedWebhooks', []);
+  const idx = webhooks.findIndex(w => w.id === id);
+  if (idx === -1) return { success: false, error: 'Webhook not found' };
+  webhooks.splice(idx, 1);
+  store.set('savedWebhooks', webhooks);
+
+  // Cascade-clean channelWebhooks
+  const channelWebhooks = store.get('channelWebhooks', {});
+  let cleaned = false;
+  for (const [chId, whId] of Object.entries(channelWebhooks)) {
+    if (whId === id) { delete channelWebhooks[chId]; cleaned = true; }
+  }
+  if (cleaned) store.set('channelWebhooks', channelWebhooks);
+
+  return { success: true };
+});
+
+ipcMain.handle('test-saved-webhook', async (_, id) => {
+  if (testModeNetworkGuard('test-saved-webhook')) return { success: false, error: 'Network blocked in test mode' };
+  const webhooks = store.get('savedWebhooks', []);
+  const wh = webhooks.find(w => w.id === id);
+  if (!wh) return { success: false, error: 'Webhook not found' };
+  if (!isValidWebhookUrl(wh.url)) return { success: false, error: 'Invalid webhook URL' };
+
+  try {
+    const https = require('https');
+    const payload = JSON.stringify({
+      embeds: [{
+        author: { name: 'SOLUS' },
+        title: 'Webhook Test',
+        description: `Testing webhook: **${wh.name}**\nYour Discord webhook is connected successfully!`,
+        color: 0x8b5cf6,
+        footer: { text: 'SOLUS Analytics' },
+        timestamp: new Date().toISOString()
+      }]
+    });
+
+    return new Promise((resolve) => {
+      const urlObj = new URL(wh.url);
+      const req = https.request({
+        hostname: urlObj.hostname,
+        path: urlObj.pathname,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          resolve({ success: res.statusCode >= 200 && res.statusCode < 300, statusCode: res.statusCode });
+        });
+      });
+      req.on('error', (e) => resolve({ success: false, error: e.message }));
+      req.setTimeout(10000, () => { req.destroy(); resolve({ success: false, error: 'Timeout' }); });
+      req.write(payload);
+      req.end();
+    });
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-channel-webhooks', async () => {
+  return store.get('channelWebhooks', {});
+});
+
+ipcMain.handle('save-channel-webhook', async (_, { channelId, webhookId }) => {
+  const channelWebhooks = store.get('channelWebhooks', {});
+
+  if (!webhookId || webhookId === 'none') {
+    delete channelWebhooks[channelId];
+  } else {
+    // Verify webhook exists
+    const webhooks = store.get('savedWebhooks', []);
+    const wh = webhooks.find(w => w.id === webhookId);
+    if (!wh) return { success: false, error: 'Webhook not found' };
+    channelWebhooks[channelId] = webhookId;
+  }
+  store.set('channelWebhooks', channelWebhooks);
+
+  // Try to sync to server
+  try {
+    const licenseKey = getDiscordAcoLicenseKey();
+    if (licenseKey) {
+      const webhooks = store.get('savedWebhooks', []);
+      const wh = webhookId && webhookId !== 'none' ? webhooks.find(w => w.id === webhookId) : null;
+      await callDiscordAcoApi('save-channel-forward', {
+        licenseKey,
+        channelId,
+        webhookUrl: wh ? wh.url : null,
+        webhookName: wh ? wh.name : null
+      });
+      return { success: true, synced: true };
+    }
+  } catch (e) {
+    console.error('[SAVED WEBHOOKS] Failed to sync channel webhook to server:', e.message);
+  }
+
+  return { success: true, synced: false };
+});
+
+ipcMain.handle('migrate-webhook', async () => {
+  const webhooks = store.get('savedWebhooks', []);
+  if (webhooks.length > 0) return { success: true, alreadyMigrated: true };
+
+  const oldUrl = store.get('discordWebhookUrl', '');
+  if (!oldUrl || !isValidWebhookUrl(oldUrl)) return { success: true, noOldWebhook: true };
+
+  const newId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  store.set('savedWebhooks', [{ id: newId, name: 'Default', url: oldUrl }]);
+  return { success: true, migrated: true, webhookId: newId };
+});
+
 ipcMain.handle('send-discord-webhook', async (_, payload) => {
   if (testModeNetworkGuard('send-discord-webhook')) return { success: false, error: 'Network blocked in test mode' };
   const url = store.get('discordWebhookUrl');
@@ -7066,19 +9792,26 @@ function getDiscordAcoLicenseKey() {
 }
 
 async function callDiscordAcoApi(action, body = {}) {
-  const response = await fetch(`${DISCORD_ACO_EDGE_URL}/${action}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${DISCORD_ACO_ANON_KEY}`
-    },
-    body: JSON.stringify(body)
-  });
-  const result = await response.json();
-  if (!response.ok) {
-    throw new Error(result.error || `API Error: ${response.status}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(`${DISCORD_ACO_EDGE_URL}/${action}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${DISCORD_ACO_ANON_KEY}`
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || `API Error: ${response.status}`);
+    }
+    return result;
+  } finally {
+    clearTimeout(timeout);
   }
-  return result;
 }
 
 // SKU Overrides - manual product name -> SKU mapping (merged with built-in mappings)
@@ -7119,8 +9852,9 @@ ipcMain.handle('get-discord-aco-settings', async () => {
     if (licenseKey) {
       try {
         const result = await callDiscordAcoApi('check-link', { licenseKey });
+        console.log('[DISCORD ACO] check-link API response:', JSON.stringify(result));
         linked = result.linked || false;
-        discordUsername = result.discordUsername || null;
+        discordUsername = result.discordUsername || result.discord_username || null;
       } catch (e) {
         console.log('[DISCORD ACO] Failed to check link status:', e.message);
       }
@@ -7165,7 +9899,7 @@ ipcMain.handle('generate-discord-link-token', async () => {
     }
 
     const result = await callDiscordAcoApi('generate-token', { licenseKey });
-    console.log('[DISCORD ACO] Link token generated:', result.token);
+    console.log('[DISCORD ACO] Link token generated successfully');
     return { success: true, token: result.token };
   } catch (error) {
     console.error('[DISCORD ACO] generate-discord-link-token FULL ERROR:', error.message, error.stack);
@@ -7173,12 +9907,16 @@ ipcMain.handle('generate-discord-link-token', async () => {
   }
 });
 
+let _discordSyncInProgress = false;
+
 ipcMain.handle('sync-discord-orders', async () => {
   if (testModeNetworkGuard('sync-discord-orders')) return { success: false, error: 'Network blocked in test mode' };
+  if (_discordSyncInProgress) return { success: false, error: 'Sync already in progress' };
   const currentMode = store.get('dataMode', 'imap');
   if (currentMode !== 'discord') {
     return { success: false, error: 'Discord sync is disabled in IMAP mode. Switch to Discord mode in Settings > General.' };
   }
+  _discordSyncInProgress = true;
   try {
     const licenseKey = getDiscordAcoLicenseKey();
     if (!licenseKey) {
@@ -7249,20 +9987,6 @@ ipcMain.handle('sync-discord-orders', async () => {
     const userOverrides = store.get('skuOverrides', {});
     const skuOverrides = { ...builtInMappings, ...userOverrides };
 
-    // Score how well two strings match (higher = better, used for substring tiebreaking)
-    function matchScore(a, b) {
-      if (a === b) return 1000;
-      const wordsA = a.split(/\s+/);
-      const wordsB = b.split(/\s+/);
-      const setB = new Set(wordsB);
-      let shared = 0;
-      for (const w of wordsA) {
-        if (setB.has(w)) shared++;
-      }
-      const lenDiff = Math.abs(a.length - b.length);
-      return shared * 100 - lenDiff;
-    }
-
     // Helper: find SKU and local image for a single product name
     function findSkuAndImage(name) {
       if (!name) return { sku: null, image: null };
@@ -7315,10 +10039,15 @@ ipcMain.handle('sync-discord-orders', async () => {
       return { cancelReason: null, manualCancel: false };
     }
 
+    // Bots whose items should NOT be SKU-mapped (they use their own image URLs)
+    const skipMappingBots = new Set(['shikari', 'refract']);
+
     const convertedOrders = rows.map(row => {
       const itemName = row.item || '';
       const isMulticart = itemName.includes(' + ');
       const cancelInfo = getDiscordCancelInfo(row);
+      const botType = (row.aco_bot || '').toLowerCase();
+      const shouldMap = !skipMappingBots.has(botType);
 
       if (isMulticart) {
         // Split multicart combined name back into individual items
@@ -7328,7 +10057,7 @@ ipcMain.handle('sync-discord-orders', async () => {
 
         // Build items array like email multicart orders
         const items = parts.map(partName => {
-          const { sku, image } = findSkuAndImage(partName);
+          const { sku, image } = shouldMap ? findSkuAndImage(partName) : { sku: null, image: null };
           return {
             name: partName,
             sku: sku,
@@ -7340,7 +10069,7 @@ ipcMain.handle('sync-discord-orders', async () => {
         });
 
         // Use first item's image as the order-level image
-        const primaryMatch = findSkuAndImage(parts[0]);
+        const primaryMatch = shouldMap ? findSkuAndImage(parts[0]) : { sku: null, image: null };
 
         return {
           orderId: normalizeOrderId(row.order_id || `discord-${row.message_id}`),
@@ -7365,7 +10094,7 @@ ipcMain.handle('sync-discord-orders', async () => {
         };
       } else {
         // Single item order
-        const { sku: matchedSku, image: matchedImage } = findSkuAndImage(itemName);
+        const { sku: matchedSku, image: matchedImage } = shouldMap ? findSkuAndImage(itemName) : { sku: null, image: null };
 
         return {
           orderId: normalizeOrderId(row.order_id || `discord-${row.message_id}`),
@@ -7386,6 +10115,13 @@ ipcMain.handle('sync-discord-orders', async () => {
         };
       }
     });
+
+    // Build set of existing order keys BEFORE save, to determine genuinely new orders
+    const existingOrderKeys = new Set();
+    const preExistingOrders = store.get('orders', []);
+    for (const o of preExistingOrders) {
+      existingOrderKeys.add(`${o.retailer}-${normalizeOrderId(o.orderId)}`);
+    }
 
     // Save in chunks to avoid blocking the main process on large imports
     const CHUNK_SIZE = 50;
@@ -7408,10 +10144,21 @@ ipcMain.handle('sync-discord-orders', async () => {
 
     store.set('discordAco.lastSync', new Date().toISOString());
 
-    // Auto-forward new orders to webhook with @mentions
+    // Filter to only genuinely new orders (not already in store before this sync)
+    const newOrders = convertedOrders.filter(o => {
+      const key = `${o.retailer}-${normalizeOrderId(o.orderId)}`;
+      return !existingOrderKeys.has(key);
+    });
+
+    // Auto-forward ONLY genuinely new orders to webhook with @mentions
     const autoForwardEnabled = store.get('discordAco.autoForwardEnabled', false);
-    const webhookUrl = store.get('discordWebhookUrl');
-    if (autoForwardEnabled && webhookUrl && isValidWebhookUrl(webhookUrl) && convertedOrders.length > 0) {
+    let webhookUrl = store.get('discordWebhookUrl');
+    // Fallback: if no legacy webhook, use first saved webhook
+    if (!webhookUrl || !isValidWebhookUrl(webhookUrl)) {
+      const saved = store.get('savedWebhooks', []);
+      if (saved.length > 0 && isValidWebhookUrl(saved[0].url)) webhookUrl = saved[0].url;
+    }
+    if (autoForwardEnabled && webhookUrl && isValidWebhookUrl(webhookUrl) && newOrders.length > 0) {
       try {
         // Fetch profile mappings for @mentions
         let mappingLookup = {};
@@ -7426,12 +10173,27 @@ ipcMain.handle('sync-discord-orders', async () => {
           console.error('[ACO FORWARD] Failed to load profile mappings:', e.message);
         }
 
-        const forwardDeclined = store.get('discordAco.forwardDeclinedEnabled', true);
-        const ordersToForward = forwardDeclined ? convertedOrders : convertedOrders.filter(o => o.status !== 'cancelled' && o.status !== 'declined');
+        // Load dedup keys to prevent re-forwarding
+        const forwardedKeys = store.get('discordAco.forwardedKeys', {});
+
+        const forwardDeclined = store.get('discordAco.forwardDeclinedEnabled', false);
+        const ordersToForward = forwardDeclined ? newOrders : newOrders.filter(o => o.status !== 'cancelled' && o.status !== 'declined');
         console.log('[ACO FORWARD] Forwarding', ordersToForward.length, 'orders to webhook...');
         let forwarded = 0;
-        for (const order of ordersToForward) {
-          const statusColor = order.status === 'confirmed' ? 0x22c55e : order.status === 'cancelled' ? 0xef4444 : 0xf59e0b;
+        const forwardLog = store.get('acoForwardLog', []);
+
+        for (let i = 0; i < ordersToForward.length; i++) {
+          const order = ordersToForward[i];
+          const dedupKey = `${order.orderId}:${order.status}`;
+          const traceId = `fwd-${Date.now()}-${i}`;
+
+          // Skip if already forwarded (dedup)
+          if (forwardedKeys[dedupKey]) {
+            forwardLog.push({ traceId, timestamp: new Date().toISOString(), orderId: order.orderId, itemName: order.item, profileName: order.profileName, action: 'skipped', result: 'dedup', mentionSent: false });
+            continue;
+          }
+
+          const statusColor = order.status === 'confirmed' ? 0x22c55e : (order.status === 'cancelled' || order.status === 'declined') ? 0xef4444 : 0xf59e0b;
           const embed = {
             title: order.item || 'Unknown Item',
             color: statusColor,
@@ -7452,18 +10214,38 @@ ipcMain.handle('sync-discord-orders', async () => {
           const payload = { embeds: [embed] };
           // Add @mention if profile is mapped
           const discordUserId = mappingLookup[order.profileName];
+          let mentionSent = false;
           if (discordUserId) {
             payload.content = `<@${discordUserId}>`;
+            mentionSent = true;
           }
 
           const result = await sendWebhookJson(webhookUrl, payload);
-          if (result.success) forwarded++;
+          if (result.success) {
+            forwarded++;
+            forwardedKeys[dedupKey] = Date.now();
+          }
+
+          // Log to audit trail
+          forwardLog.push({ traceId, timestamp: new Date().toISOString(), orderId: order.orderId, itemName: order.item, profileName: order.profileName, action: 'forward', result: result.success ? 'sent' : `failed:${result.error || result.statusCode}`, mentionSent: result.success && mentionSent });
 
           // Throttle: 1 request per second to respect Discord rate limits
-          if (ordersToForward.indexOf(order) < ordersToForward.length - 1) {
+          if (i < ordersToForward.length - 1) {
             await new Promise(r => setTimeout(r, 1000));
           }
         }
+
+        // Prune dedup keys older than 7 days
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        for (const [k, ts] of Object.entries(forwardedKeys)) {
+          if (ts < sevenDaysAgo) delete forwardedKeys[k];
+        }
+        store.set('discordAco.forwardedKeys', forwardedKeys);
+
+        // Keep audit log to last 200 entries (ring buffer)
+        while (forwardLog.length > 200) forwardLog.shift();
+        store.set('acoForwardLog', forwardLog);
+
         console.log('[ACO FORWARD] Forwarded', forwarded, '/', ordersToForward.length, 'orders');
       } catch (fwdError) {
         console.error('[ACO FORWARD] Auto-forward error:', fwdError.message);
@@ -7471,21 +10253,26 @@ ipcMain.handle('sync-discord-orders', async () => {
     }
 
     console.log('[DISCORD ACO] Sync complete. Total added:', totalAdded);
-    return { success: true, count: totalAdded, orders: convertedOrders };
+    store.set('discordAco.lastSyncCount', totalAdded);
+    return { success: true, count: totalAdded };
   } catch (error) {
     console.error('[DISCORD ACO] sync-discord-orders error:', error);
     return { success: false, error: error.message };
+  } finally {
+    _discordSyncInProgress = false;
   }
 });
 
 ipcMain.handle('get-discord-link-status', async () => {
   try {
     const licenseKey = getDiscordAcoLicenseKey();
+    console.log('[DISCORD ACO] get-link-status - licenseKey:', licenseKey ? licenseKey.substring(0, 8) + '...' : 'NULL');
     if (!licenseKey) {
       return { success: true, linked: false };
     }
 
     const result = await callDiscordAcoApi('get-link-status', { licenseKey });
+    console.log('[DISCORD ACO] get-link-status API response:', JSON.stringify(result));
 
     if (!result.linked) {
       return { success: true, linked: false };
@@ -7494,7 +10281,7 @@ ipcMain.handle('get-discord-link-status', async () => {
     return {
       success: true,
       linked: true,
-      discordUsername: result.discordUsername || null,
+      discordUsername: result.discordUsername || result.discord_username || null,
       channelCount: result.channelCount || 0,
       channels: result.channels || []
     };
@@ -7512,6 +10299,10 @@ ipcMain.handle('unlink-discord', async () => {
     }
 
     await callDiscordAcoApi('unlink', { licenseKey });
+
+    // Clear local ACO settings on unlink
+    store.set('discordAco', { lastSync: null, lastSyncCount: 0, autoSyncEnabled: false, autoSyncInterval: 60, autoForwardEnabled: false, forwardDeclinedEnabled: false });
+    store.set('channelWebhooks', {});
 
     console.log('[DISCORD ACO] Discord unlinked for license:', licenseKey);
     return { success: true };
@@ -7581,20 +10372,6 @@ ipcMain.handle('relink-discord-images', async () => {
 
     console.log('[IMAGE RELINK] SKU lookup:', Object.keys(itemToSku).length, 'exact,', Object.keys(normalizedToSku).length, 'normalized,', Object.keys(skuOverrides).length, 'overrides');
 
-    // Score how well two strings match (higher = better)
-    function matchScore(a, b) {
-      if (a === b) return 1000;
-      const wordsA = a.split(/\s+/);
-      const wordsB = b.split(/\s+/);
-      const setB = new Set(wordsB);
-      let shared = 0;
-      for (const w of wordsA) {
-        if (setB.has(w)) shared++;
-      }
-      const lenDiff = Math.abs(a.length - b.length);
-      return shared * 100 - lenDiff;
-    }
-
     function findSku(name) {
       if (!name) return null;
       const key = name.toLowerCase().trim();
@@ -7629,11 +10406,14 @@ ipcMain.handle('relink-discord-images', async () => {
     }
 
     // Pass 2: Process ALL orders - try to link/relink images
+    // Skip orders from bots that provide their own images (shikari, refract)
+    const skipRelinkBots = new Set(['shikari', 'refract']);
     let updated = 0;
     let noMatch = 0;
     let noImage = 0;
     const unmatchedSamples = [];
     for (const o of allOrders) {
+      if (o.source === 'discord' && skipRelinkBots.has((o.acoBotType || '').toLowerCase())) continue;
       // Main order item
       if (o.item && o.item !== 'Unknown Item') {
         const sku = findSku(o.item);
@@ -7751,30 +10531,140 @@ ipcMain.handle('set-forward-declined-enabled', async (_, enabled) => {
 });
 
 ipcMain.handle('get-forward-declined-enabled', async () => {
-  return store.get('discordAco.forwardDeclinedEnabled', true);
+  return store.get('discordAco.forwardDeclinedEnabled', false);
 });
 
-// Helper: send a JSON payload to a Discord webhook URL
-async function sendWebhookJson(webhookUrl, payload) {
+// Forward audit log handlers
+ipcMain.handle('get-aco-forward-log', async () => {
+  return store.get('acoForwardLog', []);
+});
+
+ipcMain.handle('clear-aco-forward-log', async () => {
+  store.set('acoForwardLog', []);
+  return { success: true };
+});
+
+// Test forward: simulate a forward for a profile without actually sending (dry-run)
+ipcMain.handle('test-aco-forward', async (_, profileName, dryRun = true) => {
+  try {
+    let webhookUrl = store.get('discordWebhookUrl');
+    // Fallback: if no legacy webhook, use first saved webhook
+    if (!webhookUrl || !isValidWebhookUrl(webhookUrl)) {
+      const saved = store.get('savedWebhooks', []);
+      if (saved.length > 0 && isValidWebhookUrl(saved[0].url)) webhookUrl = saved[0].url;
+    }
+    if (!webhookUrl || !isValidWebhookUrl(webhookUrl)) return { success: false, error: 'No valid webhook configured' };
+
+    const testOrder = {
+      orderId: `TEST-${Date.now()}`,
+      retailer: 'TestRetailer',
+      item: 'Test Item - Auto Forward Verification',
+      amount: 49.99,
+      status: 'confirmed',
+      profileName: profileName || 'TestProfile',
+      date: localDateStr()
+    };
+
+    const embed = {
+      title: `[TEST] ${testOrder.item}`,
+      color: 0x22c55e,
+      fields: [
+        { name: 'Retailer', value: testOrder.retailer, inline: true },
+        { name: 'Amount', value: `$${testOrder.amount.toFixed(2)}`, inline: true },
+        { name: 'Status', value: 'Confirmed', inline: true },
+        { name: 'Profile', value: testOrder.profileName, inline: true }
+      ],
+      footer: { text: 'SOLUS Auto-Forward [TEST]' },
+      timestamp: new Date().toISOString()
+    };
+
+    const payload = { embeds: [embed] };
+
+    // Add mention if mapped
+    let mentionSent = false;
+    const licenseKey = getDiscordAcoLicenseKey();
+    if (licenseKey) {
+      try {
+        const mappingResult = await callDiscordAcoApi('get-profile-mappings', { licenseKey });
+        const mapping = (mappingResult.mappings || []).find(m => m.profile_name === profileName);
+        if (mapping) {
+          payload.content = `<@${mapping.discord_user_id}>`;
+          mentionSent = true;
+        }
+      } catch {}
+    }
+
+    if (dryRun) {
+      return { success: true, dryRun: true, payload, mentionSent };
+    }
+
+    const result = await sendWebhookJson(webhookUrl, payload);
+
+    // Log test forward
+    const forwardLog = store.get('acoForwardLog', []);
+    forwardLog.push({ traceId: `test-${Date.now()}`, timestamp: new Date().toISOString(), orderId: testOrder.orderId, itemName: testOrder.item, profileName: testOrder.profileName, action: 'test', result: result.success ? 'sent' : 'failed', mentionSent: result.success && mentionSent });
+    while (forwardLog.length > 200) forwardLog.shift();
+    store.set('acoForwardLog', forwardLog);
+
+    return { success: result.success, dryRun: false, payload, mentionSent };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Helper: send a JSON payload to a Discord webhook URL (with 429 retry + backoff)
+async function sendWebhookJson(webhookUrl, payload, retries = 3) {
   const https = require('https');
   const urlObj = new URL(webhookUrl);
   const body = JSON.stringify(payload);
-  return new Promise((resolve) => {
-    const req = https.request({
-      hostname: urlObj.hostname,
-      path: urlObj.pathname,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve({ success: res.statusCode >= 200 && res.statusCode < 300, statusCode: res.statusCode }));
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const result = await new Promise((resolve) => {
+      const req = https.request({
+        hostname: urlObj.hostname,
+        path: urlObj.pathname,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          let retryAfter = null;
+          if (res.statusCode === 429) {
+            // Parse Retry-After header (seconds) or from response body
+            retryAfter = parseFloat(res.headers['retry-after'] || '0');
+            try { const parsed = JSON.parse(data); if (parsed.retry_after) retryAfter = parsed.retry_after; } catch {}
+          }
+          resolve({ success: res.statusCode >= 200 && res.statusCode < 300, statusCode: res.statusCode, retryAfter });
+        });
+      });
+      req.on('error', (e) => resolve({ success: false, error: e.message }));
+      req.setTimeout(10000, () => { req.destroy(); resolve({ success: false, error: 'Timeout' }); });
+      req.write(body);
+      req.end();
     });
-    req.on('error', (e) => resolve({ success: false, error: e.message }));
-    req.setTimeout(10000, () => { req.destroy(); resolve({ success: false, error: 'Timeout' }); });
-    req.write(body);
-    req.end();
-  });
+
+    if (result.success) return result;
+
+    // Retry on 429 rate limit
+    if (result.statusCode === 429 && attempt < retries) {
+      const waitMs = ((result.retryAfter || 1) * 1000) + Math.random() * 500;
+      console.log(`[WEBHOOK] Rate limited (429), retrying in ${Math.round(waitMs)}ms (attempt ${attempt + 1}/${retries})`);
+      await new Promise(r => setTimeout(r, waitMs));
+      continue;
+    }
+
+    // Retry on 5xx server errors
+    if (result.statusCode >= 500 && attempt < retries) {
+      const backoff = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+      console.log(`[WEBHOOK] Server error (${result.statusCode}), retrying in ${Math.round(backoff)}ms (attempt ${attempt + 1}/${retries})`);
+      await new Promise(r => setTimeout(r, backoff));
+      continue;
+    }
+
+    return result;
+  }
+  return { success: false, error: 'Max retries exceeded' };
 }
 
 // ==================== WINDOW ====================

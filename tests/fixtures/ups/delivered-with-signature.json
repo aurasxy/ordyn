@@ -1,0 +1,59 @@
+{
+  "_description": "UPS fixture: Normal delivered package with signature confirmation",
+  "_trackingNumber": "1Z999AA10123456784",
+  "trackResponse": {
+    "shipment": [{
+      "package": [{
+        "trackingNumber": "1Z999AA10123456784",
+        "deliveryDate": [{ "type": "DEL", "date": "20260225" }],
+        "deliveryTime": { "endTime": "143000" },
+        "currentStatus": {
+          "type": "D",
+          "description": "Delivered",
+          "code": "KB",
+          "simplifiedTextDescription": "Delivered",
+          "statusCode": "011"
+        },
+        "packageAddress": [{
+          "type": "DESTINATION",
+          "address": { "city": "AUSTIN", "stateProvince": "TX", "postalCode": "78701", "country": "US" }
+        }],
+        "weight": { "unitOfMeasurement": "LBS", "weight": "2.30" },
+        "service": { "code": "003", "description": "UPS Ground" },
+        "activity": [
+          {
+            "date": "20260225", "time": "143000",
+            "location": { "address": { "city": "AUSTIN", "stateProvince": "TX", "postalCode": "78701", "country": "US" } },
+            "status": { "type": "D", "description": "Delivered", "code": "KB", "statusCode": "011" },
+            "additionalAttributes": [{ "text": "SIGNED BY: M JOHNSON" }]
+          },
+          {
+            "date": "20260225", "time": "073000",
+            "location": { "address": { "city": "AUSTIN", "stateProvince": "TX", "country": "US" } },
+            "status": { "type": "I", "description": "Out For Delivery Today", "code": "OT", "statusCode": "021" }
+          },
+          {
+            "date": "20260224", "time": "210000",
+            "location": { "address": { "city": "MESQUITE", "stateProvince": "TX", "country": "US" } },
+            "status": { "type": "I", "description": "Arrived at Facility", "code": "AR", "statusCode": "007" }
+          },
+          {
+            "date": "20260224", "time": "030000",
+            "location": { "address": { "city": "DALLAS", "stateProvince": "TX", "country": "US" } },
+            "status": { "type": "I", "description": "Departed from Facility", "code": "DP", "statusCode": "005" }
+          },
+          {
+            "date": "20260222", "time": "180000",
+            "location": { "address": { "city": "HODGKINS", "stateProvince": "IL", "country": "US" } },
+            "status": { "type": "I", "description": "Origin Scan", "code": "OR", "statusCode": "003" }
+          },
+          {
+            "date": "20260222", "time": "100000",
+            "location": { "address": { "city": "CHICAGO", "stateProvince": "IL", "country": "US" } },
+            "status": { "type": "M", "description": "Shipper created a label, UPS has not yet received the package", "code": "MP", "statusCode": "001" }
+          }
+        ]
+      }]
+    }]
+  }
+}

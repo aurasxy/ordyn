@@ -58,7 +58,7 @@ jobs:
 
       - name: Build macOS DMG (${{ matrix.arch }})
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npx electron-builder --mac --${{ matrix.arch }} --publish always
 
@@ -89,7 +89,7 @@ jobs:
 
       - name: Build Windows installer
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npx electron-builder --win --x64 --publish always
 

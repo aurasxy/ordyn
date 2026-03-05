@@ -95,31 +95,3 @@ jobs:
         with:
           name: windows-x64
           path: dist/*.exe
-
-  notify-discord:
-    needs: [build-windows, build-mac]
-    if: ${{ always() && !cancelled() && (needs.build-windows.result == 'success' || needs.build-mac.result == 'success') }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout for version
-        uses: actions/checkout@v4
-
-      - name: Get version
-        id: version
-        run: |
-          VERSION=$(node -p 'require("./package.json").version')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Notify Discord
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          VERSION: ${{ steps.version.outputs.version }}
-          WIN_RESULT: ${{ needs.build-windows.result }}
-          MAC_RESULT: ${{ needs.build-mac.result }}
-        run: |
-          if [ "$WIN_RESULT" = "success" ]; then WIN_STATUS="pass"; else WIN_STATUS="skip"; fi
-          if [ "$MAC_RESULT" = "success" ]; then MAC_STATUS="pass"; else MAC_STATUS="skip"; fi
-          BODY="Windows: ${WIN_STATUS} | macOS: ${MAC_STATUS} -- Download: https://github.com/aurasxy/ordyn/releases/tag/v${VERSION}"
-          curl -s -H "Content-Type: application/json" \
-            -d "{\"content\":\"**SOLUS v${VERSION} build complete**\n${BODY}\"}" \
-            "$DISCORD_WEBHOOK_URL" || echo "Discord notify skipped (no webhook)"

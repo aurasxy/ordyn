@@ -5478,6 +5478,14 @@
                 <button class="btn btn-sm btn-red" onclick="clearDiscordOrders()">Clear Discord Orders</button>
                 <span id="discordLastSync" class="discord-last-sync">Last synced: Never</span>
               </div>
+              <div id="discordSyncProgress" style="display:none;margin-top:8px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="flex:1;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden">
+                    <div id="discordSyncProgressFill" style="height:100%;background:var(--accent);border-radius:3px;width:0%;transition:width 0.3s"></div>
+                  </div>
+                  <span id="discordSyncProgressText" style="font-size:11px;color:var(--text-secondary);min-width:100px;text-align:right"></span>
+                </div>
+              </div>
 
             </div>
           </div>
@@ -5504,7 +5512,119 @@
                 <option value="mapped">Mapped</option>
                 <option value="unmapped">Unmapped</option>
               </select>
+              <select id="acoSiteFilter" class="form-input form-input-sm" style="width:auto;font-size:12px" onchange="renderAcoUsers()">
+                <option value="all">All Sites</option>
+                <option value="Walmart">Walmart</option>
+                <option value="Target">Target</option>
+                <option value="Pokemon Center">Pokemon Center</option>
+                <option value="Sam's Club">Sam's Club</option>
+                <option value="Costco">Costco</option>
+                <option value="Best Buy">Best Buy</option>
+              </select>
               <button class="btn btn-primary btn-sm" onclick="showAddMappingForm()" style="font-size:11px;padding:5px 14px">+ Link Profile</button>
+              <button class="btn btn-sm" onclick="showAcoExportModal()" style="font-size:11px;padding:5px 14px">Export</button>
+            </div>
+
+            <!-- ACO Export Modal -->
+            <div id="acoExportModal" class="modal-overlay" onclick="if(event.target===this) hideAcoExportModal()">
+              <div class="modal-content" style="max-width:520px;">
+                <div class="modal-header">
+                  <h2>Export ACO Data</h2>
+                  <button class="modal-close" onclick="hideAcoExportModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                  <!-- User Type Filter -->
+                  <div class="filter-section">
+                    <div class="filter-section-title">User Type</div>
+                    <div class="filter-group" style="flex-wrap:wrap;">
+                      <button class="filter-btn active" data-aco-export-usertype="all" onclick="setAcoExportFilter('userType','all')">All</button>
+                      <button class="filter-btn" data-aco-export-usertype="mapped" onclick="setAcoExportFilter('userType','mapped')">Mapped</button>
+                      <button class="filter-btn" data-aco-export-usertype="unmapped" onclick="setAcoExportFilter('userType','unmapped')">Unmapped</button>
+                    </div>
+                  </div>
+
+                  <!-- Performance Tier Filter -->
+                  <div class="filter-section">
+                    <div class="filter-section-title">Performance Tier</div>
+                    <div class="filter-group" style="flex-wrap:wrap;">
+                      <button class="filter-btn active" data-aco-export-tier="all" onclick="setAcoExportFilter('tier','all')">All</button>
+                      <button class="filter-btn" data-aco-export-tier="diamond" onclick="setAcoExportFilter('tier','diamond')">Diamond</button>
+                      <button class="filter-btn" data-aco-export-tier="perfect" onclick="setAcoExportFilter('tier','perfect')">Perfect</button>
+                      <button class="filter-btn" data-aco-export-tier="good" onclick="setAcoExportFilter('tier','good')">Good</button>
+                      <button class="filter-btn" data-aco-export-tier="okay" onclick="setAcoExportFilter('tier','okay')">Okay</button>
+                      <button class="filter-btn" data-aco-export-tier="at-risk" onclick="setAcoExportFilter('tier','at-risk')">At Risk</button>
+                    </div>
+                  </div>
+
+                  <!-- Site Filter -->
+                  <div class="filter-section">
+                    <div class="filter-section-title">Site</div>
+                    <div class="filter-group" style="flex-wrap:wrap;">
+                      <button class="filter-btn active" data-aco-export-site="all" onclick="setAcoExportFilter('site','all')">All Sites</button>
+                      <button class="filter-btn" data-aco-export-site="Walmart" onclick="setAcoExportFilter('site','Walmart')">Walmart</button>
+                      <button class="filter-btn" data-aco-export-site="Target" onclick="setAcoExportFilter('site','Target')">Target</button>
+                      <button class="filter-btn" data-aco-export-site="Pokemon Center" onclick="setAcoExportFilter('site','Pokemon Center')">Pokemon Center</button>
+                      <button class="filter-btn" data-aco-export-site="Sam's Club" onclick="setAcoExportFilter('site','Sam\'s Club')">Sam's Club</button>
+                      <button class="filter-btn" data-aco-export-site="Costco" onclick="setAcoExportFilter('site','Costco')">Costco</button>
+                      <button class="filter-btn" data-aco-export-site="Best Buy" onclick="setAcoExportFilter('site','Best Buy')">Best Buy</button>
+                    </div>
+                  </div>
+
+                  <!-- Stick Rate Range -->
+                  <div class="filter-section">
+                    <div class="filter-section-title">Stick Rate Range (%)</div>
+                    <div style="display:flex;gap:12px;align-items:center;">
+                      <div style="flex:1;">
+                        <label style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px;">Min</label>
+                        <input type="number" id="acoExportMinStickRate" class="filter-input" min="0" max="100" step="1" value="" placeholder="0"
+                          style="width:100%;" oninput="updateAcoExportPreview()">
+                      </div>
+                      <span style="color:var(--text-muted);margin-top:16px;">-</span>
+                      <div style="flex:1;">
+                        <label style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px;">Max</label>
+                        <input type="number" id="acoExportMaxStickRate" class="filter-input" min="0" max="100" step="1" value="" placeholder="100"
+                          style="width:100%;" oninput="updateAcoExportPreview()">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Orders Range -->
+                  <div class="filter-section">
+                    <div class="filter-section-title">Orders Range</div>
+                    <div style="display:flex;gap:12px;align-items:center;">
+                      <div style="flex:1;">
+                        <label style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px;">Min</label>
+                        <input type="number" id="acoExportMinOrders" class="filter-input" min="0" step="1" value="" placeholder="0"
+                          style="width:100%;" oninput="updateAcoExportPreview()">
+                      </div>
+                      <span style="color:var(--text-muted);margin-top:16px;">-</span>
+                      <div style="flex:1;">
+                        <label style="display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px;">Max</label>
+                        <input type="number" id="acoExportMaxOrders" class="filter-input" min="0" step="1" value="" placeholder="No limit"
+                          style="width:100%;" oninput="updateAcoExportPreview()">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Detail Level -->
+                  <div class="filter-section">
+                    <div class="filter-section-title">Detail Level</div>
+                    <div class="filter-group">
+                      <button class="filter-btn active" data-aco-export-detail="summary" onclick="setAcoExportFilter('detail','summary')">Summary (1 row per profile)</button>
+                      <button class="filter-btn" data-aco-export-detail="detailed" onclick="setAcoExportFilter('detail','detailed')">Detailed (1 row per order)</button>
+                    </div>
+                  </div>
+
+                  <!-- Preview Count -->
+                  <div style="padding:12px 16px;background:var(--surface-2);border-radius:8px;text-align:center;margin-top:8px;">
+                    <span id="acoExportPreviewCount" style="font-size:14px;font-weight:600;color:var(--text-primary);">0 profiles match</span>
+                  </div>
+                </div>
+                <div class="modal-footer" style="justify-content:flex-end;">
+                  <button class="btn btn-secondary" onclick="hideAcoExportModal()">Cancel</button>
+                  <button class="btn btn-primary" onclick="executeAcoExport()">Export CSV</button>
+                </div>
+              </div>
             </div>
 
             <!-- Add/Edit Mapping Form (shared) -->
@@ -8011,6 +8131,8 @@ async function init() {
       await loadPdfSaveFolder();
       // Set up auto-sync interval timer
       await setupAutoSyncInterval();
+      // Set up Discord auto-sync timer (if in Discord mode)
+      await setupDiscordAutoSync();
       // Check for auto-sync on startup
       await checkStartupSync();
       // Check onboarding walkthrough
@@ -9041,6 +9163,8 @@ async function selectDataMode(mode) {
       // Navigate to dashboard so user immediately sees updated counts
       showPage('dashboard');
       toast('Switched to ' + (mode === 'imap' ? 'IMAP' : 'Discord') + ' mode', 'success');
+      // Start/stop Discord auto-sync timer based on mode
+      await setupDiscordAutoSync();
     } else {
       toast(result.error || 'Failed to switch mode', 'error');
     }
@@ -21797,6 +21921,8 @@ async function saveDiscordSyncSettings() {
     const result = await window.api.saveDiscordAcoSettings({ autoSyncEnabled, autoSyncInterval });
     if (result && result.success) {
       toast('Discord sync settings saved', 'success');
+      // Restart the Discord auto-sync timer with new settings
+      await setupDiscordAutoSync();
     } else {
       toast(result?.error || 'Failed to save settings', 'error');
     }
@@ -21810,11 +21936,21 @@ async function syncDiscordOrders() {
   const origText = btn.textContent;
   btn.textContent = 'Syncing...';
   btn.disabled = true;
+  // Show progress bar immediately
+  const progressEl = $('discordSyncProgress');
+  const fillEl = $('discordSyncProgressFill');
+  const textEl = $('discordSyncProgressText');
+  if (progressEl) {
+    progressEl.style.display = '';
+    fillEl.style.width = '0%';
+    textEl.textContent = 'Connecting...';
+  }
   try {
     const result = await window.api.syncDiscordOrders();
     if (result && result.success) {
       const count = result.count || 0;
-      toast('Synced ' + count + ' order' + (count === 1 ? '' : 's') + ' from Discord', 'success');
+      let syncMsg = 'Synced ' + count + ' order' + (count === 1 ? '' : 's') + ' from Discord';
+      toast(syncMsg, 'success');
       $('discordLastSync').textContent = 'Last synced: just now - ' + count + ' orders';
       // Refresh data so dashboard/pages show new orders
       await loadData();
@@ -21823,9 +21959,74 @@ async function syncDiscordOrders() {
     }
   } catch (err) {
     toast('Discord sync failed', 'error');
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+    // Ensure progress bar hides after delay if backend events didn't clear it
+    if (progressEl) {
+      setTimeout(() => { progressEl.style.display = 'none'; fillEl.style.width = '0%'; }, 2500);
+    }
   }
-  btn.textContent = origText;
-  btn.disabled = false;
+}
+
+// ==================== DISCORD AUTO-SYNC TIMER ====================
+
+let discordAutoSyncTimer = null;
+let _discordSyncRunning = false;
+
+async function setupDiscordAutoSync() {
+  // Clear existing timer
+  if (discordAutoSyncTimer) {
+    clearInterval(discordAutoSyncTimer);
+    discordAutoSyncTimer = null;
+  }
+
+  // Only run in Discord mode
+  if (currentDataMode !== 'discord') return;
+
+  const settings = await window.api.getDiscordAcoSettings();
+  if (!settings || !settings.success || !settings.autoSyncEnabled) return;
+
+  const intervalMin = settings.autoSyncInterval || 15;
+  console.log('[Discord Auto-Sync] Starting timer, interval:', intervalMin, 'minutes');
+
+  // Check every 30 seconds if it's time to sync
+  discordAutoSyncTimer = setInterval(async () => {
+    if (_discordSyncRunning) return;
+
+    const acoSettings = await window.api.getDiscordAcoSettings();
+    if (!acoSettings || !acoSettings.success || !acoSettings.autoSyncEnabled) return;
+
+    const lastSync = acoSettings.lastSync ? new Date(acoSettings.lastSync).getTime() : 0;
+    const now = Date.now();
+    const intervalMs = (acoSettings.autoSyncInterval || 15) * 60 * 1000;
+
+    if (now - lastSync >= intervalMs) {
+      _discordSyncRunning = true;
+      console.log('[Discord Auto-Sync] Running scheduled sync...');
+      try {
+        const result = await window.api.syncDiscordOrders();
+        if (result && result.success) {
+          const count = result.count || 0;
+          if (count > 0) {
+            let msg = 'Auto-synced ' + count + ' Discord order' + (count === 1 ? '' : 's');
+            toast(msg, 'success');
+          }
+          // Update last sync display if ACO panel is visible
+          const lastSyncEl = $('discordLastSync');
+          if (lastSyncEl) lastSyncEl.textContent = 'Last synced: just now' + (count ? ' - ' + count + ' orders' : '');
+          // Refresh order data
+          await loadData();
+        } else {
+          console.warn('[Discord Auto-Sync] Sync failed:', result?.error);
+        }
+      } catch (err) {
+        console.error('[Discord Auto-Sync] Error:', err);
+      } finally {
+        _discordSyncRunning = false;
+      }
+    }
+  }, 30000); // Check every 30 seconds
 }
 
 async function loadSkuOverrides() {
@@ -21919,6 +22120,11 @@ async function clearDiscordOrders() {
 let acoMappingsCache = [];
 let _acoCurrentTab = 'users';
 let _acoSelectedUser = null;
+let _acoExpandedSites = new Set();   // "profileName|siteName" keys for expanded sections
+let _acoDetailSiteFilter = 'all';    // site filter for detail view
+let _acoDetailProfileSort = 'total-desc'; // profile sort for detail view
+let _acoDetailTierFilter = new Set();     // tier filter for detail view (empty = all)
+let _acoBulkSelection = new Set();   // profile names selected for bulk link
 
 function switchAcoTab(tab) {
   _acoCurrentTab = tab;
@@ -22147,10 +22353,14 @@ async function loadAcoChannels() {
 
       const assigned = currentWhId !== 'none';
       const checkmark = assigned ? ' <span style="color:var(--green);font-size:11px">&#10003;</span>' : '';
+      const botForward = ch.forwardEnabled && ch.hasForwardWebhook
+        ? '<span style="color:var(--green);font-size:10px;white-space:nowrap" title="Bot forwards orders even when SOLUS is closed">&#10003; Bot forwarding</span>'
+        : '';
 
       return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0" id="acoChRow_' + chId + '">' +
         '<span style="color:var(--text-tertiary);font-size:12px">#</span>' +
         '<span style="color:var(--text-primary);font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + name + '</span>' +
+        botForward +
         '<select class="form-input" style="width:auto;font-size:11px;padding:2px 6px;max-width:160px" onchange="onChannelWebhookChange(\'' + chId + '\', this.value)">' + options + '</select>' +
         '<span id="acoChStatus_' + chId + '" style="font-size:10px">' + checkmark + '</span>' +
       '</div>';
@@ -22284,7 +22494,7 @@ function getAcoUserGroups() {
     if (isConfirmed) s.confirmed++;
     else if (o.finalStatus === 'declined') s.declined++;
     else if (o.finalStatus === 'cancelled') s.cancelled++;
-    if (s.orders.length < 10) s.orders.push({ item: o.item, amount: o.amount, date: o.date, status: o.finalStatus });
+    s.orders.push({ item: o.item, amount: o.amount, date: o.date, status: o.finalStatus, orderId: o.orderId });
   }
 
   // Sort site orders by date desc
@@ -22356,6 +22566,14 @@ function renderAcoUsers() {
   if (filterVal === 'mapped') filteredUnmapped = [];
   if (filterVal === 'unmapped') userList = [];
 
+  // Apply site filter
+  const siteFilter = document.getElementById('acoSiteFilter')?.value || 'all';
+  if (siteFilter !== 'all') {
+    userList = userList.map(u => ({ ...u, profiles: u.profiles.filter(p => p.sites && Object.keys(p.sites).includes(siteFilter)) })).filter(u => u.profiles.length > 0);
+    userList.forEach(u => { u.profileCount = u.profiles.length; u.totalOrders = u.profiles.reduce((s, p) => s + p.total, 0); });
+    filteredUnmapped = filteredUnmapped.filter(p => p.sites && Object.keys(p.sites).includes(siteFilter));
+  }
+
   const hasResults = userList.length > 0 || filteredUnmapped.length > 0;
   if (!hasResults) {
     const noResults = searchVal || filterVal !== 'all';
@@ -22403,15 +22621,24 @@ function renderAcoUsers() {
 
   // Unmapped profiles section
   if (filteredUnmapped.length > 0) {
-    html += `<div style="padding:10px 16px 6px 16px;font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-color);background:var(--bg-secondary)">Unmapped Profiles</div>`;
+    const allChecked = filteredUnmapped.length > 0 && filteredUnmapped.every(p => _acoBulkSelection.has(p.name));
+    html += `<div style="padding:10px 16px 6px 16px;font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-color);background:var(--bg-secondary);display:flex;align-items:center;justify-content:space-between">
+      <span>Unmapped Profiles</span>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:10px;text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-secondary)">
+        <input type="checkbox" ${allChecked ? 'checked' : ''} onchange="toggleAcoBulkSelectAll(this.checked, ${JSON.stringify(filteredUnmapped.map(p => p.name)).replace(/"/g, '&quot;')})" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">
+        Select All
+      </label>
+    </div>`;
     for (const p of filteredUnmapped) {
       const safeName = escapeHtml(p.name).replace(/'/g, '&#39;');
       const sites = Object.keys(p.sites);
       const siteStr = sites.length > 0 ? ' &middot; ' + escapeHtml(sites.join(', ')) : '';
       const botBadge = p.botType ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:rgba(139,92,246,0.15);color:#8b5cf6">${escapeHtml(p.botType)}</span>` : '';
+      const isChecked = _acoBulkSelection.has(p.name);
 
       html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border-color)">
         <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+          <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleAcoBulkSelect('${safeName}', this.checked)" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;flex-shrink:0">
           <div style="width:32px;height:32px;border-radius:50%;background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--text-primary);flex-shrink:0">${escapeHtml(p.name.charAt(0).toUpperCase())}</div>
           <div style="min-width:0;flex:1">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -22424,6 +22651,17 @@ function renderAcoUsers() {
         <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();showAddMappingForm('${safeName}')" style="font-size:10px;padding:4px 12px">Link</button>
       </div>`;
     }
+  }
+
+  // Bulk action floating bar
+  if (_acoBulkSelection.size > 0) {
+    html += `<div id="acoBulkBar" style="position:sticky;bottom:0;left:0;right:0;padding:10px 16px;background:var(--bg-primary);border-top:2px solid var(--accent);display:flex;align-items:center;justify-content:space-between;gap:8px;z-index:10;box-shadow:0 -2px 8px rgba(0,0,0,0.3)">
+      <span style="font-size:12px;color:var(--text-secondary)">${_acoBulkSelection.size} profile${_acoBulkSelection.size === 1 ? '' : 's'} selected</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="_acoBulkSelection.clear();renderAcoUsers()" style="font-size:11px;padding:4px 10px">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="showBulkLinkModal()" style="font-size:11px;padding:4px 12px">Link to User</button>
+      </div>
+    </div>`;
   }
 
   listEl.innerHTML = html;
@@ -22441,42 +22679,145 @@ function showAcoUserDetail(discordUserId) {
 
   const safeId = escapeHtml(discordUserId);
   const safeUsername = escapeHtml(user.discordUsername).replace(/'/g, '&#39;');
+  const tierColors = { diamond: '#B9F2FF', perfect: '#8b5cf6', good: '#00A86B', okay: '#F97316', 'at-risk': '#EF4444' };
+  const tierLabels = { diamond: 'Diamond', perfect: 'Perfect', good: 'Good', okay: 'Okay', 'at-risk': 'At Risk' };
+
+  // Collect all unique site names across all profiles for filter dropdown
+  const allSites = new Set();
+  for (const p of user.profiles) {
+    for (const s of Object.keys(p.sites)) allSites.add(s);
+  }
+  const sortedAllSites = [...allSites].sort();
+  const siteFilterOptions = sortedAllSites.map(s => `<option value="${escapeHtml(s)}"${_acoDetailSiteFilter === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('');
+
+  // Compute filtered aggregate stats for user banner
+  let aggTotal = 0, aggConfirmed = 0, aggDeclined = 0, aggCancelled = 0;
+  for (const p of user.profiles) {
+    for (const [siteName, sd] of Object.entries(p.sites)) {
+      if (_acoDetailSiteFilter !== 'all' && siteName !== _acoDetailSiteFilter) continue;
+      aggTotal += sd.total;
+      aggConfirmed += sd.confirmed;
+      aggDeclined += sd.declined;
+      aggCancelled += sd.cancelled;
+    }
+  }
+
+  // Compute filtered stats per profile for sorting
+  const sortableProfiles = user.profiles.map(profile => {
+    const filteredSites = Object.entries(profile.sites)
+      .filter(([siteName]) => _acoDetailSiteFilter === 'all' || siteName === _acoDetailSiteFilter);
+    if (_acoDetailSiteFilter !== 'all' && filteredSites.length === 0) return null;
+    let sTotal = 0, sConfirmed = 0, sSpent = 0;
+    for (const [, sd] of filteredSites) {
+      sTotal += sd.total;
+      sConfirmed += sd.confirmed;
+      for (const o of sd.orders) sSpent += (o.amount || 0);
+    }
+    if (_acoDetailSiteFilter === 'all') { sTotal = profile.total; sConfirmed = profile.confirmed; }
+    const sStick = sTotal > 0 ? sConfirmed / sTotal : 0;
+    const sStickPct = sTotal > 0 ? Math.round((sConfirmed / sTotal) * 100) : 0;
+    const sTier = getAccountStatsTier(sStickPct, sTotal);
+    return { profile, _sTotal: sTotal, _sStick: sStick, _sSpent: sSpent, _sTier: sTier };
+  }).filter(Boolean);
+
+  // Filter by tier
+  if (_acoDetailTierFilter.size > 0) {
+    for (let i = sortableProfiles.length - 1; i >= 0; i--) {
+      if (!_acoDetailTierFilter.has(sortableProfiles[i]._sTier)) sortableProfiles.splice(i, 1);
+    }
+  }
+
+  // Sort profiles
+  sortableProfiles.sort((a, b) => {
+    switch (_acoDetailProfileSort) {
+      case 'total-asc': return a._sTotal - b._sTotal;
+      case 'stick-asc': return a._sStick - b._sStick;
+      case 'stick-desc': return b._sStick - a._sStick;
+      case 'spent-desc': return b._sSpent - a._sSpent;
+      case 'spent-asc': return a._sSpent - b._sSpent;
+      default: return b._sTotal - a._sTotal; // total-desc
+    }
+  });
 
   // Build profile cards
   let profileCardsHtml = '';
-  for (const profile of user.profiles) {
+  let visibleProfileCount = 0;
+  for (const { profile, _sSpent: pSpent } of sortableProfiles) {
     const safeName = escapeHtml(profile.name).replace(/'/g, '&#39;');
-    const stickRate = profile.total > 0 ? Math.round((profile.confirmed / profile.total) * 100) : 0;
     const botBadge = profile.botType ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:rgba(139,92,246,0.15);color:#8b5cf6;margin-left:6px">${escapeHtml(profile.botType)}</span>` : '';
 
-    // Per-site sections
+    // Filter sites
+    const sortedSites = Object.entries(profile.sites)
+      .filter(([siteName]) => _acoDetailSiteFilter === 'all' || siteName === _acoDetailSiteFilter)
+      .sort((a, b) => b[1].total - a[1].total);
+
+    visibleProfileCount++;
+
+    // Compute profile-level filtered stats
+    let pTotal = 0, pConfirmed = 0, pDeclined = 0, pCancelled = 0;
+    for (const [, sd] of sortedSites) {
+      pTotal += sd.total;
+      pConfirmed += sd.confirmed;
+      pDeclined += sd.declined;
+      pCancelled += sd.cancelled;
+    }
+    if (_acoDetailSiteFilter === 'all') {
+      pTotal = profile.total; pConfirmed = profile.confirmed; pDeclined = profile.declined; pCancelled = profile.cancelled;
+    }
+    const stickRate = pTotal > 0 ? Math.round((pConfirmed / pTotal) * 100) : 0;
+    const tier = getAccountStatsTier(stickRate, pTotal);
+    const tierColor = tierColors[tier] || '#888';
+    const tierLabel = tierLabels[tier] || tier;
+
+    // Per-site expandable sections
     let siteSectionsHtml = '';
-    const sortedSites = Object.entries(profile.sites).sort((a, b) => b[1].total - a[1].total);
     for (const [siteName, siteData] of sortedSites) {
       const siteStick = siteData.total > 0 ? Math.round((siteData.confirmed / siteData.total) * 100) : 0;
+      const siteKey = profile.name + '|' + siteName;
+      const isExpanded = _acoExpandedSites.has(siteKey);
+      const safeKey = escapeHtml(siteKey).replace(/'/g, '&#39;');
+      const siteDeclined = siteData.declined || 0;
+      const siteCancelled = siteData.cancelled || 0;
+      const subCounts = [];
+      if (siteDeclined > 0) subCounts.push(`<span style="color:var(--red)">${siteDeclined} decl</span>`);
+      if (siteCancelled > 0) subCounts.push(`<span style="color:#EAB308">${siteCancelled} canc</span>`);
+      const subCountStr = subCounts.length > 0 ? ' &middot; ' + subCounts.join(' &middot; ') : '';
+
+      const chevronSvg = isExpanded
+        ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>'
+        : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>';
+
       let ordersHtml = '';
-      for (const o of siteData.orders.slice(0, 5)) {
-        const icon = (o.status === 'confirmed' || o.status === 'shipped' || o.status === 'delivered')
-          ? '<span style="color:var(--green)">&#10003;</span>'
-          : o.status === 'declined' ? '<span style="color:var(--red)">&times;</span>'
-          : o.status === 'cancelled' ? '<span style="color:var(--red)">&times;</span>'
-          : '<span style="color:var(--yellow)">?</span>';
-        const statusLabel = o.status === 'declined' ? ' <span style="font-size:10px;color:var(--text-tertiary)">(Declined)</span>' :
-                           o.status === 'cancelled' ? ' <span style="font-size:10px;color:var(--text-tertiary)">(Cancelled)</span>' : '';
-        ordersHtml += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px">
-          <span style="width:16px;text-align:center;flex-shrink:0">${icon}</span>
-          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-primary)">${escapeHtml(o.item || 'Unknown')}${statusLabel}</span>
-          <span style="color:var(--text-secondary);flex-shrink:0">${o.amount ? '$' + o.amount.toFixed(2) : ''}</span>
-          <span style="color:var(--text-tertiary);font-size:11px;flex-shrink:0;min-width:65px;text-align:right">${o.date || ''}</span>
-        </div>`;
+      if (isExpanded) {
+        for (const o of siteData.orders) {
+          const isConf = o.status === 'confirmed' || o.status === 'shipped' || o.status === 'delivered';
+          const isDec = o.status === 'declined';
+          const isCanc = o.status === 'cancelled';
+          const badgeColor = isConf ? 'var(--green)' : (isDec || isCanc) ? 'var(--red)' : '#EAB308';
+          const badgeBg = isConf ? 'rgba(34,197,94,0.12)' : (isDec || isCanc) ? 'rgba(239,68,68,0.12)' : 'rgba(234,179,8,0.12)';
+          const badgeLabel = isConf ? (o.status === 'delivered' ? 'Delivered' : o.status === 'shipped' ? 'Shipped' : 'Confirmed') : isDec ? 'Declined' : isCanc ? 'Cancelled' : 'Pending';
+          ordersHtml += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;border-bottom:1px solid rgba(255,255,255,0.04)">
+            <span style="font-size:10px;padding:1px 6px;border-radius:6px;background:${badgeBg};color:${badgeColor};flex-shrink:0;min-width:58px;text-align:center">${badgeLabel}</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-primary)">${escapeHtml(o.item || 'Unknown')}</span>
+            <span style="color:var(--text-secondary);flex-shrink:0;font-family:monospace;font-size:11px">${o.amount ? '$' + o.amount.toFixed(2) : ''}</span>
+            <span style="color:var(--text-tertiary);font-size:11px;flex-shrink:0;min-width:65px;text-align:right">${o.date || ''}</span>
+          </div>`;
+        }
+        if (siteData.orders.length === 0) {
+          ordersHtml = '<div style="padding:8px 0;text-align:center;color:var(--text-tertiary);font-size:11px">No orders</div>';
+        }
       }
 
-      siteSectionsHtml += `<div style="margin-top:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:4px;border-bottom:1px solid var(--border-color);margin-bottom:4px">
-          <span style="font-weight:600;font-size:12px;color:var(--text-primary)">${escapeHtml(siteName)} (${siteData.total})</span>
+      siteSectionsHtml += `<div style="margin-top:8px">
+        <div onclick="toggleAcoSiteOrders('${safeKey}')" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:var(--radius-sm);cursor:pointer;transition:background 0.15s;background:${isExpanded ? 'rgba(255,255,255,0.04)' : 'transparent'}" onmouseenter="this.style.background='rgba(255,255,255,0.06)'" onmouseleave="this.style.background='${isExpanded ? 'rgba(255,255,255,0.04)' : 'transparent'}'">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="color:var(--text-tertiary);flex-shrink:0">${chevronSvg}</span>
+            <span style="font-weight:600;font-size:12px;color:var(--text-primary)">${escapeHtml(siteName)}</span>
+            <span style="font-size:11px;color:var(--text-secondary)">(${siteData.total})${subCountStr}</span>
+          </div>
           <span style="font-size:11px;color:var(--text-secondary)">${siteStick}% stick</span>
         </div>
-        ${ordersHtml}
+        ${isExpanded ? `<div style="padding:2px 8px 4px 26px">${ordersHtml}</div>` : ''}
       </div>`;
     }
 
@@ -22484,6 +22825,8 @@ function showAcoUserDetail(discordUserId) {
       siteSectionsHtml = '<div style="padding:12px 0;text-align:center;color:var(--text-secondary);font-size:12px">No orders yet</div>';
     }
 
+    // 6-stat grid
+    const diamondGlow = tier === 'diamond' ? 'text-shadow:0 0 8px rgba(185,242,255,0.6);' : '';
     profileCardsHtml += `<div class="card" style="margin-bottom:16px">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px">
         <div style="display:flex;align-items:center;gap:8px">
@@ -22493,38 +22836,71 @@ function showAcoUserDetail(discordUserId) {
         <button class="btn btn-sm" onclick="event.stopPropagation();deleteAcoMapping('${safeName}')" style="font-size:10px;padding:3px 10px;color:var(--danger)">Remove</button>
       </div>
       <div class="card-body" style="padding:12px 16px">
-        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:4px">
-          <div><span style="font-weight:700;font-size:16px;color:var(--text-primary)">${profile.total}</span> <span style="font-size:11px;color:var(--text-secondary)">orders</span></div>
-          <div><span style="font-weight:700;font-size:16px;color:var(--green)">${profile.confirmed}</span> <span style="font-size:11px;color:var(--text-secondary)">confirmed</span></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px 16px;margin-bottom:8px">
+          <div><span style="font-weight:700;font-size:16px;color:var(--text-primary)">${pTotal}</span> <span style="font-size:11px;color:var(--text-secondary)">total</span></div>
+          <div><span style="font-weight:700;font-size:16px;color:var(--green)">${pConfirmed}</span> <span style="font-size:11px;color:var(--text-secondary)">confirmed</span></div>
+          <div><span style="font-weight:700;font-size:16px;color:var(--red)">${pDeclined}</span> <span style="font-size:11px;color:var(--text-secondary)">declined</span></div>
+          <div><span style="font-weight:700;font-size:16px;color:#EAB308">${pCancelled}</span> <span style="font-size:11px;color:var(--text-secondary)">cancelled</span></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px;margin-bottom:8px">
           <div><span style="font-weight:700;font-size:16px;color:var(--accent)">${stickRate}%</span> <span style="font-size:11px;color:var(--text-secondary)">stick</span></div>
+          <div><span style="font-weight:700;font-size:16px;color:var(--text-primary)">$${pSpent.toFixed(2)}</span> <span style="font-size:11px;color:var(--text-secondary)">spent</span></div>
+          <div><span style="font-weight:700;font-size:14px;padding:1px 8px;border-radius:8px;background:${tierColor}22;color:${tierColor};${diamondGlow}">${tierLabel}</span></div>
         </div>
         ${siteSectionsHtml}
       </div>
     </div>`;
   }
 
+  const aggStick = aggTotal > 0 ? Math.round((aggConfirmed / aggTotal) * 100) : 0;
+
   detailEl.innerHTML = `
     <div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-      <button class="btn btn-sm" onclick="hideAcoUserDetail()" style="font-size:12px;padding:4px 12px">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><polyline points="15 18 9 12 15 6"/></svg>
-        Back to Users
-      </button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-sm" onclick="hideAcoUserDetail()" style="font-size:12px;padding:4px 12px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><polyline points="15 18 9 12 15 6"/></svg>
+          Back to Users
+        </button>
+        <select onchange="_acoDetailSiteFilter=this.value;showAcoUserDetail('${safeId}')" style="font-size:11px;padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);cursor:pointer">
+          <option value="all"${_acoDetailSiteFilter === 'all' ? ' selected' : ''}>All Sites</option>
+          ${siteFilterOptions}
+        </select>
+        <select onchange="_acoDetailProfileSort=this.value;showAcoUserDetail('${safeId}')" style="font-size:11px;padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);cursor:pointer">
+          <option value="total-desc"${_acoDetailProfileSort === 'total-desc' ? ' selected' : ''}>Most Orders</option>
+          <option value="total-asc"${_acoDetailProfileSort === 'total-asc' ? ' selected' : ''}>Fewest Orders</option>
+          <option value="stick-asc"${_acoDetailProfileSort === 'stick-asc' ? ' selected' : ''}>Lowest Stick %</option>
+          <option value="stick-desc"${_acoDetailProfileSort === 'stick-desc' ? ' selected' : ''}>Highest Stick %</option>
+          <option value="spent-desc"${_acoDetailProfileSort === 'spent-desc' ? ' selected' : ''}>Most Spent</option>
+          <option value="spent-asc"${_acoDetailProfileSort === 'spent-asc' ? ' selected' : ''}>Least Spent</option>
+        </select>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm btn-primary" onclick="showAddMappingForm(null, '${safeId}', '${safeUsername}')" style="font-size:11px;padding:5px 12px">+ Add Profile</button>
         <button class="btn btn-sm" onclick="testAcoForward('${escapeHtml(user.profiles[0]?.name || '').replace(/'/g, '&#39;')}')" style="font-size:11px;padding:5px 12px">Send Test Forward</button>
       </div>
     </div>
 
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--text-tertiary);margin-right:2px">Tier:</span>
+      ${[['diamond','Diamond','#B9F2FF'],['perfect','Perfect','#8b5cf6'],['good','Good','#00A86B'],['okay','Okay','#F97316'],['at-risk','At Risk','#EF4444']].map(([k,l,c]) => {
+        const active = _acoDetailTierFilter.has(k);
+        return `<button onclick="toggleAcoTierFilter('${k}','${safeId}')" style="font-size:10px;padding:2px 10px;border-radius:12px;border:1px solid ${c}${active ? '' : '44'};background:${active ? c + '22' : 'transparent'};color:${active ? c : 'var(--text-tertiary)'};cursor:pointer;transition:all 0.15s;font-weight:${active ? '600' : '400'}">${l}</button>`;
+      }).join('')}
+      ${_acoDetailTierFilter.size > 0 ? `<button onclick="_acoDetailTierFilter.clear();showAcoUserDetail('${safeId}')" style="font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-tertiary);cursor:pointer">Clear</button>` : ''}
+    </div>
+
     <div style="margin-bottom:16px;padding:12px 16px;border-radius:var(--radius-md);background:rgba(88,101,242,0.08);border:1px solid rgba(88,101,242,0.2)">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:40px;height:40px;border-radius:50%;background:#5865F2;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff">${escapeHtml(user.discordUsername.charAt(0).toUpperCase())}</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="width:40px;height:40px;border-radius:50%;background:#5865F2;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0">${escapeHtml(user.discordUsername.charAt(0).toUpperCase())}</div>
         <div>
           <div style="font-weight:700;font-size:16px;color:#5865F2">@${escapeHtml(user.discordUsername)}</div>
           <div style="font-size:11px;color:var(--text-tertiary)">ID: ${escapeHtml(discordUserId)}</div>
         </div>
-        <div style="margin-left:auto;text-align:right">
-          <div style="font-size:14px;font-weight:700;color:var(--text-primary)">${user.totalOrders} total orders</div>
-          <div style="font-size:11px;color:var(--text-secondary)">${user.profileCount} ${user.profileCount === 1 ? 'profile' : 'profiles'}</div>
+        <div style="margin-left:auto;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+          <div style="text-align:center"><div style="font-size:15px;font-weight:700;color:var(--text-primary)">${aggTotal}</div><div style="font-size:10px;color:var(--text-secondary)">orders</div></div>
+          <div style="text-align:center"><div style="font-size:15px;font-weight:700;color:var(--green)">${aggConfirmed}</div><div style="font-size:10px;color:var(--text-secondary)">confirmed</div></div>
+          <div style="text-align:center"><div style="font-size:15px;font-weight:700;color:var(--accent)">${aggStick}%</div><div style="font-size:10px;color:var(--text-secondary)">stick</div></div>
+          <div style="font-size:11px;color:var(--text-secondary)">${visibleProfileCount} ${visibleProfileCount === 1 ? 'profile' : 'profiles'}</div>
         </div>
       </div>
     </div>
@@ -22538,8 +22914,279 @@ function showAcoUserDetail(discordUserId) {
   detailEl.style.display = '';
 }
 
+function toggleAcoTierFilter(tier, userId) {
+  if (_acoDetailTierFilter.has(tier)) _acoDetailTierFilter.delete(tier);
+  else _acoDetailTierFilter.add(tier);
+  showAcoUserDetail(userId);
+}
+
+function toggleAcoSiteOrders(siteKey) {
+  if (_acoExpandedSites.has(siteKey)) _acoExpandedSites.delete(siteKey);
+  else _acoExpandedSites.add(siteKey);
+  if (_acoSelectedUser) showAcoUserDetail(_acoSelectedUser);
+}
+
+function toggleAcoBulkSelect(profileName, checked) {
+  if (checked) _acoBulkSelection.add(profileName);
+  else _acoBulkSelection.delete(profileName);
+  renderAcoUsers();
+}
+
+function toggleAcoBulkSelectAll(checked, profileNames) {
+  if (checked) {
+    for (const n of profileNames) _acoBulkSelection.add(n);
+  } else {
+    for (const n of profileNames) _acoBulkSelection.delete(n);
+  }
+  renderAcoUsers();
+}
+
+function showBulkLinkModal() {
+  if (_acoBulkSelection.size === 0) return;
+  const count = _acoBulkSelection.size;
+  const overlay = document.createElement('div');
+  overlay.id = 'acoBulkLinkOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:24px;width:380px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
+      <div style="font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:4px">Bulk Link Profiles</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">Link ${count} selected profile${count === 1 ? '' : 's'} to a Discord user.</div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Discord User ID <span style="color:var(--red)">*</span></label>
+        <input id="acoBulkDiscordId" type="text" placeholder="e.g. 123456789012345678" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text-primary);box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:11px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Discord Username <span style="font-size:10px;color:var(--text-tertiary)">(optional)</span></label>
+        <input id="acoBulkDiscordUsername" type="text" placeholder="e.g. username" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text-primary);box-sizing:border-box">
+      </div>
+      <div id="acoBulkLinkError" style="display:none;font-size:11px;color:var(--red);margin-bottom:8px"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn btn-sm" onclick="closeBulkLinkModal()" style="font-size:12px;padding:6px 14px">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="bulkLinkProfiles()" style="font-size:12px;padding:6px 14px">Link ${count} Profile${count === 1 ? '' : 's'}</button>
+      </div>
+    </div>
+  `;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeBulkLinkModal(); });
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('acoBulkDiscordId')?.focus(), 50);
+}
+
+function closeBulkLinkModal() {
+  const overlay = document.getElementById('acoBulkLinkOverlay');
+  if (overlay) overlay.remove();
+}
+
+async function bulkLinkProfiles() {
+  const discordId = (document.getElementById('acoBulkDiscordId')?.value || '').trim();
+  const discordUsername = (document.getElementById('acoBulkDiscordUsername')?.value || '').trim();
+  const errorEl = document.getElementById('acoBulkLinkError');
+
+  if (!discordId || !/^\d{17,20}$/.test(discordId)) {
+    if (errorEl) { errorEl.textContent = 'Please enter a valid Discord User ID (17-20 digits).'; errorEl.style.display = ''; }
+    return;
+  }
+
+  const profiles = [..._acoBulkSelection];
+  closeBulkLinkModal();
+  toast(`Linking ${profiles.length} profile${profiles.length === 1 ? '' : 's'}...`, 'info');
+
+  let successCount = 0, failCount = 0;
+  for (const profileName of profiles) {
+    try {
+      const result = await window.api.saveProfileMapping(profileName, discordId, discordUsername || undefined);
+      if (result && result.success) successCount++;
+      else failCount++;
+    } catch {
+      failCount++;
+    }
+  }
+
+  _acoBulkSelection.clear();
+  await loadAcoMappings();
+  renderAcoUsers();
+
+  if (failCount === 0) {
+    toast(`Linked ${successCount} profile${successCount === 1 ? '' : 's'} to ${discordUsername || discordId}`, 'success');
+  } else {
+    toast(`Linked ${successCount}, failed ${failCount} profile${failCount === 1 ? '' : 's'}`, 'error');
+  }
+}
+
+// ==================== ACO EXPORT ====================
+let _acoExportUserType = 'all';
+let _acoExportTier = 'all';
+let _acoExportSite = 'all';
+let _acoExportDetail = 'summary';
+
+function showAcoExportModal() {
+  _acoExportUserType = 'all';
+  _acoExportTier = 'all';
+  _acoExportSite = 'all';
+  _acoExportDetail = 'summary';
+  const modal = $('acoExportModal');
+  modal.querySelectorAll('[data-aco-export-usertype]').forEach(b => b.classList.toggle('active', b.getAttribute('data-aco-export-usertype') === 'all'));
+  modal.querySelectorAll('[data-aco-export-tier]').forEach(b => b.classList.toggle('active', b.getAttribute('data-aco-export-tier') === 'all'));
+  modal.querySelectorAll('[data-aco-export-site]').forEach(b => b.classList.toggle('active', b.getAttribute('data-aco-export-site') === 'all'));
+  modal.querySelectorAll('[data-aco-export-detail]').forEach(b => b.classList.toggle('active', b.getAttribute('data-aco-export-detail') === 'summary'));
+  $('acoExportMinStickRate').value = '';
+  $('acoExportMaxStickRate').value = '';
+  $('acoExportMinOrders').value = '';
+  $('acoExportMaxOrders').value = '';
+  document.body.appendChild(modal);
+  modal.classList.add('show');
+  updateAcoExportPreview();
+}
+
+function hideAcoExportModal() {
+  $('acoExportModal').classList.remove('show');
+}
+
+function setAcoExportFilter(type, value) {
+  const modal = $('acoExportModal');
+  if (type === 'userType') {
+    _acoExportUserType = value;
+    modal.querySelectorAll('[data-aco-export-usertype]').forEach(b => b.classList.toggle('active', b.getAttribute('data-aco-export-usertype') === value));
+  } else if (type === 'tier') {
+    _acoExportTier = value;
+    modal.querySelectorAll('[data-aco-export-tier]').forEach(b => b.classList.toggle('active', b.getAttribute('data-aco-export-tier') === value));
+  } else if (type === 'site') {
+    _acoExportSite = value;
+    modal.querySelectorAll('[data-aco-export-site]').forEach(b => b.classList.toggle('active', b.getAttribute('data-aco-export-site') === value));
+  } else if (type === 'detail') {
+    _acoExportDetail = value;
+    modal.querySelectorAll('[data-aco-export-detail]').forEach(b => b.classList.toggle('active', b.getAttribute('data-aco-export-detail') === value));
+  }
+  updateAcoExportPreview();
+}
+
+function getAcoExportFilteredProfiles() {
+  const { users, unmapped } = getAcoUserGroups();
+  const minRate = $('acoExportMinStickRate').value !== '' ? parseFloat($('acoExportMinStickRate').value) : null;
+  const maxRate = $('acoExportMaxStickRate').value !== '' ? parseFloat($('acoExportMaxStickRate').value) : null;
+  const minOrders = $('acoExportMinOrders').value !== '' ? parseInt($('acoExportMinOrders').value) : null;
+  const maxOrders = $('acoExportMaxOrders').value !== '' ? parseInt($('acoExportMaxOrders').value) : null;
+
+  // Build flat list of { discordUsername, discordUserId, profile, isMapped }
+  const entries = [];
+  for (const u of Object.values(users)) {
+    for (const p of u.profiles) {
+      entries.push({ discordUsername: u.discordUsername, discordUserId: u.discordUserId, profile: p, isMapped: true });
+    }
+  }
+  for (const p of unmapped) {
+    entries.push({ discordUsername: '', discordUserId: '', profile: p, isMapped: false });
+  }
+
+  return entries.filter(e => {
+    const p = e.profile;
+    // User type filter
+    if (_acoExportUserType === 'mapped' && !e.isMapped) return false;
+    if (_acoExportUserType === 'unmapped' && e.isMapped) return false;
+
+    // Site filter — profile must have orders on this site
+    if (_acoExportSite !== 'all' && (!p.sites || !p.sites[_acoExportSite])) return false;
+
+    // Compute stick rate & tier for this profile (or site-filtered subset)
+    let total, confirmed;
+    if (_acoExportSite !== 'all' && p.sites && p.sites[_acoExportSite]) {
+      const s = p.sites[_acoExportSite];
+      total = s.total; confirmed = s.confirmed;
+    } else {
+      total = p.total; confirmed = p.confirmed;
+    }
+    const stickRate = total > 0 ? (confirmed / total) * 100 : 0;
+    const tier = getAccountStatsTier(stickRate, total);
+
+    // Tier filter
+    if (_acoExportTier !== 'all' && tier !== _acoExportTier) return false;
+
+    // Stick rate range
+    if (minRate !== null && stickRate < minRate) return false;
+    if (maxRate !== null && stickRate > maxRate) return false;
+
+    // Orders range
+    if (minOrders !== null && total < minOrders) return false;
+    if (maxOrders !== null && total > maxOrders) return false;
+
+    return true;
+  });
+}
+
+function updateAcoExportPreview() {
+  const filtered = getAcoExportFilteredProfiles();
+  const el = $('acoExportPreviewCount');
+  if (el) el.textContent = `${filtered.length} profile${filtered.length === 1 ? '' : 's'} match`;
+}
+
+async function executeAcoExport() {
+  const filtered = getAcoExportFilteredProfiles();
+  if (filtered.length === 0) { toast('No profiles match the current filters', 'error'); return; }
+
+  let content, fileName;
+  const dateStamp = localDateStr(new Date());
+
+  if (_acoExportDetail === 'summary') {
+    const headers = ['Discord User', 'Discord ID', 'Profile', 'Bot Type', 'Site', 'Total Orders', 'Confirmed', 'Declined', 'Cancelled', 'Stick Rate %', 'Total Spent', 'Tier'];
+    const rows = [headers.join(',')];
+    for (const e of filtered) {
+      const p = e.profile;
+      const sites = (_acoExportSite !== 'all') ? { [_acoExportSite]: p.sites[_acoExportSite] } : (p.sites || {});
+      for (const [siteName, s] of Object.entries(sites)) {
+        const total = s.total, confirmed = s.confirmed, declined = s.declined || 0, cancelled = s.cancelled || 0;
+        const stickRate = total > 0 ? ((confirmed / total) * 100).toFixed(1) : '0.0';
+        const tier = getAccountStatsTier(parseFloat(stickRate), total);
+        const spent = s.orders.reduce((sum, o) => {
+          const amt = typeof o.amount === 'string' ? parseFloat(o.amount.replace(/[^0-9.]/g, '')) : (o.amount || 0);
+          return sum + (isNaN(amt) ? 0 : amt);
+        }, 0);
+        rows.push([
+          csvEsc(e.discordUsername), csvEsc(e.discordUserId), csvEsc(p.name), csvEsc(p.botType || ''),
+          csvEsc(siteName), total, confirmed, declined, cancelled, stickRate, spent.toFixed(2), tier
+        ].join(','));
+      }
+    }
+    content = rows.join('\n') + '\n';
+    fileName = `aco-export-summary-${dateStamp}.csv`;
+  } else {
+    const headers = ['Discord User', 'Discord ID', 'Profile', 'Bot Type', 'Site', 'Order ID', 'Item', 'Amount', 'Date', 'Status'];
+    const rows = [headers.join(',')];
+    for (const e of filtered) {
+      const p = e.profile;
+      const sites = (_acoExportSite !== 'all') ? { [_acoExportSite]: p.sites[_acoExportSite] } : (p.sites || {});
+      for (const [siteName, s] of Object.entries(sites)) {
+        for (const o of s.orders) {
+          rows.push([
+            csvEsc(e.discordUsername), csvEsc(e.discordUserId), csvEsc(p.name), csvEsc(p.botType || ''),
+            csvEsc(siteName), csvEsc(o.orderId || ''), csvEsc(o.item || ''), csvEsc(o.amount || ''),
+            csvEsc(o.date || ''), csvEsc(o.status || '')
+          ].join(','));
+        }
+      }
+    }
+    content = rows.join('\n') + '\n';
+    fileName = `aco-export-detailed-${dateStamp}.csv`;
+  }
+
+  const result = await window.api.saveTextFile(content, fileName);
+  if (result.success) {
+    toast(`Exported ${filtered.length} profile${filtered.length === 1 ? '' : 's'} (CSV)`, 'success');
+    hideAcoExportModal();
+  } else if (!result.canceled) {
+    toast('Export failed: ' + (result.error || 'Unknown error'), 'error');
+  }
+}
+
+function csvEsc(val) {
+  const s = String(val == null ? '' : val);
+  return (s.includes(',') || s.includes('"') || s.includes('\n')) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
 function hideAcoUserDetail() {
   _acoSelectedUser = null;
+  _acoExpandedSites.clear();
+  _acoDetailSiteFilter = 'all';
+  _acoDetailProfileSort = 'total-desc';
+  _acoDetailTierFilter.clear();
   const detailEl = document.getElementById('acoUserDetail');
   const listEl = document.getElementById('acoUsersList');
   if (detailEl) detailEl.style.display = 'none';
@@ -23519,6 +24166,30 @@ document.getElementById('acoTabSwitcher')?.addEventListener('click', e => {
 if (window.api.onSyncProgress) {
   window.api.onSyncProgress(data => {
     if (data && typeof data === 'object') {
+      // Discord sync progress
+      if (data.discordSync) {
+        const progressEl = $('discordSyncProgress');
+        const fillEl = $('discordSyncProgressFill');
+        const textEl = $('discordSyncProgressText');
+        if (!progressEl) return;
+
+        if (data.phase === 'done' || data.phase === 'error') {
+          fillEl.style.width = '100%';
+          textEl.textContent = data.phase === 'done' ? `Done — ${data.count || 0} added` : 'Error';
+          setTimeout(() => { progressEl.style.display = 'none'; fillEl.style.width = '0%'; }, 2000);
+        } else {
+          progressEl.style.display = '';
+          if (data.total && data.current) {
+            const pct = Math.round((data.current / data.total) * 100);
+            fillEl.style.width = pct + '%';
+            textEl.textContent = `${data.current}/${data.total} (${pct}%)`;
+          } else {
+            fillEl.style.width = '0%';
+            textEl.textContent = data.message || 'Syncing...';
+          }
+        }
+        return;
+      }
       // Update individual account progress if accountId is provided
       if (data.accountId) {
         const total = data.total || 0;

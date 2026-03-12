@@ -747,8 +747,9 @@ if (needsSourceMigration) {
   store.set('orders', existingOrders);
 }
 
-// Status priority for order merging: cancelled > declined > delivered > shipped > confirmed
-const STATUS_PRIORITY = { cancelled: 5, declined: 4, delivered: 3, shipped: 2, confirmed: 1 };
+// Status priority for order merging: cancelled > delivered > shipped > confirmed > declined
+// Declined = failed checkout attempt (payment rejected), never actually placed — lowest priority
+const STATUS_PRIORITY = { cancelled: 5, delivered: 3, shipped: 2, confirmed: 1, declined: 0 };
 
 // Migration: Merge duplicate order entries (confirmed + shipped + delivered -> single entry)
 if (!store.get('ordersMerged', false)) {
@@ -770,6 +771,28 @@ if (!store.get('ordersNormalized', false)) {
   }
   store.set('orders', merged);
   store.set('ordersNormalized', true);
+}
+
+// Migration: Reclassify Discord ACO "cancelled" orders that have cancelReason as "declined"
+// Payment declines are failed checkout attempts, not real cancellations
+if (!store.get('declinesMigrated', false)) {
+  const allOrders = store.get('orders', []);
+  let reclassified = 0;
+  for (const o of allOrders) {
+    if (o.source === 'discord' && o.status === 'cancelled' && o.cancelReason) {
+      const reasonLower = (o.cancelReason || '').toLowerCase();
+      const isManualCancel = /quantity\s*limit|manual|customer\s*request|self.?cancel/i.test(reasonLower);
+      if (!isManualCancel) {
+        o.status = 'declined';
+        reclassified++;
+      }
+    }
+  }
+  if (reclassified > 0) {
+    console.log(`[MIGRATION] Reclassified ${reclassified} Discord payment declines from cancelled → declined`);
+    store.set('orders', allOrders);
+  }
+  store.set('declinesMigrated', true);
 }
 
 // ==================== LICENSE SYSTEM ====================
@@ -1847,10 +1870,28 @@ function extractWalmartImages(html) {
 
 function parseWalmartEmail(parsed, accountEmail) {
   const subject = parsed.subject || '';
-  const text = parsed.text || '';
-  const html = parsed.html || '';
-  const content = text + ' ' + html;
+  let text = parsed.text || '';
+  let html = parsed.html || '';
   const emailDate = toLocalDateString(parsed.date);
+
+  // Truncate promo/recommendation sections to avoid picking up wrong items and prices
+  const wmCutoffPatterns = [
+    /You might also like/i,
+    /Recommended for you/i,
+    /More items to explore/i,
+    /Customers also bought/i,
+    /Shop similar items/i,
+    /Based on your/i,
+    /You may also like/i,
+  ];
+  for (const pattern of wmCutoffPatterns) {
+    const textIdx = text.search(pattern);
+    if (textIdx > 100) text = text.substring(0, textIdx);
+    const htmlIdx = html.search(pattern);
+    if (htmlIdx > 100) html = html.substring(0, htmlIdx);
+  }
+
+  const content = text + ' ' + html;
   
   const status = determineStatus(content, subject);
   debugLog(`[WALMART] Parsing email: subject="${subject.substring(0, 80)}" status=${status}`);
@@ -1914,14 +1955,78 @@ function parseWalmartEmail(parsed, accountEmail) {
       }
     }
 
-    const amounts = [];
-    const amtRegex = /\$\s*([\d,]+\.?\d*)/g;
-    let amtMatch;
-    while ((amtMatch = amtRegex.exec(content)) !== null) {
-      const val = parseFloat(amtMatch[1].replace(/,/g, ''));
-      if (!isNaN(val) && val > 0 && val < 50000) amounts.push(val);
+    // Extract order total using multiple strategies for different Walmart email formats
+
+    // Strategy 1: HTML automation-id="order-total" section (delivery order format)
+    const orderTotalSection = html.match(/automation-id=["']order-total["'][^>]*>[\s\S]*?\$\s*([\d,]+\.?\d*)/i);
+    if (orderTotalSection) {
+      const val = parseFloat(orderTotalSection[1].replace(/,/g, ''));
+      if (!isNaN(val) && val > 0 && val < 50000) amount = val;
     }
-    if (amounts.length > 0) amount = Math.max(...amounts);
+
+    // Strategy 2: HTML class="order-total-price" (pickup/ship format)
+    if (amount === 0) {
+      const otpMatch = html.match(/order-total-price[^>]*>\s*\$?\s*([\d,]+\.?\d*)/i);
+      if (otpMatch) {
+        const val = parseFloat(otpMatch[1].replace(/,/g, ''));
+        if (!isNaN(val) && val > 0 && val < 50000) amount = val;
+      }
+    }
+
+    // Strategy 3: Text-based "Order total" with $ on same or nearby line
+    if (amount === 0) {
+      const totalPatterns = [
+        /order\s*total[:\s]*\$\s*([\d,]+\.?\d*)/i,
+        /estimated\s*total[:\s]*\$\s*([\d,]+\.?\d*)/i,
+      ];
+      for (const pattern of totalPatterns) {
+        const m = content.match(pattern);
+        if (m) {
+          const val = parseFloat(m[1].replace(/,/g, ''));
+          if (!isNaN(val) && val > 0 && val < 50000) { amount = val; break; }
+        }
+      }
+    }
+
+    // Strategy 4: "Order total" label with amount further away (e.g., "Order total\n...\n$X.XX")
+    if (amount === 0) {
+      const otIdx = content.toLowerCase().indexOf('order total');
+      if (otIdx >= 0) {
+        // Grab up to 300 chars after "Order total" and find the first $ not preceded by "saved"
+        const afterTotal = content.substring(otIdx, otIdx + 300);
+        const amtInSection = /\$\s*([\d,]+\.?\d*)/g;
+        let m;
+        while ((m = amtInSection.exec(afterTotal)) != null) {
+          const before = afterTotal.substring(Math.max(0, m.index - 30), m.index).toLowerCase();
+          if (/sav(?:e|ed|ing)/.test(before)) continue;
+          const val = parseFloat(m[1].replace(/,/g, ''));
+          if (!isNaN(val) && val > 0 && val < 50000) { amount = val; break; }
+        }
+      }
+    }
+
+    // Strategy 5: totalChargedClass (delivery order variant)
+    if (amount === 0) {
+      const tccMatch = html.match(/totalChargedClass[^>]*>\s*(?:<[^>]*>)*\s*\$?\s*([\d,]+\.?\d*)/i);
+      if (tccMatch) {
+        const val = parseFloat(tccMatch[1].replace(/,/g, ''));
+        if (!isNaN(val) && val > 0 && val < 50000) amount = val;
+      }
+    }
+
+    // Strategy 6: Fallback — collect all dollar amounts but exclude "saved", "was", "before sale" contexts
+    if (amount === 0) {
+      const amounts = [];
+      const amtContextRegex = /(.{0,30})\$\s*([\d,]+\.?\d*)/g;
+      let amtMatch;
+      while ((amtMatch = amtContextRegex.exec(content)) !== null) {
+        const ctx = (amtMatch[1] || '').toLowerCase();
+        if (/sav(?:e|ed|ing)|was\s*$|before\s*sale|original|regular\s*price|marked?\s*down|off\s*$/i.test(ctx)) continue;
+        const val = parseFloat(amtMatch[2].replace(/,/g, ''));
+        if (!isNaN(val) && val > 0 && val < 50000) amounts.push(val);
+      }
+      if (amounts.length > 0) amount = Math.max(...amounts);
+    }
   } else {
     // Shipped/delivered: extract item name from /seo/ image URL only (reliable, no promo links)
     if (productImages.length > 0) {
@@ -9372,7 +9477,7 @@ ipcMain.handle('clear-live-tracking-cache', async () => {
 ipcMain.handle('update-orders-from-tracking', async (_, updates) => {
   // updates: [{ tracking, status, eta }]
   const orders = store.get('orders', []);
-  const statusPriority = { cancelled: 5, declined: 4, delivered: 3, shipped: 2, confirmed: 1 };
+  const statusPriority = { cancelled: 5, delivered: 3, shipped: 2, confirmed: 1, declined: 0 };
   let updated = 0;
 
   for (const upd of updates) {
@@ -9924,6 +10029,9 @@ ipcMain.handle('sync-discord-orders', async () => {
     }
 
     console.log('[DISCORD ACO] Starting order sync...');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('sync-progress', { discordSync: true, phase: 'fetch', message: 'Fetching orders from Discord...' });
+    }
 
     const syncResult = await callDiscordAcoApi('sync-orders', { licenseKey });
     const rows = syncResult.orders || [];
@@ -9935,6 +10043,9 @@ ipcMain.handle('sync-discord-orders', async () => {
     }
 
     console.log('[DISCORD ACO] Found', rows.length, 'new orders');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('sync-progress', { discordSync: true, phase: 'process', message: `Processing ${rows.length} orders...`, total: rows.length });
+    }
 
     // Build item name -> SKU/image lookup from existing orders for image matching
     const existingOrders = store.get('orders', []);
@@ -10049,6 +10160,17 @@ ipcMain.handle('sync-discord-orders', async () => {
       const botType = (row.aco_bot || '').toLowerCase();
       const shouldMap = !skipMappingBots.has(botType);
 
+      // Detect payment declines: bot sends status='cancelled' with decline_reason for failed attempts
+      // These are NOT real cancellations — they're failed checkout attempts (payment rejected)
+      let effectiveStatus = row.status;
+      if (row.status === 'cancelled' && row.decline_reason) {
+        const reasonLower = (row.decline_reason || '').toLowerCase();
+        const isManualCancel = /quantity\s*limit|manual|customer\s*request|self.?cancel/i.test(reasonLower);
+        if (!isManualCancel) {
+          effectiveStatus = 'declined';
+        }
+      }
+
       if (isMulticart) {
         // Split multicart combined name back into individual items
         const parts = itemName.split(' + ').map(p => p.trim());
@@ -10083,7 +10205,7 @@ ipcMain.handle('sync-discord-orders', async () => {
           amount: amount,
           subtotal: amount,
           quantity: parts.length,
-          status: row.status,
+          status: effectiveStatus,
           date: row.order_date ? row.order_date.split('T')[0] : localDateStr(),
           email: row.account_email || 'discord-aco',
           source: 'discord',
@@ -10104,7 +10226,7 @@ ipcMain.handle('sync-discord-orders', async () => {
           sku: matchedSku,
           amount: parseFloat(row.amount) || 0,
           quantity: row.quantity || 1,
-          status: row.status,
+          status: effectiveStatus,
           date: row.order_date ? row.order_date.split('T')[0] : localDateStr(),
           email: row.account_email || 'discord-aco',
           source: 'discord',
@@ -10131,11 +10253,12 @@ ipcMain.handle('sync-discord-orders', async () => {
       const added = saveOrdersBatch(chunk);
       totalAdded += added;
       console.log(`[DISCORD ACO] Saved chunk ${Math.floor(i / CHUNK_SIZE) + 1}: ${added} new (${i + chunk.length}/${convertedOrders.length})`);
+      // Send progress on every chunk
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('sync-progress', { discordSync: true, phase: 'import', current: i + chunk.length, total: convertedOrders.length });
+      }
       // Yield to event loop between chunks to keep app responsive
       if (i + CHUNK_SIZE < convertedOrders.length) {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('sync-progress', { message: `Importing orders... ${i + chunk.length}/${convertedOrders.length}` });
-        }
         await new Promise(r => setImmediate(r));
       }
     }
@@ -10150,113 +10273,17 @@ ipcMain.handle('sync-discord-orders', async () => {
       return !existingOrderKeys.has(key);
     });
 
-    // Auto-forward ONLY genuinely new orders to webhook with @mentions
-    const autoForwardEnabled = store.get('discordAco.autoForwardEnabled', false);
-    let webhookUrl = store.get('discordWebhookUrl');
-    // Fallback: if no legacy webhook, use first saved webhook
-    if (!webhookUrl || !isValidWebhookUrl(webhookUrl)) {
-      const saved = store.get('savedWebhooks', []);
-      if (saved.length > 0 && isValidWebhookUrl(saved[0].url)) webhookUrl = saved[0].url;
-    }
-    if (autoForwardEnabled && webhookUrl && isValidWebhookUrl(webhookUrl) && newOrders.length > 0) {
-      try {
-        // Fetch profile mappings for @mentions
-        let mappingLookup = {};
-        try {
-          const mappingResult = await callDiscordAcoApi('get-profile-mappings', { licenseKey });
-          if (mappingResult.mappings) {
-            for (const m of mappingResult.mappings) {
-              mappingLookup[m.profile_name] = m.discord_user_id;
-            }
-          }
-        } catch (e) {
-          console.error('[ACO FORWARD] Failed to load profile mappings:', e.message);
-        }
-
-        // Load dedup keys to prevent re-forwarding
-        const forwardedKeys = store.get('discordAco.forwardedKeys', {});
-
-        const forwardDeclined = store.get('discordAco.forwardDeclinedEnabled', false);
-        const ordersToForward = forwardDeclined ? newOrders : newOrders.filter(o => o.status !== 'cancelled' && o.status !== 'declined');
-        console.log('[ACO FORWARD] Forwarding', ordersToForward.length, 'orders to webhook...');
-        let forwarded = 0;
-        const forwardLog = store.get('acoForwardLog', []);
-
-        for (let i = 0; i < ordersToForward.length; i++) {
-          const order = ordersToForward[i];
-          const dedupKey = `${order.orderId}:${order.status}`;
-          const traceId = `fwd-${Date.now()}-${i}`;
-
-          // Skip if already forwarded (dedup)
-          if (forwardedKeys[dedupKey]) {
-            forwardLog.push({ traceId, timestamp: new Date().toISOString(), orderId: order.orderId, itemName: order.item, profileName: order.profileName, action: 'skipped', result: 'dedup', mentionSent: false });
-            continue;
-          }
-
-          const statusColor = order.status === 'confirmed' ? 0x22c55e : (order.status === 'cancelled' || order.status === 'declined') ? 0xef4444 : 0xf59e0b;
-          const embed = {
-            title: order.item || 'Unknown Item',
-            color: statusColor,
-            fields: [
-              { name: 'Retailer', value: order.retailer || 'Unknown', inline: true },
-              { name: 'Amount', value: order.amount ? `$${order.amount.toFixed(2)}` : 'N/A', inline: true },
-              { name: 'Status', value: (order.status || 'unknown').charAt(0).toUpperCase() + (order.status || 'unknown').slice(1), inline: true },
-              { name: 'Profile', value: order.profileName || 'Unknown', inline: true },
-              { name: 'Order ID', value: order.orderId || 'N/A', inline: true }
-            ],
-            footer: { text: 'SOLUS Auto-Forward' },
-            timestamp: new Date().toISOString()
-          };
-          if (order.imageUrl && !order.imageUrl.startsWith('data:')) {
-            embed.thumbnail = { url: order.imageUrl };
-          }
-
-          const payload = { embeds: [embed] };
-          // Add @mention if profile is mapped
-          const discordUserId = mappingLookup[order.profileName];
-          let mentionSent = false;
-          if (discordUserId) {
-            payload.content = `<@${discordUserId}>`;
-            mentionSent = true;
-          }
-
-          const result = await sendWebhookJson(webhookUrl, payload);
-          if (result.success) {
-            forwarded++;
-            forwardedKeys[dedupKey] = Date.now();
-          }
-
-          // Log to audit trail
-          forwardLog.push({ traceId, timestamp: new Date().toISOString(), orderId: order.orderId, itemName: order.item, profileName: order.profileName, action: 'forward', result: result.success ? 'sent' : `failed:${result.error || result.statusCode}`, mentionSent: result.success && mentionSent });
-
-          // Throttle: 1 request per second to respect Discord rate limits
-          if (i < ordersToForward.length - 1) {
-            await new Promise(r => setTimeout(r, 1000));
-          }
-        }
-
-        // Prune dedup keys older than 7 days
-        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        for (const [k, ts] of Object.entries(forwardedKeys)) {
-          if (ts < sevenDaysAgo) delete forwardedKeys[k];
-        }
-        store.set('discordAco.forwardedKeys', forwardedKeys);
-
-        // Keep audit log to last 200 entries (ring buffer)
-        while (forwardLog.length > 200) forwardLog.shift();
-        store.set('acoForwardLog', forwardLog);
-
-        console.log('[ACO FORWARD] Forwarded', forwarded, '/', ordersToForward.length, 'orders');
-      } catch (fwdError) {
-        console.error('[ACO FORWARD] Auto-forward error:', fwdError.message);
-      }
-    }
-
     console.log('[DISCORD ACO] Sync complete. Total added:', totalAdded);
     store.set('discordAco.lastSyncCount', totalAdded);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('sync-progress', { discordSync: true, phase: 'done', count: totalAdded });
+    }
     return { success: true, count: totalAdded };
   } catch (error) {
     console.error('[DISCORD ACO] sync-discord-orders error:', error);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('sync-progress', { discordSync: true, phase: 'error', message: error.message });
+    }
     return { success: false, error: error.message };
   } finally {
     _discordSyncInProgress = false;

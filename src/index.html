@@ -1412,7 +1412,35 @@
     .btn-list-track:hover { background: var(--accent); color: #fff; transform: translateY(-1px); }
     .track-na { color: var(--text-muted); font-size: var(--text-sm); }
     /* .modal-lg max-width now defined in Modal Size Variants above */
-    .flex-modal { background: linear-gradient(180deg, var(--bg-secondary) 0%, #0d0d0f 100%); border: 1px solid var(--accent); box-shadow: 0 20px 60px rgba(139,92,246,0.2), 0 0 40px rgba(139,92,246,0.1); }
+    .flex-modal { background: linear-gradient(180deg, var(--bg-secondary) 0%, #0d0d0f 100%); border: none; box-shadow: 0 20px 60px rgba(139,92,246,0.2), 0 0 40px rgba(139,92,246,0.1); position: relative; overflow: hidden; }
+    .flex-modal-watermark {
+      position: absolute;
+      inset: -20px;
+      opacity: 0.12;
+      pointer-events: none;
+      z-index: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, 80px);
+      grid-auto-rows: 80px;
+      justify-content: space-evenly;
+      align-content: space-evenly;
+      overflow: hidden;
+    }
+    .flex-modal-watermark img {
+      width: 52px;
+      height: 52px;
+      place-self: center;
+      flex-shrink: 0;
+      mix-blend-mode: screen;
+    }
+    .flex-modal > *:not(.flex-modal-watermark) { position: relative; z-index: 1; }
+    @media (max-width: 520px) {
+      .flex-modal { border-radius: var(--radius-md); margin: 4px; border: none; box-shadow: 0 0 0 1px rgba(139,92,246,0.3), 0 20px 60px rgba(139,92,246,0.15), inset 0 1px 0 rgba(139,92,246,0.15); }
+      .flex-modal .flex-modal-stats { grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
+      .flex-modal .flex-stat { padding: var(--space-3) var(--space-2); }
+      .flex-modal .flex-stat-value { font-size: var(--text-2xl); }
+      .flex-modal .flex-modal-footer { flex-wrap: wrap; }
+    }
     .flex-modal-header { text-align: center; margin-bottom: 24px; }
     .flex-modal-subtitle { font-size: var(--text-2xl); font-weight: 700; background: linear-gradient(135deg, var(--yellow), var(--orange)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: 1px; }
     .flex-modal-images { display: flex; justify-content: center; gap: var(--space-3); margin-bottom: var(--space-5); }
@@ -6765,7 +6793,7 @@
     </div>
   </div>
 
-  <div class="modal-overlay" id="flexModal"><div class="modal modal-lg flex-modal" id="flexModalContent"><div class="flex-modal-header"><div class="flex-modal-subtitle">You COOKED! <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/></svg></div></div><div class="flex-modal-images" id="flexModalImages"></div><div class="flex-modal-items" id="flexModalItems"></div><div class="flex-modal-stats"><div class="flex-stat"><div class="flex-stat-value green" id="flexModalConfirmed">0</div><div class="flex-stat-label">Confirmed Orders</div></div><div class="flex-stat"><div class="flex-stat-value cyan" id="flexModalQty">0</div><div class="flex-stat-label">Total Quantity</div></div><div class="flex-stat"><div class="flex-stat-value yellow" id="flexModalSpent">$0</div><div class="flex-stat-label">Total Spent</div></div><div class="flex-stat"><div class="flex-stat-value purple" id="flexModalRate">0%</div><div class="flex-stat-label">Stick Rate</div></div></div><div class="flex-modal-footer" id="flexModalFooter"><button class="flex-save-btn" id="saveFlexBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Save PNG</button><button class="flex-save-btn" id="flexDiscordBtn" style="background:linear-gradient(135deg,var(--discord),var(--discord-hover));"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>Send to Discord</button><button class="flex-close-btn" id="closeFlexBtn">Close</button></div></div></div>
+  <div class="modal-overlay" id="flexModal"><div class="modal modal-lg flex-modal" id="flexModalContent"><div class="flex-modal-watermark"></div><div class="flex-modal-header"><div class="flex-modal-subtitle">You COOKED! <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/></svg></div></div><div class="flex-modal-images" id="flexModalImages"></div><div class="flex-modal-items" id="flexModalItems"></div><div class="flex-modal-stats"><div class="flex-stat"><div class="flex-stat-value green" id="flexModalConfirmed">0</div><div class="flex-stat-label">Confirmed Orders</div></div><div class="flex-stat"><div class="flex-stat-value cyan" id="flexModalQty">0</div><div class="flex-stat-label">Total Quantity</div></div><div class="flex-stat"><div class="flex-stat-value yellow" id="flexModalSpent">$0</div><div class="flex-stat-label">Total Spent</div></div><div class="flex-stat"><div class="flex-stat-value purple" id="flexModalRate">0%</div><div class="flex-stat-label">Stick Rate</div></div></div><div class="flex-modal-footer" id="flexModalFooter"><button class="flex-save-btn" id="saveFlexBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Save PNG</button><button class="flex-save-btn" id="flexDiscordBtn" style="background:linear-gradient(135deg,var(--discord),var(--discord-hover));"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>Send to Discord</button><button class="flex-close-btn" id="closeFlexBtn">Close</button></div></div></div>
   
   <div class="modal-overlay" id="itemDetailModal">
     <div class="item-modal">
@@ -8961,7 +8989,7 @@ function computeOrderStatuses() {
   if (_computedOrdersCache && _computedOrdersCacheVersion === _ordersMutationVersion) {
     return _computedOrdersCache;
   }
-  const m = new Map(), p = { cancelled: 5, declined: 4, delivered: 3, shipped: 2, confirmed: 1 };
+  const m = new Map(), p = { cancelled: 5, delivered: 3, shipped: 2, confirmed: 1, declined: 0 };
   orders.forEach(o => {
     const key = `${o.retailer}-${normalizeOrderId(o.orderId)}`;
     const e = m.get(key);
@@ -15591,10 +15619,19 @@ function updateAdvancedFilterBadge() {
   }
 }
 
+function populateFlexWatermark() {
+  const wm = document.querySelector('.flex-modal-watermark');
+  if (!wm || wm.children.length > 0) return;
+  const img = '<img src="../assets/solus-icon.png" alt="" draggable="false">';
+  const count = 120;
+  wm.innerHTML = img.repeat(count);
+}
+
 function showFlexModal(retailer, dropDate) {
   // Store context for filename generation
   currentFlexRetailer = retailer;
   currentFlexDropDate = dropDate;
+  populateFlexWatermark();
 
   const all = getOrdersByRetailer(retailer);
   const drops = getDrops(all);
@@ -15721,10 +15758,12 @@ function showFlexModal(retailer, dropDate) {
   });
 
   // Render images (up to 3) with quantity badges — skip items with no image
+  // Only show qty badges for multi-item orders (badges not useful for single-item drops)
   const itemsWithImages = displayItems.filter(item => item.image);
+  const isMultiItem = aggregatedItems.length > 1;
   const imagesHtml = itemsWithImages.map((item, idx) => {
     const sizeClass = itemsWithImages.length === 1 ? 'single' : '';
-    const qtyBadge = item.qty > 0 ? `<span class="img-qty-badge">${item.qty}</span>` : '';
+    const qtyBadge = isMultiItem && item.qty > 0 ? `<span class="img-qty-badge">${item.qty}</span>` : '';
     return `<div class="flex-modal-image-wrapper ${sizeClass}"><img class="flex-modal-image ${sizeClass}" src="${escapeHtml(item.image)}" onerror="this.parentElement.style.display='none'" alt="">${qtyBadge}</div>`;
   }).join('');
   $('flexModalImages').innerHTML = imagesHtml;
@@ -16331,7 +16370,7 @@ async function saveFlexAsPng() {
     subtitle.style.backgroundClip = 'unset';
   }
   
-  // Add branded watermark with logo + text
+  // Add branded watermark with logo + text (bottom-right)
   const wmEl = document.createElement('div');
   wmEl.style.cssText = 'position:absolute;bottom:10px;right:14px;display:flex;align-items:center;gap:6px;pointer-events:none;z-index:100;';
   const wmImg = document.createElement('img');
@@ -16344,6 +16383,21 @@ async function saveFlexAsPng() {
   wmEl.appendChild(wmText);
   modal.style.position = 'relative';
   modal.appendChild(wmEl);
+
+  // Add site + date label (bottom-left)
+  const _rNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const _siteName = _rNames[currentFlexRetailer] || currentFlexRetailer || '';
+  let _dateLabel = '';
+  if (currentFlexDropDate && currentFlexDropDate !== 'Unknown') {
+    try { _dateLabel = new Date(currentFlexDropDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch(e) {}
+  }
+  const infoEl = document.createElement('div');
+  infoEl.style.cssText = 'position:absolute;bottom:10px;left:14px;pointer-events:none;z-index:100;';
+  const infoText = document.createElement('span');
+  infoText.textContent = _dateLabel ? `${_siteName} \u2022 ${_dateLabel}` : _siteName;
+  infoText.style.cssText = 'font-size:12px;font-weight:600;color:rgba(167,139,250,0.5);letter-spacing:0.5px;font-family:Arial,Helvetica,sans-serif;';
+  infoEl.appendChild(infoText);
+  modal.appendChild(infoEl);
 
   try {
     // Use html2canvas to capture the modal
@@ -16420,8 +16474,9 @@ async function saveFlexAsPng() {
     footer.style.display = 'flex';
     modal.style.paddingBottom = '';
     
-    // Remove watermark element
+    // Remove watermark and info elements
     if (wmEl.parentNode) wmEl.parentNode.removeChild(wmEl);
+    if (infoEl.parentNode) infoEl.parentNode.removeChild(infoEl);
     // Restore gradient text
     if (subtitle) {
       subtitle.style.background = 'linear-gradient(135deg, var(--yellow), var(--orange))';
@@ -16475,6 +16530,21 @@ async function flexToDiscord() {
   modal.style.position = 'relative';
   modal.appendChild(wmEl);
 
+  // Add site + date label (bottom-left)
+  const _rNames2 = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const _siteName2 = _rNames2[currentFlexRetailer] || currentFlexRetailer || '';
+  let _dateLabel2 = '';
+  if (currentFlexDropDate && currentFlexDropDate !== 'Unknown') {
+    try { _dateLabel2 = new Date(currentFlexDropDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch(e) {}
+  }
+  const infoEl = document.createElement('div');
+  infoEl.style.cssText = 'position:absolute;bottom:10px;left:14px;pointer-events:none;z-index:100;';
+  const infoText = document.createElement('span');
+  infoText.textContent = _dateLabel2 ? `${_siteName2} \u2022 ${_dateLabel2}` : _siteName2;
+  infoText.style.cssText = 'font-size:12px;font-weight:600;color:rgba(167,139,250,0.5);letter-spacing:0.5px;font-family:Arial,Helvetica,sans-serif;';
+  infoEl.appendChild(infoText);
+  modal.appendChild(infoEl);
+
   try {
     // Capture the flex modal as PNG
     const canvas = await html2canvas(modal, {
@@ -16484,6 +16554,7 @@ async function flexToDiscord() {
       useCORS: true,
       allowTaint: true
     });
+
     const dataUrl = canvas.toDataURL('image/png');
 
     // Build the stats embed from the modal's displayed values
@@ -16553,6 +16624,7 @@ async function flexToDiscord() {
     footer.style.display = 'flex';
     modal.style.paddingBottom = '';
     if (wmEl.parentNode) wmEl.parentNode.removeChild(wmEl);
+    if (infoEl.parentNode) infoEl.parentNode.removeChild(infoEl);
     if (subtitle) {
       subtitle.style.background = 'linear-gradient(135deg, var(--yellow), var(--orange))';
       subtitle.style.webkitBackgroundClip = 'text';

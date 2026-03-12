@@ -54,6 +54,8 @@ Deno.serve(async (req) => {
         return handleSaveProfileMapping(licenseKey, body)
       case 'delete-profile-mapping':
         return handleDeleteProfileMapping(licenseKey, body)
+      case 'save-channel-forward':
+        return handleSaveChannelForward(licenseKey, body)
       default:
         return errorResponse('Unknown action: ' + action, 404)
     }
@@ -191,7 +193,7 @@ async function handleGetLinkStatus(licenseKey: string) {
   if (discordUserId) {
     const { data: channelRows } = await supabase
       .from('discord_channels')
-      .select('channel_name, channel_id, aco_bot_type')
+      .select('channel_name, channel_id, aco_bot_type, forward_webhook_url, forward_enabled')
       .eq('discord_user_id', discordUserId)
       .eq('is_active', true)
 
@@ -201,6 +203,8 @@ async function handleGetLinkStatus(licenseKey: string) {
         id: ch.channel_id,
         botType: ch.aco_bot_type,
         guildName: null,
+        forwardEnabled: !!ch.forward_enabled,
+        hasForwardWebhook: !!ch.forward_webhook_url,
       }))
     }
   }
@@ -295,6 +299,43 @@ async function handleDeleteProfileMapping(licenseKey: string, body: any) {
     .eq('profile_name', profileName)
 
   if (error) return errorResponse(error.message, 500)
+
+  return jsonResponse({ success: true })
+}
+
+// ── save-channel-forward: Sync webhook URL from app to discord_channels ──
+async function handleSaveChannelForward(licenseKey: string, body: any) {
+  const { channelId, webhookUrl, webhookName } = body
+
+  if (!channelId) {
+    return errorResponse('channelId is required')
+  }
+
+  // Look up discord_user_id from license key
+  const { data: links, error: linkErr } = await supabase
+    .from('discord_links')
+    .select('discord_user_id')
+    .eq('license_key', licenseKey)
+    .eq('is_active', true)
+
+  if (linkErr) return errorResponse(linkErr.message, 500)
+  if (!links || links.length === 0) return errorResponse('No linked Discord account found')
+
+  const discordUserId = links[0].discord_user_id
+  if (!discordUserId) return errorResponse('Discord account not fully linked')
+
+  // Update the channel's forward fields
+  const { error: updateErr } = await supabase
+    .from('discord_channels')
+    .update({
+      forward_webhook_url: webhookUrl || null,
+      forward_title: webhookName || null,
+      forward_enabled: !!webhookUrl,
+    })
+    .eq('discord_user_id', discordUserId)
+    .eq('channel_id', channelId)
+
+  if (updateErr) return errorResponse(updateErr.message, 500)
 
   return jsonResponse({ success: true })
 }

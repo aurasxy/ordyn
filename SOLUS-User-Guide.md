@@ -1,4 +1,4 @@
-# SOLUS User Guide v2.0
+# SOLUS User Guide v3.0
 ### Order Analytics for Resellers
 
 ---
@@ -6,17 +6,20 @@
 ## Table of Contents
 
 1. [Getting Started](#getting-started)
-2. [Dashboard](#dashboard)
-3. [IMAP Accounts](#imap-accounts)
-4. [Retailer Pages](#retailer-pages)
-5. [Delivery Hub](#delivery-hub)
-6. [Analytics](#analytics)
-7. [Account Stats](#account-stats)
-8. [Reports](#reports)
-9. [Inventory Management](#inventory-management)
-10. [TCG Price Tracker](#tcg-price-tracker)
-11. [Settings](#settings)
-12. [Tips & Tricks](#tips--tricks)
+2. [Data Modes](#data-modes)
+3. [Dashboard](#dashboard)
+4. [IMAP Accounts & Sync](#imap-accounts--sync)
+5. [Discord ACO Integration](#discord-aco-integration)
+6. [Retailer Pages](#retailer-pages)
+7. [Delivery Hub](#delivery-hub)
+8. [Live Track](#live-track)
+9. [Analytics](#analytics)
+10. [Account Stats](#account-stats)
+11. [Reports](#reports)
+12. [Inventory Management](#inventory-management)
+13. [TCG Price Tracker](#tcg-price-tracker)
+14. [Settings](#settings)
+15. [Tips & Tricks](#tips--tricks)
 
 ---
 
@@ -25,9 +28,18 @@
 ### Activation
 When you first launch SOLUS, you'll be prompted to enter your license key.
 
-**License Format:** `OA-PRO-XXXX-XXXX-XXXX`
-
 Enter your key and click **Activate License**. Once activated, you'll have full access to all features.
+
+### License Details
+
+After activation you can view your license info in **Settings > License**:
+- License key (masked)
+- Plan type
+- Status (active/expired)
+- Activation and expiration dates
+- Days remaining (color-coded: green > 30 days, orange > 7, yellow > 3, red when expired)
+
+Click **Disconnect License** to log out of your license on this device.
 
 ### Onboarding Walkthrough
 
@@ -42,9 +54,45 @@ After activation, a guided walkthrough tutorial will appear automatically on fir
 Each step highlights the relevant part of the UI and explains how to use it. You can skip the walkthrough at any time, or replay it later from **Settings > General > Show Walkthrough**.
 
 ### First Steps
-1. **Add your email accounts** - Go to IMAP page and connect your Gmail, Yahoo, Outlook, or iCloud accounts
-2. **Run your first sync** - Select date range and sync to pull in your order emails
-3. **Explore your data** - View orders by retailer, check analytics, and track deliveries
+1. **Choose your data mode** - IMAP (email sync) or Discord (ACO bot sync)
+2. **Connect your data source** - Add email accounts or link your Discord
+3. **Run your first sync** - Pull in your order data
+4. **Explore your data** - View orders by retailer, check analytics, and track deliveries
+
+---
+
+## Data Modes
+
+SOLUS supports two data import methods. You choose your mode in **Settings > General**.
+
+### IMAP Mode (Email Sync)
+- Connects directly to your email accounts via IMAP
+- Parses order confirmations, shipping updates, and delivery notifications
+- Tracks full order lifecycle: Confirmed > Shipped > Delivered
+- Enables Delivery Hub, Live Track, and carrier analytics
+- Best for: complete order tracking with delivery data
+
+### Discord Mode (ACO Bot Sync)
+- Syncs orders captured by Discord auto-checkout bots (Alpine, Valor, Hayha, Stellara, Refract, Shikari, TSB, etc.)
+- Orders pulled from the SOLUS Discord relay server
+- Tracks: Confirmed, Cancelled, Declined statuses
+- Enables ACO Panel with profile mappings and webhook forwarding
+- Best for: monitoring ACO bot checkouts across profiles
+
+### Switching Modes
+1. Go to **Settings > General**
+2. Click **IMAP Mode** or **Discord Mode**
+3. Confirm the switch (your orders for the other mode are preserved separately)
+
+When you switch modes, the sidebar navigation updates to show only relevant pages. IMAP mode shows Accounts and Delivery Hub; Discord mode shows Discord sync and the ACO Panel.
+
+### Source Filter
+On the Dashboard, a **source filter bar** lets you toggle between:
+- **All Sources** - Show everything
+- **Email (IMAP)** - Only email-synced orders
+- **Discord** - Only Discord-synced orders
+
+This filter applies across the dashboard, retailer pages, and analytics.
 
 ---
 
@@ -56,8 +104,10 @@ The Dashboard gives you a quick overview of all your orders across retailers.
 Each supported retailer has a card showing:
 - **Confirmed** - Orders successfully placed
 - **Cancelled** - Orders that were cancelled
-- **Shipped** - Orders in transit
-- **Delivered** - Orders that have arrived
+- **Shipped** - Orders in transit (hidden in Discord mode)
+- **Delivered** - Orders that have arrived (hidden in Discord mode)
+
+In Discord mode, "Shipped" shows as **Declined** instead.
 
 **Click any retailer card** to jump to that retailer's detailed page.
 
@@ -75,19 +125,19 @@ Show or hide individual retailer cards based on which retailers you actively use
 - Best Buy
 
 **Stats Section Toggles:**
-Show or hide individual stats sections to keep the dashboard focused on what matters to you.
+Show or hide the Overall Statistics bar or Quick Stats bar.
 
 Your layout preferences are **saved automatically** and persist across sessions. Toggle cards on and off at any time without losing any underlying data.
 
 ### Dashboard Alerts
 
-An alerts bar appears at the top of the dashboard when there are items that need your attention. Alerts include:
+An alerts bar appears at the top of the dashboard when there are items that need your attention:
 
 - **Low Stick Rate Warning** - "X accounts below 50% stick rate" - Click to jump to Account Stats
 - **Overdue Deliveries** - "X orders awaiting delivery past ETA" - Click to jump to Delivery Hub
 - **Recent Cancellations** - "X orders cancelled in last 24h" - Click to view cancelled orders
 
-Each alert is clickable and navigates you to the relevant page for more detail. Alerts can be **dismissed per session** by clicking the X on each one. They will reappear on your next launch if the conditions still apply.
+Each alert is clickable and navigates you to the relevant page. Alerts can be **dismissed per session** by clicking the X. They reappear on your next launch if the conditions still apply.
 
 ### Quick Stats Bar
 
@@ -97,34 +147,41 @@ A persistent quick stats bar is displayed below the alerts showing at-a-glance n
 - **Spending This Month** - Total confirmed order value for the current month
 - **Delivered This Week** - How many packages arrived in the last 7 days
 
+Each stat is clickable and navigates to the relevant page.
+
 ### Statistics Bar
 View aggregated totals:
 - Total orders across all retailers
 - Total amount spent
 - Overall stick rate
+- Confirmed / Cancelled / Shipped / Delivered counts
 
 ### Time Period Filter
 Toggle between **7D**, **30D**, **90D**, or **All** to filter the dashboard data.
 
+### Navigation Badges
+The sidebar shows order count badges next to each retailer name, so you can see at a glance which retailers have the most activity.
+
 ---
 
-## IMAP Accounts
+## IMAP Accounts & Sync
 
 Connect your email accounts to automatically sync order confirmations, shipping updates, and delivery notifications.
 
 ### Supported Providers
-| Provider | Badge Color | App Password Required |
+| Provider | IMAP Server | App Password Required |
 |----------|-------------|----------------------|
-| Gmail | Red | Yes |
-| Yahoo | Purple | Yes |
-| Outlook/Hotmail | Blue | Yes (or regular password) |
-| iCloud | Gray | Yes |
-| AOL | Orange | Yes |
+| Gmail | imap.gmail.com | Yes |
+| Yahoo | imap.mail.yahoo.com | Yes (2FA required) |
+| Outlook/Hotmail | outlook.office365.com | Yes (or regular password) |
+| iCloud | imap.mail.me.com | Yes |
+
+Provider is auto-detected from your email address.
 
 ### Adding an Account
 
 1. Click **+ Add Account**
-2. Select your email provider
+2. Select your email provider (or let it auto-detect)
 3. Enter your email address
 4. Enter your **App Password** (not your regular password)
 5. Click **Test Connection** to verify
@@ -134,17 +191,16 @@ Connect your email accounts to automatically sync order confirmations, shipping 
 
 ### Provider-Specific Help
 
-When adding an account or when a connection test fails, SOLUS will automatically display provider-specific instructions to guide you through the setup process.
+When adding an account or when a connection test fails, SOLUS displays provider-specific instructions.
 
 **Gmail:**
-- Go to your Google Account settings
 - Enable IMAP in Gmail settings (Settings > Forwarding and POP/IMAP)
 - Create an App Password at [myaccount.google.com](https://myaccount.google.com) under Security > 2-Step Verification > App Passwords
 - Use the generated 16-character password in SOLUS
 
 **Outlook / Hotmail:**
 - Enable IMAP in Outlook settings
-- If you have 2FA enabled, you may need to generate an App Password
+- If you have 2FA enabled, generate an App Password
 - Use your app password (or regular password if 2FA is off)
 
 **Yahoo:**
@@ -157,12 +213,16 @@ When adding an account or when a connection test fails, SOLUS will automatically
 - Under Security, generate an app-specific password
 - Use that password in SOLUS
 
-**AOL:**
-- Go to [login.aol.com](https://login.aol.com) and navigate to Account Security
-- Generate an App Password
-- Use the generated password in SOLUS
+All provider help links open externally in your default browser.
 
-All provider help links open externally in your default browser so you can complete the setup alongside SOLUS.
+### Account Management
+
+Each account in the list shows:
+- Email address with provider badge (Gmail/Yahoo/Outlook/iCloud)
+- Editable nickname (click to rename, max 30 chars)
+- Last sync time or "Never synced"
+- Order count for that account
+- Action buttons: Test Connection, View Sync Log, Sync, Edit Password, Delete
 
 ### Syncing Emails
 
@@ -177,7 +237,7 @@ Once an account is added, you have several sync options:
 ### Sync Progress
 
 During sync you'll see:
-- Progress bar with email count
+- Progress bar with percentage
 - Current status message
 - **Pause** button (yellow) - Pause after current batch
 - **Stop** button (red) - Stop immediately
@@ -190,13 +250,149 @@ If a sync pauses (due to connection issues), you'll see:
 - **Auto-resume countdown** if enabled
 - **Resume** button to continue manually
 
-**Configure Auto-Resume** in Settings > General:
-- 1, 5, 10, 15, 30, or 60 minutes
-- Default: 1 minute (enabled by default)
+Auto-resume retries up to 3 times before stopping. Configure the interval in Settings > General (1, 5, 10, 15, 30, or 60 minutes; default: 1 minute).
+
+### Auto-Sync on Launch
+
+When enabled in Settings, SOLUS automatically syncs all accounts on startup, pulling orders from each account's last sync date (or 7 days back if never synced).
 
 ### Bulk Import
 
 Have multiple accounts? Click **Import CSV** to bulk import accounts from a CSV file.
+
+### Sync Log
+
+Click **View Sync Log** on any account to see detailed IMAP diagnostics. The log captures connection events, email counts, parsing results, and any errors encountered.
+
+---
+
+## Discord ACO Integration
+
+SOLUS integrates with Discord auto-checkout bots to track orders captured in your Discord server channels.
+
+### Supported ACO Bots
+- Alpine
+- Valor
+- Hayha
+- Stellara
+- Refract
+- Shikari
+- TSB
+- Generic (auto-detected)
+
+### Linking Your Discord Account
+
+1. Go to **Settings > Discord** (or the Discord nav item)
+2. Click **Generate Link Token** - a 6-character code is created
+3. Go to your Discord server and run `/link <token>` with the SOLUS bot
+4. Once linked, your Discord username appears and channels are loaded
+
+### ACO Panel
+
+The ACO Panel is your hub for managing Discord checkout data. It has two tabs: **Users** and **Settings**.
+
+#### Users Tab
+
+The Users tab shows all your Discord profiles grouped by Discord user.
+
+**Profile List:**
+- Each user card shows: Discord username, profile count, total order count
+- Click a user card to expand their detail view
+- Unmapped profiles appear separately at the bottom with a **Link** button
+
+**User Detail View:**
+- Full profile breakdown with per-site stats (orders, stick rate, spending)
+- Recent orders (up to 5 per site) with status icons
+- **+ Add Profile** button to map additional profiles to this Discord user
+- **Send Test Forward** button to test webhook forwarding for a profile
+- **Remove** button to unlink a profile mapping
+
+**Profile Mapping:**
+When you click **+ Link Profile** or the **Link** button on an unmapped profile:
+1. Enter the profile name (must match exactly what the ACO bot uses)
+2. Enter the Discord User ID (17-20 digit number)
+3. Optionally enter the Discord username
+4. Click Save
+
+Profile mappings are stored server-side and used for @mention tagging when orders are forwarded via webhook.
+
+**Searching & Filtering:**
+- Search by Discord username, user ID, or profile name
+- Filter: All, Mapped only, Unmapped only
+
+#### Settings Tab
+
+The Settings tab has five sections:
+
+**1. Saved Webhooks**
+Manage your Discord webhook URLs:
+- Click **+ Add** to save a new webhook
+- Each webhook shows: name, masked URL, Test/Edit/Delete buttons
+- Maximum 10 webhooks per user
+- URL must be a valid Discord webhook URL (`discord.com/api/webhooks/...`)
+- **Test** sends a test embed to verify the webhook works
+
+**2. Watched Channels**
+Assign webhooks to each channel the bot is monitoring:
+- Shows all channels added via the SOLUS Discord bot
+- Dropdown to assign a saved webhook to each channel
+- Status indicator: checkmark when assigned, "Synced" briefly after saving
+- **Bot forwarding** indicator (green checkmark + "Bot forwarding") appears when the server-side bot has forwarding active for that channel - this means orders forward even when SOLUS is closed
+- Click **Refresh** to reload the channel list
+
+**3. Auto-Forward**
+- Toggle to automatically forward new orders to assigned webhooks when SOLUS syncs
+- **Forward Declined/Cancelled** sub-toggle - include or exclude declined/cancelled orders
+- When enabled and a profile mapping exists, forwarded embeds include an @mention
+
+**4. Sync Settings**
+- **Last Sync** display showing time ago and order count
+- **Sync Now** button to manually sync Discord orders
+- **Refresh Images** to re-map product images to orders
+- **Clear Orders** to delete all Discord-source orders (red, requires confirmation)
+
+**5. Diagnostics**
+- Webhook status: shows count of saved webhooks or "None configured"
+- Discord link status: shows "Linked (username)" or "Not linked"
+
+**6. Recent Forward Log**
+- Audit trail of forwarded orders (up to 50 most recent shown, 200 stored)
+- Each entry shows: status icon (sent/skipped/failed), item name, profile, time ago
+- "@mentioned" badge when a Discord mention was included
+- **Clear** button to wipe the log
+
+### Server-Side Bot Forwarding
+
+When you assign a webhook to a channel in the Settings tab, SOLUS syncs the webhook URL to the server. The Discord bot then handles forwarding automatically:
+
+- **Orders forward instantly** when captured by the bot (no delay)
+- **Works with SOLUS closed** - the bot runs independently on the server
+- **@mention support** - if a profile mapping exists, the forwarded embed tags the Discord user
+- **Forwarded embed includes**: status (confirmed/declined/cancelled), retailer, item name, profile name, product image, and SOLUS branding
+- The bot's channel cache refreshes every 60 seconds, so new webhook assignments take effect within a minute
+
+### Auto-Sync (Discord Mode)
+
+When in Discord mode, SOLUS checks for new orders every 30 seconds:
+- If auto-sync is enabled and enough time has elapsed since the last sync (default: 15 minutes), it fetches new orders
+- New orders are auto-forwarded if the auto-forward toggle is on
+- A toast notification shows the count of new orders and forwards
+
+### Discord Webhook Sharing (Flex & Reports)
+
+Separately from ACO forwarding, you can share individual orders and reports to Discord:
+
+**Drop Flex:**
+1. Navigate to any retailer page
+2. Click the **Discord icon** on an order card
+3. A styled embed is sent to your configured webhook with item name, image, amount, status, and retailer
+
+**Report Share:**
+1. Generate a report from the Reports page
+2. Click **Share to Discord**
+3. An embed with key stats plus a PNG screenshot is sent to your webhook
+
+Configure your main webhook URL in **Settings > Reports**.
 
 ---
 
@@ -207,93 +403,153 @@ Each retailer has its own dedicated page with detailed order information.
 ### Supported Retailers
 - **Walmart** - Blue theme
 - **Target** - Red theme
-- **Pokemon Center** - Yellow theme
+- **Pokemon Center** - Yellow/Amber theme
 - **Sam's Club** - Navy theme
 - **Costco** - Red theme
-- **Best Buy** - Blue/Yellow theme
+- **Best Buy** - Blue theme
 
-### Page Features
+### Page Layout
 
-#### Statistics Grid
-Quick view of order counts and totals:
-- Confirmed / Cancelled / Shipped / Delivered
+Each retailer page has three view levels:
+
+#### Drops View (Landing)
+Orders are grouped by "drops" (order date). Each drop card shows:
+- Up to 3 product images
+- Item name previews (up to 4 items)
+- Account count
+- Status counts (confirmed/cancelled/shipped/delivered)
+- Stick rate percentage
+- Total spent for that drop
+- **Resync** button to re-fetch emails for that date
+- **Flex** button to create a visual drop card for sharing
+
+Click a drop to expand into the detail view.
+
+#### Items Grid
+Below the drops, an items grid shows each unique product:
+- Product image
+- Item name
+- Quantity ordered
+- Stick rate percentage
+- Total spend
+
+Click an item to filter the orders list to just that product.
+
+#### Orders List
+The full order list with sorting, filtering, and multiple view options.
+
+### Statistics Grid
+Quick view at the top of each retailer page:
+- Confirmed / Cancelled / Shipped / Delivered counts
 - Total Orders
 - Total Spent
 
-#### Pagination Info
-Above the order list, a **"Showing X of Y orders"** indicator is displayed so you always know how many orders are loaded versus the total available. This updates as you apply filters or search.
+### Pagination Info
+"Showing X of Y orders" indicator above the order list, updating as you filter or search.
 
-#### Search
-Search orders by:
-- Item name
-- Order ID
-- Email address
-- Date
+### Search
+Search orders by item name, order ID, amount, tracking number, or date.
 
-Press **/** to quickly jump to search.
+Press **/** to quickly jump to the search bar.
 
-#### Advanced Filters
+### Advanced Filters
 
-Click the **Advanced Filters** toggle button to expand a full filtering panel with the following options:
+Click the **Advanced Filters** toggle to expand the filtering panel:
 
-- **Date Range** - Start and end date pickers to narrow orders to a specific window
-- **Amount Range** - Min and max dollar amount fields to filter by order value
+- **Date Range** - Start and end date pickers
+- **Amount Range** - Min and max dollar amount
 - **Carrier Dropdown** - Filter by shipping carrier (UPS, FedEx, USPS, etc.)
-- **Status Checkboxes** - Check/uncheck Confirmed, Cancelled, Shipped, Delivered to show only the statuses you want
-- **Has Tracking Toggle** - Show only orders that have (or do not have) a tracking number
-- **Account / Email Filter** - Filter orders by the specific email account they were synced from
+- **Status Checkboxes** - Confirmed, Cancelled, Shipped, Delivered
+- **Has Tracking Toggle** - Show only orders with/without tracking
+- **Account / Email Filter** - Filter by email account
 
-When filters are active, a **badge** appears on the Advanced Filters button showing the count of active filters (e.g., "Filters (3)"). Click **Clear All Filters** to reset everything at once.
+When filters are active, a **badge** shows the count (e.g., "Filters (3)"). Click **Clear All Filters** to reset.
 
-Filters **persist per retailer** -- switching to another tab and back will keep your filters in place. They reset when you close the app.
+Filters **persist per retailer** - switching tabs and back keeps your filters. They reset when you close the app.
 
-#### Flex to Discord
+### View Modes
+Toggle between **Grid** and **List** view.
 
-Each order card includes a **Discord icon button**. Click it to share that specific order as a "drop flex" to your configured Discord webhook. The embed sent to Discord includes:
+**Column Toggles (List view):**
+- Item name
+- Email/Account
+- ETA
+- Shipping address
+- Tracking number
+- Per-unit price
 
+### Period Filter
+Filter orders by: All, 30 days, 60 days, 90 days.
+
+### Sorting
+Sort by: Date, Order ID, Amount, Status, Item Name. Click a column header to toggle ascending/descending.
+
+### Flex to Discord
+
+Each order card includes a **Discord icon button**. Click it to share that order as a "drop flex" embed. The embed includes:
 - Item name and image
 - Order amount and status
 - Retailer name
 - SOLUS logo branding
 
-Configure your Discord webhook URL in **Settings > Reports** before using this feature. See the [Discord Integration](#discord-integration) section for more details.
+### Bulk Operations
 
-#### Drops View
-Orders are grouped by "drops" (order date):
-- Drop date header
-- Product image grid
-- Quantity badges
-- Status counts per drop
-- Drop total spent
+**Multi-Select:**
+- Hold **Ctrl/Cmd** and click to select multiple drops
+- Use **Select All** checkbox to select all visible orders
+- A **floating action bar** appears at the bottom showing the count
 
-**Click a drop** to expand and see all items.
+**Bulk Actions:**
+- **Mark Delivered** - Mark all selected orders as delivered
+- **Export CSV** - Export selected orders to a CSV file
 
-#### Multi-Select
-Hold **Ctrl/Cmd** and click to select multiple drops for bulk actions.
+### Target-Specific Features
+
+Target retailer pages have additional features:
+- **Fetch Images** button on drops without product images (scrapes Target.com)
+- **Auto-Spread Images** - fills missing item images from other drops with the same product
+- **Clear Images** - removes fetched images (hover to reveal)
 
 ---
 
 ## Delivery Hub
 
-Track all your incoming packages in one place.
+Track all your incoming packages in one place. Available in IMAP mode.
 
-### Three Views
+### Four Tabs
 
-#### In Transit Tab
+#### In Transit
 Shows all packages currently on the way.
 
-**Quick Filters:**
-- **Today** - Arriving today
-- **This Week** - Arriving within 7 days
-- **In Transit** - All shipped orders
-- **Alerts** - Delivery issues
+**Summary Cards:**
+- **Today** - Packages arriving today (teal)
+- **This Week** - Arriving within 7 days (indigo)
+- **In Transit** - All shipped orders (yellow)
+- **Alerts** - Delivery issues (orange)
+
+Click any card to filter to that category.
 
 **View Modes:**
-- **Timeline** - Organized by delivery date
+- **Timeline** - Organized by delivery date (sections: Today, Tomorrow, This Week, Later, No ETA)
 - **By Address** - Grouped by shipping address
 - **By Retailer** - Grouped by store
 
-#### Recently Delivered Tab
+**Delivery Card Details:**
+- Retailer badge (W/T/P/S/C/B with retailer color)
+- Product image
+- Item name
+- Shipping address
+- Carrier and tracking number
+- ETA with visual formatting (arriving today/tomorrow/overdue)
+- **Track** button - opens carrier tracking in browser
+- **Mark Delivered** button
+- Expandable section with full order details
+
+**Alerts:**
+- **Stale Shipments** - Orders shipped 7+ days ago without delivery
+- **Delayed Orders** - Orders past their expected delivery date
+
+#### Recently Delivered
 View orders that have already arrived.
 
 Filter by: Last 7 Days, 30 Days, 90 Days, Year, All Time
@@ -301,23 +557,52 @@ Filter by: Last 7 Days, 30 Days, 90 Days, Year, All Time
 #### Calendar View
 Visual calendar showing deliveries by date.
 - Navigate months with arrows
-- Click any day to see deliveries
+- Up to 3 orders shown per day with item names
+- "+N more" indicator for busy days
+- Click any day to see full delivery details in a popup
 - **Today** button jumps to current date
+- Integrates with Live Track data for most accurate ETAs
+
+#### Live Track
+See [Live Track](#live-track) section below.
 
 ### Bulk Mark Delivered
 
-Select multiple shipped items at once and mark them all as delivered in a single action.
-
-1. **Checkboxes** appear next to each shipped item in the In Transit tab
-2. Use the **Select All** checkbox in the header to select every item at once
-3. When one or more items are selected, a **floating action bar** appears at the bottom of the screen
-4. The action bar shows the count of selected items (e.g., "12 items selected")
-5. Click the **Mark Delivered** button to mark all selected items as delivered
-
-This is especially useful after a large drop day when multiple packages arrive at once.
+1. **Checkboxes** appear next to each shipped item
+2. Use **Select All** to select everything
+3. A **floating action bar** shows the count of selected items
+4. Click **Mark Delivered** to mark all selected as delivered
 
 ### Address Linking
-In **By Address** view, drag and drop addresses to link them together. This is useful for jig addresses that should be grouped.
+In **By Address** view, drag and drop addresses to link them together. Useful for jig addresses that should be grouped.
+
+---
+
+## Live Track
+
+Real-time package tracking for FedEx shipments. Available in the Delivery Hub's Live Track tab.
+
+### How It Works
+
+Live Track uses a manual search approach to conserve API credits:
+
+1. Set your **date range** (defaults to last 30 days)
+2. Click **Search** to fetch live tracking data for all FedEx orders in that range
+3. Results display with real-time statuses, updated ETAs, and status descriptions
+
+### Status Filters
+Filter results by: All, In Transit, Out for Delivery, Delivered, Exception, Pending, No Data
+
+### Sorting
+Sort by: ETA (soonest/latest), Status, Retailer, Date (oldest/newest)
+
+### Status Mapping
+Live Track maps FedEx statuses to SOLUS statuses:
+- `DELIVERED` - marked as delivered
+- `IN_TRANSIT`, `OUT_FOR_DELIVERY`, `PICKED_UP` - shown as shipped/in transit
+
+### Cache
+Live Track data is cached locally. Clear the cache in **Settings** if results seem stale.
 
 ---
 
@@ -327,137 +612,185 @@ Deep dive into your ordering performance with comprehensive charts and insights.
 
 ### Summary Cards
 
-At the top of the Analytics page, four summary cards provide a quick snapshot:
+At the top of the Analytics page:
 - **Total Orders** - Combined order count for the selected period
 - **Confirmed** - Number of confirmed (non-cancelled) orders
 - **Total Spent** - Dollar amount across all confirmed orders
-- **Stick Rate** - Percentage of orders that were confirmed vs. total placed
+- **Stick Rate** - Percentage of orders confirmed vs. total placed
+
+### Sub-Tabs
+
+Analytics is divided into four sub-tabs:
+- **Overview** - Summary stats and main charts
+- **Trends** - Spending, stick rate, and cancel rate over time
+- **Patterns** - Ordering heatmap and carrier analytics
+- **Insights** - Top performers, worst performers, biggest drop days
 
 ### Retailer Filter Tabs
 
-Filter all analytics data by retailer using tabs at the top:
+Filter all analytics data by retailer:
 - **All** - Aggregate data across every retailer
-- **Walmart**
-- **Target**
-- **Pokemon Center**
-- **Sam's Club**
-- **Costco**
-- **Best Buy**
+- **Walmart**, **Target**, **Pokemon Center**, **Sam's Club**, **Costco**, **Best Buy**
 
 ### Period Filter
 - **7 Days**, **30 Days**, **90 Days**, **1 Year**, **All Time**
 
 ### Chart Toggle Bar
 
-Use the toggle bar to show or hide individual chart sections. This keeps the page clean when you only want to focus on certain metrics. Toggles are available for:
-- Spending
-- Stick Rate
-- Cancel Rate
-- Order Volume
-- Retailer Compare
-- Patterns
-- Carriers
-- Insights
+Use the toggle bar to show or hide individual chart sections:
+- Spending, Stick Rate, Cancel Rate, Order Volume, Retailer Compare, Patterns, Carriers, Insights
 
 ### Charts
 
-SOLUS v2.0 includes seven full charts:
-
 #### 1. Spending Over Time
-A **line chart** showing your daily or weekly spending over the selected period. When "All" retailers is selected, each retailer is color-coded with its own line so you can compare spending patterns across stores.
+**Line chart** showing daily/weekly spending. When "All" retailers is selected, each retailer gets its own color-coded line.
 
 #### 2. Stick Rate Trend
-A **line chart** tracking your stick rate (confirmed / total) over time, drawn in the app's accent color. Useful for spotting dips that may indicate account issues.
+**Line chart** tracking your stick rate (confirmed / total) over time in the app's accent color.
 
 #### 3. Cancel Rate Trend
-A **line chart** showing the daily cancellation rate over time. Helps identify days or periods where cancellation rates spike so you can investigate causes.
+**Line chart** showing daily cancellation rate in red. Helps identify spike patterns.
 
 #### 4. Order Volume
-A **stacked bar chart** showing order counts per day or week. Green bars represent confirmed orders and red bars represent cancelled orders. The stacked view makes it easy to see both volume and success at a glance.
+**Stacked bar chart** - green bars for confirmed, red for cancelled. Shows both volume and success rate at a glance.
 
 #### 5. Retailer Comparison
-A **horizontal bar chart** that only appears when the "All" retailer tab is selected. Compares total orders, stick rate, and spending across all retailers side by side.
+**Horizontal bar chart** (only visible when "All" retailers tab selected). Toggle between three metrics:
+- **Stick Rate** - confirmation percentage per retailer
+- **Orders** - total order count
+- **Spending** - total dollar amount
 
 #### 6. Ordering Patterns Heatmap
-A **heatmap** showing your order distribution by day of the week. Includes:
-- Per-retailer tabs to see patterns for each store individually
-- Color intensity based on order volume
+**Heatmap** showing order distribution by day of the week:
+- Per-retailer tabs to see patterns for each store
+- Color intensity based on volume
 - Peak drop day insights (e.g., "Your busiest day at Walmart is Tuesday")
 
 #### 7. Carrier Performance
-Three visualizations in one section:
-- **Doughnut chart** showing carrier distribution (what percentage of orders ship via UPS, FedEx, USPS, etc.)
-- **Bar chart** showing average delivery time per carrier in days
-- **Stats table** with detailed carrier metrics including total shipments, average transit time, and on-time percentage
+Three visualizations:
+- **Doughnut chart** - carrier distribution (UPS, FedEx, USPS, etc.)
+- **Bar chart** - average delivery time per carrier in days
+- **Stats table** - total shipments, average transit time, on-time percentage
 
 ### Period Comparison
 
-Click the **Compare** toggle to overlay the previous period's data as a dashed line on your Spending, Stick Rate, and Cancel Rate charts. For example, if you're viewing 30 Days, enabling Compare will overlay the prior 30-day period so you can see how your performance has changed.
+Click the **Compare** toggle to overlay the previous period's data as a dashed line on Spending, Stick Rate, and Cancel Rate charts. For example, viewing 30 Days with Compare enabled overlays the prior 30-day period.
 
 ### Performance Insights
 
-A dedicated insights panel showing your top and bottom performers:
-- **Top Items by Stick Rate** - Which products have the highest confirmation rate
+A dedicated panel showing your top and bottom performers:
+- **Top Items by Stick Rate** - Which products have the highest confirmation rate (min 3 orders)
 - **Top Items by Spend** - Where you're spending the most
-- **Top Items by Volume** - Your most-ordered products
+- **Top Items by Volume** - Most-ordered products
 - **Worst Performers** - Items with the highest cancellation rates
+- **Biggest Drop Days** - Dates with the most orders
+
+Clickable item names navigate directly to the retailer page with that item searched.
 
 ---
 
 ## Account Stats
 
-Analyze performance by individual email account or shipping address.
+Analyze performance by individual email account (IMAP mode) or Discord profile (Discord mode).
+
+The page title changes based on mode: **Account Stats** (IMAP) or **Profile Stats** (Discord).
 
 ### How to Use
 
-1. Select a **Retailer** (required - no "All" option)
-2. Select a **Time Period**
-3. View account performance cards
+1. Select a **Retailer** (or All)
+2. Select a **Time Period** (7D, 30D, 90D, All, or Custom date range)
+3. View account/profile performance cards
+
+### View Modes
+Toggle between **Grid** (cards) and **List** (rows) view.
 
 ### Metrics Per Account
-- Total orders
-- Stick rate percentage
-- Total spent
-- Success indicators
+
+Each card shows:
+- **Rank** - #1 (gold), #2 (silver), #3 (bronze)
+- **Email/Profile** (with editable nickname)
+- **Stick Rate %** with tier color and trend arrow (up/flat/down)
+- **Tier Label** - Diamond, Perfect, Good, Okay, or At Risk
+- **Benchmark** - comparison vs tier average ("vs tier avg: +5.2%")
+- **Score** badge (0-100, color-coded)
+- **Mini outcome bar** - visual confirmed/total ratio
+- **Detailed metrics**: confirmed/total orders, total spent, avg order value, last order date
+- Expandable mini order list
+
+**Discord Mode extras:**
+- Bot type badge
+- Decline count and decline rate
+- Health score (if declines > 0)
+
+**Pokemon Center extras:**
+- Base address grouping
+- Variant count and email count
+- Expandable variants showing address variant, email, order count, spent
+
+### Tier System
+
+| Tier | Stick Rate | Color | Requirements |
+|------|-----------|-------|--------------|
+| Diamond | 100% | Ice-blue glow | 3+ orders AND 100% stick |
+| Perfect | 80%+ | Purple | - |
+| Good | 60%+ | Jade green | - |
+| Okay | 40%+ | Orange | - |
+| At Risk | Below 40% | Red | - |
 
 ### Account Risk Score
 
-Each account receives a composite **Risk Score from 0 to 100** that gives you an at-a-glance assessment of account health. The score is calculated from five weighted factors:
+Each account receives a composite **Risk Score from 0 to 100**:
 
 | Factor | Weight | Description |
 |--------|--------|-------------|
 | Stick Rate | 40% | Higher stick rate = higher score |
-| Order Volume Confidence | 25% | More orders = more reliable score |
+| Order Volume Confidence | 25% | More orders = more reliable (log scale, 20 orders = full) |
 | Recent Trend | 20% | Improving stick rate boosts score |
-| Cancellation Pattern | 10% | Sporadic cancels score better than streaks |
-| Carrier Diversity | 5% | Using multiple carriers scores slightly higher |
+| Decline Rate | 15% | High decline rate penalizes score |
 
 **Score Color Coding:**
-- **Green (80-100)** - Healthy account, performing well
-- **Yellow (60-79)** - Acceptable, monitor for changes
-- **Orange (40-59)** - At risk, consider reducing volume
+- **Green (80-100)** - Healthy account
+- **Yellow (60-79)** - Acceptable, monitor
+- **Orange (40-59)** - At risk, reduce volume
 - **Red (0-39)** - High risk, investigate or retire
 
-The Risk Score is available as a **sort option** so you can quickly surface your most at-risk accounts.
+### Recommendations
 
-### Benchmark vs Tier
+Accounts with 5+ orders receive actionable recommendations:
+- **Performing** (green) - Stick rate 80%+, decline rate < 10%
+- **Needs Attention** (yellow) - Stick rate 70-80%, decline 10-20%, or inactive 14+ days
+- **Consider Retiring** (red) - Stick rate < 50%, decline 20%+
+- Accounts with < 5 orders show "Need more data"
 
-Each account card shows how it compares to the average for its tier. A benchmark indicator displays the difference, for example:
+### Summary Cards
 
-- **"vs tier avg: +5.2%"** with a green up arrow (performing above tier average)
-- **"vs tier avg: -3.1%"** with a red down arrow (performing below tier average)
+At the top of the page:
+- Total Accounts/Profiles count
+- Base Addresses (Pokemon Center only)
+- Average Stick Rate (with delta vs prior period)
+- Total Spent (IMAP) or Total Declines (Discord)
+- Diamond/Perfect account counts
+- Need Attention and Consider Retiring counts
 
-This helps you identify which accounts are outperforming or underperforming relative to similar accounts.
+### Tier Distribution Bar
+
+A visual bar showing the count of accounts in each tier, giving you a quick picture of overall account health.
 
 ### Sorting Options
 - Stick Rate (High to Low)
 - Order Count (High to Low)
 - Total Spent (High to Low)
 - Account Name (A-Z)
-- Risk Score (Low to High / High to Low)
+- Risk Score (High to Low / Low to High)
 
 ### Advanced Filters
-Click the filter icon to filter by stick rate ranges (e.g., only show accounts with 80%+ stick rate).
+
+Click the filter icon to open the advanced filter modal:
+- **Minimum Stick Rate** slider (0-100%)
+- **Minimum Orders** slider
+- **Date Range** picker
+- **Tier Chips** - filter to specific tiers
+- Filter badge shows active filter count
 
 ---
 
@@ -465,111 +798,61 @@ Click the filter icon to filter by stick rate ranges (e.g., only show accounts w
 
 Generate, export, and share detailed reports from your order data.
 
-### Accessing Reports
-
-The Reports page is accessible from the **sidebar navigation**. You can also quick-generate reports directly from the Dashboard or Analytics pages using the report icon button.
-
 ### Report Templates
 
 Save reusable report configurations so you can generate the same report with one click.
 
 **Creating a Template:**
 1. Click **+ New Template**
-2. Give it a name (e.g., "Weekly Walmart Summary" or "Monthly Full Report")
+2. Give it a name (e.g., "Weekly Walmart Summary")
 3. Select which sections to include
 4. Choose the time period (7D, 30D, 90D, 1Y, All)
-5. Optionally set a retailer filter (All or a specific retailer)
+5. Optionally set a retailer filter
 6. Save the template
 
-Templates are saved and available for reuse at any time.
-
 ### Available Report Sections
-
-When building a template, choose from the following sections to include:
 
 - **Summary Stats** - Total orders, confirmed, cancelled, stick rate, total spent
 - **Retailer Breakdown** - Per-retailer order counts and spend
 - **Top Performers** - Best items by stick rate, spend, and volume
 - **Account Scores** - Risk scores and stick rates per account
 - **Carrier Stats** - Carrier distribution and average delivery times
-- **Stick Rate Trend** - Line chart of stick rate over the selected period
+- **Stick Rate Trend** - Line chart over the selected period
 - **Spending Chart** - Line chart of spending over time
 
 ### Generating Reports
 
-Click **Generate** on any saved template. SOLUS will compile the data and present a **styled PDF preview** in-app. The preview matches SOLUS branding with your accent color and includes all selected sections with formatted tables and charts.
+Click **Generate** on any saved template. SOLUS compiles the data and presents a **styled PDF preview** in-app matching SOLUS branding.
 
 ### Export Options
 
-From the report preview, you have four export options:
-
 | Option | Description |
 |--------|-------------|
-| **Download PDF** | Save the report as a styled PDF file to your computer |
-| **Copy to Clipboard** | Copies a PNG screenshot of the report to your clipboard for quick pasting |
-| **Export CSV** | Downloads raw report data as a CSV file for spreadsheet use |
-| **Export JSON** | Downloads structured report data as JSON for programmatic use |
+| **Download PDF** | Save the report as a styled PDF file |
+| **Copy to Clipboard** | Copies a PNG screenshot for quick pasting |
+| **Export CSV** | Downloads raw report data as CSV for spreadsheets |
+| **Export JSON** | Downloads structured report data as JSON |
+
+### CSV Export Settings
+
+Customize which columns appear in CSV exports. Go to **Settings > Data** to toggle columns:
+- Date, Retailer, Order ID, Item, Quantity, Amount, Per-unit Cost, Tracking, Carrier, Tracking URL, Email, Status, Address, ETA
+
+### PDF Receipt Export
+
+Export individual order receipts as PDF files:
+1. Set a **PDF Save Folder** in Settings > Data
+2. Click **Export PDFs** to batch-export order receipts
+3. Confirmation required for batches over 50
 
 ### Share to Discord
 
-Click the **Share to Discord** button to send the report to your configured Discord webhook. The message includes:
-
-- An embed with key stats fields (order count, stick rate, total spent, top item)
-- A PNG screenshot of the full report as an attachment
-- SOLUS branding in the embed footer
+Click **Share to Discord** to send the report to your webhook. The message includes:
+- An embed with key stats (order count, stick rate, total spent, top item)
+- A PNG screenshot as an attachment
+- SOLUS branding
 
 Configure your webhook in **Settings > Reports** before using this feature.
-
----
-
-## Discord Integration
-
-SOLUS integrates with Discord via webhooks to let you share order wins and reports with your group.
-
-### Setup
-
-1. Go to **Settings > Reports** tab
-2. Paste your Discord webhook URL in the **Webhook URL** field
-3. Both `discord.com` and `discordapp.com` webhook URLs are supported
-4. Click **Test Webhook** to send a test message and verify the connection
-5. Save your settings
-
-### Two Ways to Share
-
-#### Drop Flex
-
-Share individual orders as a flex to your Discord channel.
-
-1. Navigate to any retailer page
-2. Find the order you want to share
-3. Click the **Discord icon button** on the order card
-4. An embed is sent to your webhook with:
-   - Item name and image
-   - Order amount
-   - Order status
-   - Retailer name
-   - SOLUS logo
-
-#### Report Share
-
-Share full analytics reports with your group.
-
-1. Generate a report from the Reports page
-2. Click **Share to Discord**
-3. An embed is sent with:
-   - Order count
-   - Stick rate
-   - Total spent
-   - Top item
-   - PNG screenshot of the report as an attachment
-
-### Embed Format
-
-All Discord embeds follow a consistent format with:
-- Purple accent color sidebar (or your configured accent color)
-- SOLUS logo as the embed thumbnail
-- Structured fields for key metrics
-- Timestamp of when the share was sent
 
 ---
 
@@ -582,7 +865,7 @@ Track your inventory, costs, and profits.
 #### Summary Cards
 - **Market Value** - Current total value
 - **Cost Basis** - What you paid
-- **Profit/Loss** - Green when positive!
+- **Profit/Loss** - Green when positive
 - **ROI %** - Return on investment
 - **Item Count** - Total unique items
 
@@ -592,12 +875,20 @@ Track your inventory, costs, and profits.
 1. Click **+ Add Item**
 2. Enter SKU, name, quantity, cost per unit
 3. Optionally set current market value
-4. Click Save
+4. Optionally link to a TCGPlayer URL for price tracking
+5. Click Save
 
 **Import from Orders:**
 1. Click **Import from Orders**
-2. Select items from your synced orders
-3. Items are added with order price as cost basis
+2. Select a retailer to see orders grouped by drop date
+3. Select items to add
+4. Items are added with order price as cost basis
+
+#### View Modes
+Toggle between Grid and List view. Sort by name, quantity, investment, or date added.
+
+#### Search
+Filter inventory by item name or set name in real-time.
 
 #### Item Details
 Click any item to see:
@@ -626,7 +917,7 @@ Track items you've sold.
 5. Add date and optional notes
 6. Click Save
 
-Your profit is automatically calculated!
+Your profit is automatically calculated.
 
 ---
 
@@ -635,11 +926,25 @@ Your profit is automatically calculated!
 Monitor TCGPlayer prices for your trading card inventory.
 
 ### Adding Items
+
+**By URL:**
 1. Click **+ Add Item**
-2. Paste a TCGPlayer URL or enter product details
-3. Item is added and price fetched
+2. Paste a TCGPlayer URL
+3. Item is added and price fetched automatically
+
+**By Search:**
+1. Click **Search by Name**
+2. Type a product name (500ms debounce)
+3. Up to 20 candidates shown with images, set names, market prices, and confidence scores
+4. Select a match to add or link to an existing inventory item
 
 ### Price Monitoring
+
+Items with TCGPlayer links automatically show:
+- Current market price
+- Price trend indicator (up/down)
+- Quantity held
+- Last refresh time
 
 #### Auto-Refresh Options
 | Interval | Best For |
@@ -656,80 +961,75 @@ For heavy monitoring, set up proxies to avoid rate limits:
 3. Paste your proxies (one per line)
 4. Select the list as active
 
-### Price Display
-Each item shows:
-- Current market price
-- Price trend indicator (up/down)
-- Quantity held
-- Last refresh time
+### TCG Analytics
+View price change analytics:
+- 1-day change
+- 7-day change
+- 30-day change
 
 ---
 
 ## Settings
 
-Configure SOLUS to work your way.
+Configure SOLUS to work your way. Settings are organized into tabs.
 
 ### General Tab
 
-#### Preferences
-- **Auto-sync on Launch** - Automatically sync recent emails when app starts
-- **Light Mode** - Switch between dark and light themes
-- **Flex PNG Folder** - Choose where to save flex screenshots
+#### Data Mode
+Switch between IMAP and Discord modes. See [Data Modes](#data-modes) for details.
+
+#### Theme
+Toggle between **Dark** and **Light** mode. Stored locally and applied instantly.
 
 #### Accent Colors
+Personalize the look of SOLUS:
 
-Personalize the look of SOLUS by choosing an accent color in **Settings > General**.
+**Preset Colors:** Purple (default), Blue, Green, Red, Orange, Pink
 
-**Preset Colors:**
-- Purple (default)
-- Blue
-- Green
-- Red
-- Orange
-- Pink
+**Custom Color:** Enter any hex color code (e.g., `#FF6B35`).
 
-**Custom Color:** Enter any hex color code (e.g., `#FF6B35`) for a fully custom accent.
+The accent color applies across all UI elements including buttons, charts, sidebar highlights, and Discord embeds.
 
-The accent color is applied across all UI elements including buttons, active states, chart colors, sidebar highlights, and Discord embed sidebars.
+#### Auto-Sync on Launch
+Automatically sync recent emails when the app starts.
 
-#### Sync Settings
-- **Auto-Resume** - Automatically retry failed syncs (1-60 minutes, default: 1 min)
+#### Auto-Resume
+Automatically retry paused syncs (1-60 minutes, default: 1 minute). Retries up to 3 times.
+
+#### Flex PNG Folder
+Choose where to save flex card screenshots.
 
 #### Walkthrough
-- **Show Walkthrough** - Click this button to replay the 5-step onboarding tutorial at any time
+Click **Show Walkthrough** to replay the onboarding tutorial.
 
 ### License Tab
 View your license details:
-- License key
-- Plan type
-- Status
-- Expiration date
-- Days remaining
-
-Click **Disconnect License** to log out.
-
-### Reports Tab
-
-Configure report generation and Discord sharing.
-
-- **Discord Webhook URL** - Paste your webhook URL for Discord integration
-- **Test Webhook** - Send a test message to verify the connection
-- **Report Templates** - Manage your saved report templates
-- **PDF Export Settings** - Configure styling and layout preferences for generated PDFs
+- License key (masked)
+- Plan type and status
+- Activation and expiration dates
+- Days remaining (color-coded)
+- **Disconnect License** button
 
 ### Data Tab
 
-#### Statistics
-- Total Accounts
-- Total Orders
+#### Export
+- **Export JSON** - Download your data as a backup
+- **Export CSV** - Download orders with configurable columns
+- **Export PDFs** - Batch export order receipts (set save folder first)
 
-#### Actions
-- **Export** - Download your data as backup
-- **Clear Orders** - Remove orders by timeframe (7, 14, 30, 60, 90 days or all)
-- **Clear All Data** - Full reset (removes everything)
+#### Date Range
+Set from/to dates to scope exports to a specific window.
 
-#### Dev Tools
-- **Import EML** - Test email parsing with .eml files
+#### Export Column Selection
+Toggle which columns appear in CSV exports.
+
+#### Import
+- **Import CSV** - Import accounts from a CSV file
+- **Import EML** (Dev Tools) - Test email parsing with raw .eml files
+
+#### Clear Data
+- **Clear Orders** - Remove orders by timeframe (7, 14, 30, 60, 90 days, or all)
+- **Clear All Data** - Full reset with double confirmation
 
 ### Jig Detection Tab
 
@@ -737,9 +1037,9 @@ Group orders from jigged addresses together.
 
 #### Built-in Patterns
 Automatically decodes common leetspeak:
-- `1` → `i`, `3` → `e`, `0` → `o`
-- `@` or `4` → `a`, `$` or `5` → `s`
-- `7` → `t`, `8` → `b`, `9` → `g`
+- `1` to `i`, `3` to `e`, `0` to `o`
+- `@` or `4` to `a`, `$` or `5` to `s`
+- `7` to `t`, `8` to `b`, `9` to `g`
 
 #### Custom Patterns
 Add your own substitutions:
@@ -755,7 +1055,15 @@ Paste AYCD jig expressions:
 ```
 
 #### Manual Linking
-Link addresses manually by dragging in Delivery Hub > By Address view.
+Link addresses manually by dragging in Delivery Hub > By Address view. View and unlink addresses in this settings tab.
+
+### Reports Tab
+- **Discord Webhook URL** - Paste your webhook for Discord sharing
+- **Test Webhook** - Send a test message
+- **Report Templates** - Manage saved templates
+
+### SKU Overrides
+Map product names to custom SKU identifiers. Merged with built-in mappings. Useful for normalizing item names across different email formats.
 
 ---
 
@@ -765,6 +1073,8 @@ Link addresses manually by dragging in Delivery Hub > By Address view.
 | Key | Action |
 |-----|--------|
 | `/` | Jump to search (on retailer pages) |
+| `Escape` | Close modals or clear search |
+| `Enter` | Activate license, save edits, trigger searches |
 | `Ctrl/Cmd + Click` | Multi-select drops |
 
 ### Best Practices
@@ -781,11 +1091,17 @@ Link addresses manually by dragging in Delivery Hub > By Address view.
 
 6. **Check Analytics Weekly** - Monitor trends to optimize your buying strategy.
 
-7. **Use Discord Webhooks** - Share your wins and reports with your group. Set up a webhook in Settings > Reports and use the flex button on order cards or the share button on reports.
+7. **Use Discord Webhooks** - Share your wins and reports with your group.
 
-8. **Customize Your Dashboard** - Hide retailer cards you don't use and focus on the stores that matter to your workflow. Click the gear icon on the dashboard to toggle cards on and off.
+8. **Customize Your Dashboard** - Hide retailer cards you don't use. Click the gear icon to toggle.
 
-9. **Use Report Templates** - Create templates for your weekly or monthly check-ins. Generate them with one click and share to Discord or export as PDF for record-keeping.
+9. **Use Report Templates** - Create templates for weekly or monthly reports. Generate with one click and share to Discord or export as PDF.
+
+10. **Set Up Server-Side Forwarding** (Discord Mode) - Assign webhooks to watched channels in the ACO Panel Settings. The bot forwards orders automatically, even when SOLUS is closed.
+
+11. **Map Your Profiles** (Discord Mode) - Link profile names to Discord user IDs in the ACO Panel Users tab. Forwarded orders will @mention the mapped user.
+
+12. **Use Live Track** - Check real-time FedEx tracking status for your packages in the Delivery Hub's Live Track tab.
 
 ### Troubleshooting
 
@@ -793,6 +1109,7 @@ Link addresses manually by dragging in Delivery Hub > By Address view.
 - Check date range includes the order dates
 - Try "Rescue from Spam" - emails might be filtered
 - Verify app password is correct
+- Check the Sync Log for detailed error messages
 
 **Orders showing wrong status?**
 - Re-sync to pull latest updates
@@ -801,12 +1118,26 @@ Link addresses manually by dragging in Delivery Hub > By Address view.
 **High cancellation rate?**
 - Check Account Stats to identify problematic accounts/addresses
 - Review jig detection settings
-- Look at the Account Risk Score to surface high-risk accounts quickly
+- Look at the Account Risk Score to surface high-risk accounts
+
+**Discord forwarding not working?**
+- Re-assign the webhook in the ACO Panel Settings (change to None, then back to your webhook)
+- Wait 60 seconds for the bot to pick up the new assignment
+- Check that you see "Bot forwarding" indicator next to the channel
+- Verify the webhook URL is still valid with the Test button
+
+**Profile @mentions not tagging?**
+- Ensure the profile name matches exactly (case-insensitive)
+- Wait 5 minutes after adding a new mapping (bot caches mappings)
+- Verify the Discord User ID is correct (17-20 digits)
 
 **Charts not loading?**
-- Make sure the Analytics page has fully loaded before interacting with charts
-- Try switching to a different tab and then switching back
-- Check the DevTools console (Ctrl+Shift+I) for any error messages
+- Try switching to a different tab and back
+- Make sure enough data exists for the selected period
+
+**Live Track showing stale data?**
+- Clear the cache in Settings
+- Re-run the search with your date range
 
 ---
 
@@ -822,4 +1153,4 @@ Need help? Have feedback?
 
 ---
 
-*SOLUS v2.0 - Built for resellers, by resellers.*
+*SOLUS v3.0 - Built for resellers, by resellers.*

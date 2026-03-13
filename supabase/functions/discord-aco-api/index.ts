@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
       case 'generate-token':
         return handleGenerateToken(licenseKey)
       case 'sync-orders':
-        return handleSyncOrders(licenseKey)
+        return handleSyncOrders(licenseKey, body)
       case 'get-link-status':
         return handleGetLinkStatus(licenseKey)
       case 'unlink':
@@ -56,6 +56,8 @@ Deno.serve(async (req) => {
         return handleDeleteProfileMapping(licenseKey, body)
       case 'save-channel-forward':
         return handleSaveChannelForward(licenseKey, body)
+      case 'reset-sync':
+        return handleResetSync(licenseKey)
       default:
         return errorResponse('Unknown action: ' + action, 404)
     }
@@ -144,13 +146,20 @@ async function handleGenerateToken(licenseKey: string) {
 }
 
 // ── sync-orders: Fetch unfetched orders and delete them from relay ──
-async function handleSyncOrders(licenseKey: string) {
-  // Get unfetched orders
-  const { data: rows, error } = await supabase
+async function handleSyncOrders(licenseKey: string, body: any) {
+  const fullResync = body?.fullResync === true
+
+  // Get orders — either unfetched only, or all (for full resync after data clear)
+  let query = supabase
     .from('discord_orders')
     .select('*')
     .eq('license_key', licenseKey)
-    .is('fetched_at', null)
+
+  if (!fullResync) {
+    query = query.is('fetched_at', null)
+  }
+
+  const { data: rows, error } = await query
 
   if (error) return errorResponse(error.message, 500)
 
@@ -158,12 +167,12 @@ async function handleSyncOrders(licenseKey: string) {
     return jsonResponse({ orders: [] })
   }
 
-  // Delete fetched rows from relay
+  // Mark rows as fetched (instead of deleting, so re-sync after data clear can recover)
   const messageIds = rows.map((r: any) => r.message_id).filter(Boolean)
   if (messageIds.length > 0) {
     await supabase
       .from('discord_orders')
-      .delete()
+      .update({ fetched_at: new Date().toISOString() })
       .in('message_id', messageIds)
   }
 
@@ -338,6 +347,23 @@ async function handleSaveChannelForward(licenseKey: string, body: any) {
   if (updateErr) return errorResponse(updateErr.message, 500)
 
   return jsonResponse({ success: true })
+}
+
+// ── reset-sync: Clear fetched_at so all orders come back as unfetched ──
+async function handleResetSync(licenseKey: string) {
+  const { data, error: countErr } = await supabase
+    .from('discord_orders')
+    .select('id', { count: 'exact' })
+    .eq('license_key', licenseKey)
+
+  const { error } = await supabase
+    .from('discord_orders')
+    .update({ fetched_at: null })
+    .eq('license_key', licenseKey)
+
+  if (error) return errorResponse(error.message, 500)
+
+  return jsonResponse({ success: true, resetCount: data?.length || 0 })
 }
 
 // ── Helper: generate random token ──

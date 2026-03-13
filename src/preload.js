@@ -227,6 +227,7 @@ contextBridge.exposeInMainWorld('api', {
   getDiscordLinkStatus: () => ipcRenderer.invoke('get-discord-link-status'),
   unlinkDiscord: () => ipcRenderer.invoke('unlink-discord'),
   clearDiscordOrders: () => ipcRenderer.invoke('clear-discord-orders'),
+  resetDiscordSync: () => ipcRenderer.invoke('reset-discord-sync'),
   relinkDiscordImages: () => ipcRenderer.invoke('relink-discord-images'),
 
   // SKU Overrides

@@ -1,1299 +1,1895 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SOLUS User Guide</title>
-  <style>
-    :root {
-      --primary: #8b5cf6;
-      --primary-light: #a78bfa;
-      --primary-dark: #7c3aed;
-      --bg: #0f0f0f;
-      --bg-card: #1a1a1a;
-      --bg-elevated: #252525;
-      --text: #ffffff;
-      --text-muted: #a0a0a0;
-      --border: #333;
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --error: #ef4444;
-      --info: #3b82f6;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOLUS User Guide v4.0</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+  :root {
+    --accent: #a78bfa;
+    --accent-dim: rgba(167,139,250,0.12);
+    --accent-dark: #7c3aed;
+    --bg-dark: #0f1117;
+    --bg-card: #181a24;
+    --bg-section: #1e2030;
+    --text: #e2e4eb;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+    --border: #2a2d3e;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --cyan: #06b6d4;
+    --walmart: #0071dc;
+    --target: #cc0000;
+    --pokecenter: #f59e0b;
+    --samsclub: #4a90d9;
+    --costco: #e31837;
+    --bestbuy: #0046be;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg-dark);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Print / PDF Styles - Dark theme preserved */
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    body { background: var(--bg-dark) !important; color: var(--text) !important; font-size: 11pt; margin: 0; padding: 0; }
+
+    /* Cover page - fill exactly one printed page with gradient background */
+    .cover-page {
+      page-break-after: always;
+      min-height: 100vh !important;
+      height: 100vh !important;
+      padding: 60px 40px !important;
+      overflow: hidden !important;
     }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.7;
-      font-size: 16px;
+    /* TOC - constrain all 19 cards to one page */
+    .toc-page { page-break-after: always; padding: 16px 0 8px; }
+    .toc-page h2 { font-size: 18px; margin-bottom: 8px; }
+    .toc-grid {
+      gap: 3px;
+      grid-template-columns: repeat(4, 1fr) !important;
     }
+    .toc-card { padding: 4px 8px; border-radius: 4px; }
+    .toc-card .toc-num { margin-bottom: 0; font-size: 7px; line-height: 1.1; }
+    .toc-card .toc-label { font-size: 9px; line-height: 1.2; }
+    .toc-card .toc-desc { font-size: 7px; margin-top: 1px; line-height: 1.2; }
 
-    .container { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
+    /* Sections - flow naturally, no forced page breaks */
+    section { page-break-before: auto; padding: 16px 0 8px; }
 
-    .header {
-      text-align: center;
-      padding: 60px 0;
-      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, var(--primary-light) 100%);
-      border-radius: 20px;
-      margin-bottom: 48px;
-    }
-
-    .header h1 { font-size: 3rem; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.02em; }
-    .header .version { font-size: 1.1rem; opacity: 0.9; font-weight: 500; }
-    .header .tagline { font-size: 1.2rem; opacity: 0.8; margin-top: 8px; }
-
-    .toc {
-      background: var(--bg-card);
-      border-radius: 16px;
-      padding: 32px;
-      margin-bottom: 48px;
-      border: 1px solid var(--border);
-    }
-
-    .toc h2 { font-size: 1.5rem; margin-bottom: 20px; color: var(--primary-light); }
-    .toc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 32px; }
-
-    .toc a {
-      color: var(--text);
-      text-decoration: none;
-      padding: 8px 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: color 0.2s;
-    }
-
-    .toc a:hover { color: var(--primary-light); }
-
-    .toc-num {
-      background: var(--primary);
-      color: white;
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.85rem;
-      font-weight: 600;
-    }
-
-    .section { margin-bottom: 64px; }
-
+    /* Section headers - keep with following content */
     .section-header {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: 2px solid var(--border);
+      page-break-after: avoid; break-after: avoid;
+      page-break-inside: avoid; break-inside: avoid;
+      margin-bottom: 10px; padding: 16px 20px; border-radius: 10px;
     }
+    .section-header .section-num { font-size: 9px; margin-bottom: 2px; }
+    .section-header h2 { font-size: 20px; margin-bottom: 2px; }
+    .section-header p { font-size: 11px; }
 
-    .section-num {
-      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
-      color: white;
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.3rem;
-      font-weight: 700;
-    }
+    h3 { margin: 16px 0 8px; font-size: 15px; page-break-after: avoid; break-after: avoid; }
 
-    .section-header h2 { font-size: 1.8rem; font-weight: 600; }
+    /* Content blocks - avoid splitting across pages */
+    .feature-card { break-inside: avoid; page-break-inside: avoid; margin-bottom: 10px; }
+    .step-card { break-inside: avoid; page-break-inside: avoid; margin-bottom: 6px; }
+    .tip-box { break-inside: avoid; page-break-inside: avoid; }
+    .warning-box { break-inside: avoid; page-break-inside: avoid; }
+    .mode-grid { break-inside: avoid; page-break-inside: avoid; }
+    table { break-inside: avoid; page-break-inside: avoid; }
+    .two-col { break-inside: avoid; page-break-inside: avoid; }
 
-    .subsection { margin-bottom: 32px; }
+    .guide-container { max-width: 100%; padding: 0 20px; }
+  }
 
-    .subsection h3 {
-      font-size: 1.3rem;
-      font-weight: 600;
-      margin-bottom: 16px;
-      color: var(--primary-light);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+  /* Cover Page */
+  .cover-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: linear-gradient(160deg, #0f1117 0%, #1a1030 50%, #0f1117 100%);
+    padding: 60px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover-page::before {
+    content: '';
+    position: absolute;
+    top: -200px; right: -200px;
+    width: 600px; height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(167,139,250,0.08) 0%, transparent 70%);
+  }
+  .cover-page::after {
+    content: '';
+    position: absolute;
+    bottom: -200px; left: -200px;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,58,237,0.06) 0%, transparent 70%);
+  }
+  .cover-logo {
+    font-size: 72px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #a78bfa, #7c3aed);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    position: relative;
+    z-index: 1;
+  }
+  .cover-subtitle {
+    font-size: 18px;
+    color: var(--text-secondary);
+    margin-bottom: 48px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    position: relative;
+    z-index: 1;
+  }
+  .cover-title {
+    font-size: 38px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 12px;
+    position: relative;
+    z-index: 1;
+  }
+  .cover-accent { color: var(--accent); }
+  .cover-version {
+    font-size: 15px;
+    color: var(--text-muted);
+    margin-top: 48px;
+    position: relative;
+    z-index: 1;
+  }
+  .cover-divider {
+    width: 80px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+    border-radius: 2px;
+    margin: 32px auto;
+    position: relative;
+    z-index: 1;
+  }
 
-    .subsection h3::before {
-      content: '';
-      width: 4px;
-      height: 24px;
-      background: var(--primary);
-      border-radius: 2px;
-    }
+  /* Main Content */
+  .guide-container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 40px;
+  }
 
-    p { margin-bottom: 16px; color: var(--text-muted); }
+  /* TOC */
+  .toc-page { padding: 80px 0 60px; }
+  .toc-page h2 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 32px;
+    color: var(--accent);
+  }
+  .toc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .toc-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+  .toc-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(167,139,250,0.1);
+  }
+  .toc-card .toc-num {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .toc-card .toc-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .toc-card .toc-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
 
-    .card {
-      background: var(--bg-card);
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 20px;
-      border: 1px solid var(--border);
-    }
+  /* Sections */
+  section { padding: 64px 0 40px; }
+  .section-header {
+    background: linear-gradient(135deg, var(--bg-card), var(--bg-section));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 32px;
+  }
+  .section-header .section-num {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .section-header h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .section-header p { color: var(--text-secondary); font-size: 14px; }
 
-    .card-title {
-      font-size: 1.1rem;
-      font-weight: 600;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+  h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 32px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h4 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 16px 0 8px;
+  }
 
-    .card-icon { font-size: 1.4rem; }
+  /* Feature Cards */
+  .feature-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+  .feature-card h4 { margin-top: 0; margin-bottom: 8px; color: var(--text); font-size: 15px; }
+  .feature-card p { color: var(--text-secondary); font-size: 13px; margin-bottom: 8px; }
+  .feature-card ul { padding-left: 20px; color: var(--text-secondary); font-size: 13px; }
+  .feature-card li { margin-bottom: 4px; }
+  .feature-card li strong { color: var(--text); }
 
-    .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 20px 0; }
+  /* Step Cards */
+  .step-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .step-content h4 { margin-top: 2px; color: var(--text); }
+  .step-content p { color: var(--text-secondary); font-size: 13px; }
 
-    .feature-item {
-      background: var(--bg-elevated);
-      border-radius: 10px;
-      padding: 16px;
-      border: 1px solid var(--border);
-    }
+  /* Tip / Warning Boxes */
+  .tip-box {
+    background: rgba(167,139,250,0.08);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .tip-box .tip-label { font-weight: 600; color: var(--accent); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+  .tip-box p { font-size: 13px; color: var(--text-secondary); }
+  .warning-box {
+    background: rgba(245,158,11,0.08);
+    border-left: 4px solid var(--yellow);
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .warning-box .tip-label { font-weight: 600; color: var(--yellow); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+  .warning-box p { font-size: 13px; color: var(--text-secondary); }
 
-    .feature-item h4 {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; background: var(--bg-section); color: var(--text); font-weight: 600; border-bottom: 2px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
 
-    .feature-item p { font-size: 0.9rem; margin: 0; }
+  /* Status Badges */
+  .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-yellow { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .badge-cyan { background: rgba(6,182,212,0.15); color: var(--cyan); }
+  .badge-purple { background: rgba(167,139,250,0.15); color: var(--accent); }
 
-    .steps { margin: 20px 0; }
+  .kbd {
+    display: inline-block; padding: 2px 8px; background: var(--bg-section);
+    border: 1px solid var(--border); border-radius: 4px;
+    font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: 12px; color: var(--text);
+  }
 
-    .step { display: flex; gap: 16px; margin-bottom: 20px; }
+  .retailer-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  .dot-walmart { background: var(--walmart); }
+  .dot-target { background: var(--target); }
+  .dot-pokecenter { background: var(--pokecenter); }
+  .dot-samsclub { background: var(--samsclub); }
+  .dot-costco { background: var(--costco); }
+  .dot-bestbuy { background: var(--bestbuy); }
 
-    .step-num {
-      background: var(--primary);
-      color: white;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      flex-shrink: 0;
-    }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
 
-    .step-content h4 { font-size: 1.05rem; font-weight: 600; margin-bottom: 6px; }
-    .step-content p { margin: 0; font-size: 0.95rem; }
+  code {
+    background: var(--bg-section); padding: 2px 6px; border-radius: 4px;
+    font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: 12px; color: var(--accent);
+  }
 
-    ul, ol { margin: 16px 0 16px 24px; color: var(--text-muted); }
-    li { margin-bottom: 8px; }
-    li strong { color: var(--text); }
-
-    .callout {
-      border-radius: 10px;
-      padding: 16px 20px;
-      margin: 20px 0;
-      display: flex;
-      gap: 14px;
-      align-items: flex-start;
-    }
-
-    .callout-icon { font-size: 1.3rem; flex-shrink: 0; }
-    .callout-content h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
-    .callout-content p { margin: 0; font-size: 0.9rem; }
-
-    .callout.tip { background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); }
-    .callout.tip .callout-icon { color: var(--primary-light); }
-
-    .callout.warning { background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); }
-    .callout.warning .callout-icon { color: var(--warning); }
-
-    .callout.info { background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); }
-    .callout.info .callout-icon { color: var(--info); }
-
-    .callout.success { background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); }
-    .callout.success .callout-icon { color: var(--success); }
-
-    code {
-      background: var(--bg-elevated);
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-      font-size: 0.9em;
-      color: var(--primary-light);
-    }
-
-    table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.95rem; }
-    th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); }
-    th { background: var(--bg-elevated); font-weight: 600; color: var(--text); }
-    td { color: var(--text-muted); }
-
-    .retailer-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      font-weight: 500;
-      margin: 4px;
-    }
-
-    .retailer-walmart { background: #0071dc; color: white; }
-    .retailer-target { background: #cc0000; color: white; }
-    .retailer-pokemon { background: #ffcb05; color: #1a1a1a; }
-    .retailer-bestbuy { background: #0046be; color: white; }
-    .retailer-costco { background: #e31837; color: white; }
-    .retailer-sams { background: #0067a0; color: white; }
-
-    .status {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      font-weight: 500;
-    }
-
-    .status-confirmed { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-    .status-shipped { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
-    .status-delivered { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
-    .status-cancelled { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-
-    .mode-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 600;
-    }
-
-    .mode-imap { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
-    .mode-discord { background: rgba(88, 101, 242, 0.2); color: #7289da; border: 1px solid rgba(88, 101, 242, 0.3); }
-
-    .comparison-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin: 20px 0;
-    }
-
-    .comparison-col {
-      background: var(--bg-card);
-      border-radius: 12px;
-      padding: 20px;
-      border: 1px solid var(--border);
-    }
-
-    .comparison-col h4 {
-      font-size: 1.1rem;
-      font-weight: 600;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .comparison-col ul { margin: 0; padding-left: 20px; }
-
-    @media print {
-      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      body { background: var(--bg) !important; color: var(--text) !important; }
-      .container { max-width: 100%; }
-      .header { background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, var(--primary-light) 100%) !important; }
-      .toc { background: var(--bg-card) !important; border: 1px solid var(--border) !important; }
-      .card { background: var(--bg-card) !important; border: 1px solid var(--border) !important; }
-      .feature-item { background: var(--bg-elevated) !important; border: 1px solid var(--border) !important; }
-      .comparison-col { background: var(--bg-card) !important; border: 1px solid var(--border) !important; }
-      .callout { background: var(--bg-card) !important; }
-      .callout.tip { background: rgba(139, 92, 246, 0.15) !important; border: 1px solid rgba(139, 92, 246, 0.3) !important; }
-      .callout.warning { background: rgba(245, 158, 11, 0.15) !important; border: 1px solid rgba(245, 158, 11, 0.3) !important; }
-      .callout.info { background: rgba(59, 130, 246, 0.15) !important; border: 1px solid rgba(59, 130, 246, 0.3) !important; }
-      table { background: var(--bg-card) !important; }
-      th { background: var(--bg-elevated) !important; color: var(--text) !important; }
-      td { color: var(--text-muted) !important; }
-      .section-num { background: linear-gradient(135deg, var(--primary-dark), var(--primary)) !important; }
-      .toc-num { background: var(--primary) !important; }
-      .step-num { background: var(--primary) !important; }
-      code { background: var(--bg-elevated) !important; color: var(--primary-light) !important; }
-      .status { -webkit-print-color-adjust: exact !important; }
-      .retailer-badge { -webkit-print-color-adjust: exact !important; }
-      .mode-badge { -webkit-print-color-adjust: exact !important; }
-      a { color: var(--primary-light) !important; }
-      p { color: var(--text-muted) !important; }
-      li { color: var(--text-muted) !important; }
-      h3 { color: var(--primary-light) !important; }
-    }
-
-    @page { margin: 0.75in; }
-  </style>
+  .spacer { height: 24px; }
+  .divider { height: 1px; background: var(--border); margin: 32px 0; }
+</style>
 </head>
 <body>
-  <div class="container">
 
-    <!-- Header -->
-    <div class="header">
-      <h1>SOLUS</h1>
-      <div class="version">Version 2.0.0</div>
-      <div class="tagline">Order Analytics for Walmart, Target, Pokemon Center & More</div>
+<!-- COVER PAGE -->
+<div class="cover-page">
+  <div class="cover-logo">SOLUS</div>
+  <div class="cover-subtitle">Order Analytics</div>
+  <div class="cover-divider"></div>
+  <div class="cover-title">User Guide</div>
+  <p style="color:#9ca3af;font-size:15px;position:relative;z-index:1;">Everything you need to track, analyze, and optimize your orders.</p>
+  <div class="cover-version">Version 4.0</div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc-page">
+  <div class="guide-container">
+    <h2>Contents</h2>
+    <div class="toc-grid">
+      <a class="toc-card" href="#getting-started">
+        <div class="toc-num">01</div>
+        <div class="toc-label">Getting Started</div>
+        <div class="toc-desc">Activation, onboarding, first steps</div>
+      </a>
+      <a class="toc-card" href="#data-modes">
+        <div class="toc-num">02</div>
+        <div class="toc-label">Data Modes</div>
+        <div class="toc-desc">IMAP vs Discord, switching modes</div>
+      </a>
+      <a class="toc-card" href="#dashboard">
+        <div class="toc-num">03</div>
+        <div class="toc-label">Dashboard</div>
+        <div class="toc-desc">Retailer cards, alerts, quick stats, layout</div>
+      </a>
+      <a class="toc-card" href="#imap">
+        <div class="toc-num">04</div>
+        <div class="toc-label">IMAP &amp; Email Sync</div>
+        <div class="toc-desc">Accounts, syncing, app passwords, auto-resume</div>
+      </a>
+      <a class="toc-card" href="#discord">
+        <div class="toc-num">05</div>
+        <div class="toc-label">Discord ACO</div>
+        <div class="toc-desc">Bot linking, profiles, webhooks, forwarding</div>
+      </a>
+      <a class="toc-card" href="#retailer-pages">
+        <div class="toc-num">06</div>
+        <div class="toc-label">Retailer Pages</div>
+        <div class="toc-desc">Drops, items, orders, bulk actions, filters</div>
+      </a>
+      <a class="toc-card" href="#flex-cards">
+        <div class="toc-num">07</div>
+        <div class="toc-label">Flex Cards</div>
+        <div class="toc-desc">Visual drop summaries, save PNG, share</div>
+      </a>
+      <a class="toc-card" href="#delivery-hub">
+        <div class="toc-num">08</div>
+        <div class="toc-label">Delivery Hub</div>
+        <div class="toc-desc">In transit, calendar, address linking</div>
+      </a>
+      <a class="toc-card" href="#live-track">
+        <div class="toc-num">09</div>
+        <div class="toc-label">Live Track</div>
+        <div class="toc-desc">Real-time FedEx tracking, status updates</div>
+      </a>
+      <a class="toc-card" href="#analytics">
+        <div class="toc-num">10</div>
+        <div class="toc-label">Analytics</div>
+        <div class="toc-desc">Trends, patterns, insights, comparisons</div>
+      </a>
+      <a class="toc-card" href="#account-stats">
+        <div class="toc-num">11</div>
+        <div class="toc-label">Account Stats</div>
+        <div class="toc-desc">Tiers, risk scores, recommendations</div>
+      </a>
+      <a class="toc-card" href="#reports">
+        <div class="toc-num">12</div>
+        <div class="toc-label">Reports</div>
+        <div class="toc-desc">PDF, CSV, JSON, templates, Discord sharing</div>
+      </a>
+      <a class="toc-card" href="#inventory">
+        <div class="toc-num">13</div>
+        <div class="toc-label">Inventory &amp; Portfolio</div>
+        <div class="toc-desc">Stock, sales, cost lots, profit tracking</div>
+      </a>
+      <a class="toc-card" href="#tcg-tracker">
+        <div class="toc-num">14</div>
+        <div class="toc-label">TCG Price Tracker</div>
+        <div class="toc-desc">TCGPlayer monitoring, auto-refresh, proxies</div>
+      </a>
+      <a class="toc-card" href="#settings">
+        <div class="toc-num">15</div>
+        <div class="toc-label">Settings Reference</div>
+        <div class="toc-desc">General, license, data, jig, reports, SKU</div>
+      </a>
+      <a class="toc-card" href="#shortcuts">
+        <div class="toc-num">16</div>
+        <div class="toc-label">Keyboard Shortcuts</div>
+        <div class="toc-desc">Quick keys for navigation and actions</div>
+      </a>
+      <a class="toc-card" href="#best-practices">
+        <div class="toc-num">17</div>
+        <div class="toc-label">Best Practices</div>
+        <div class="toc-desc">Tips for security, sync, and workflow</div>
+      </a>
+      <a class="toc-card" href="#troubleshooting">
+        <div class="toc-num">18</div>
+        <div class="toc-label">Troubleshooting</div>
+        <div class="toc-desc">Common issues and solutions</div>
+      </a>
+      <a class="toc-card" href="#glossary">
+        <div class="toc-num">19</div>
+        <div class="toc-label">Glossary</div>
+        <div class="toc-desc">Key terms and definitions</div>
+      </a>
     </div>
-
-    <!-- Table of Contents -->
-    <div class="toc">
-      <h2>Table of Contents</h2>
-      <div class="toc-grid">
-        <a href="#getting-started"><span class="toc-num">1</span> Getting Started</a>
-        <a href="#data-modes"><span class="toc-num">2</span> Data Modes Explained</a>
-        <a href="#imap-setup"><span class="toc-num">3</span> IMAP Email Setup</a>
-        <a href="#discord-setup"><span class="toc-num">4</span> Discord Bot Setup</a>
-        <a href="#split-ui"><span class="toc-num">5</span> Split UI Guide</a>
-        <a href="#dashboard"><span class="toc-num">6</span> Dashboard</a>
-        <a href="#retailers"><span class="toc-num">7</span> Retailer Pages</a>
-        <a href="#deliveries"><span class="toc-num">8</span> Deliveries (IMAP)</a>
-        <a href="#analytics"><span class="toc-num">9</span> Analytics</a>
-        <a href="#account-stats"><span class="toc-num">10</span> Account & Profile Stats</a>
-        <a href="#inventory"><span class="toc-num">11</span> Inventory & TCG</a>
-        <a href="#reports"><span class="toc-num">12</span> Reports</a>
-        <a href="#settings"><span class="toc-num">13</span> Settings</a>
-        <a href="#troubleshooting"><span class="toc-num">14</span> Troubleshooting</a>
-      </div>
-    </div>
-
-    <!-- Section 1: Getting Started -->
-    <section class="section" id="getting-started">
-      <div class="section-header">
-        <span class="section-num">1</span>
-        <h2>Getting Started</h2>
-      </div>
-
-      <div class="subsection">
-        <h3>Welcome to SOLUS</h3>
-        <p>SOLUS is a powerful order analytics application designed for tracking retail orders across multiple stores. It supports two distinct data import methods — each optimized for different workflows.</p>
-
-        <div class="feature-grid">
-          <div class="feature-item">
-            <h4>📧 IMAP Mode</h4>
-            <p>Connect email accounts to sync order confirmations, shipping updates, and delivery notifications directly from your inbox.</p>
-          </div>
-          <div class="feature-item">
-            <h4>💬 Discord Mode</h4>
-            <p>Link with the SOLUS Discord bot to import orders from ACO and similar automation tools that post to Discord channels.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Supported Retailers</h3>
-        <div style="margin: 16px 0;">
-          <span class="retailer-badge retailer-walmart">Walmart</span>
-          <span class="retailer-badge retailer-target">Target</span>
-          <span class="retailer-badge retailer-pokemon">Pokemon Center</span>
-          <span class="retailer-badge retailer-bestbuy">Best Buy</span>
-          <span class="retailer-badge retailer-costco">Costco</span>
-          <span class="retailer-badge retailer-sams">Sam's Club</span>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>First Launch</h3>
-        <div class="steps">
-          <div class="step">
-            <span class="step-num">1</span>
-            <div class="step-content">
-              <h4>Activate Your License</h4>
-              <p>Enter your license key (format: <code>SOLUS-XXXX-XXXX-XXXX</code>) and click Activate.</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">2</span>
-            <div class="step-content">
-              <h4>Choose Your Data Mode</h4>
-              <p>Select <span class="mode-badge mode-imap">📧 IMAP</span> or <span class="mode-badge mode-discord">💬 Discord</span> based on how you want to import orders.</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">3</span>
-            <div class="step-content">
-              <h4>Connect Your Data Source</h4>
-              <p>Add email accounts (IMAP) or link your Discord account (Discord mode).</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Section 2: Data Modes Explained -->
-    <section class="section" id="data-modes">
-      <div class="section-header">
-        <span class="section-num">2</span>
-        <h2>Data Modes Explained</h2>
-      </div>
-
-      <p>SOLUS operates in one of two exclusive modes. The entire interface adapts based on your selected mode, showing only relevant features and hiding those that don't apply.</p>
-
-      <div class="comparison-grid">
-        <div class="comparison-col">
-          <h4><span class="mode-badge mode-imap">📧 IMAP Mode</span></h4>
-          <p style="margin-bottom: 16px; font-size: 0.9rem;">Best for: Direct email account access, full order lifecycle tracking</p>
-          <ul>
-            <li><strong>Full tracking</strong> — Confirmed → Shipped → Delivered</li>
-            <li><strong>Carrier info</strong> — FedEx, UPS, USPS, DHL tracking</li>
-            <li><strong>Delivery addresses</strong> — Full address extraction</li>
-            <li><strong>Prices</strong> — Order totals from confirmation emails</li>
-            <li><strong>Deliveries page</strong> — Track packages by address</li>
-            <li><strong>Account Stats</strong> — Group by email address</li>
-          </ul>
-        </div>
-        <div class="comparison-col">
-          <h4><span class="mode-badge mode-discord">💬 Discord Mode</span></h4>
-          <p style="margin-bottom: 16px; font-size: 0.9rem;">Best for: ACO bot users, profile-based tracking</p>
-          <ul>
-            <li><strong>Confirmations & cancels</strong> — From bot posts</li>
-            <li><strong>Profile tracking</strong> — Group by bot profile name</li>
-            <li><strong>Bot type badges</strong> — See which bot placed each order</li>
-            <li><strong>Real-time sync</strong> — Auto-sync from watched channels</li>
-            <li><strong>Profile Stats</strong> — Performance by profile</li>
-            <li><strong>Streamlined UI</strong> — No shipping/delivery clutter</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="callout tip">
-        <span class="callout-icon">💡</span>
-        <div class="callout-content">
-          <h4>Which Mode Should I Use?</h4>
-          <p>Use <strong>IMAP</strong> if you want complete order tracking including shipping and delivery. Use <strong>Discord</strong> if you primarily use ACO or similar bots and want to track performance by profile name.</p>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Switching Between Modes</h3>
-        <div class="steps">
-          <div class="step">
-            <span class="step-num">1</span>
-            <div class="step-content">
-              <h4>Go to Settings</h4>
-              <p>Click the gear icon in the sidebar navigation.</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">2</span>
-            <div class="step-content">
-              <h4>Find Data Mode</h4>
-              <p>Under the General tab, locate the "Data Mode" option.</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">3</span>
-            <div class="step-content">
-              <h4>Select Your Mode</h4>
-              <p>Choose Email (IMAP) or Discord. The UI instantly updates.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="callout info">
-          <span class="callout-icon">ℹ️</span>
-          <div class="callout-content">
-            <h4>Your Data is Safe</h4>
-            <p>Switching modes doesn't delete anything. Orders from both sources are stored separately and will reappear when you switch back.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Section 3: IMAP Setup -->
-    <section class="section" id="imap-setup">
-      <div class="section-header">
-        <span class="section-num">3</span>
-        <h2>IMAP Email Setup</h2>
-      </div>
-
-      <div class="callout info">
-        <span class="callout-icon">📧</span>
-        <div class="callout-content">
-          <h4>IMAP Mode Feature</h4>
-          <p>This section applies when using IMAP mode. The IMAP page appears in the sidebar only when IMAP mode is active.</p>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Adding an Email Account</h3>
-        <div class="steps">
-          <div class="step">
-            <span class="step-num">1</span>
-            <div class="step-content">
-              <h4>Navigate to IMAP Page</h4>
-              <p>Click <strong>IMAP</strong> in the sidebar (visible in IMAP mode).</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">2</span>
-            <div class="step-content">
-              <h4>Click "Add Account"</h4>
-              <p>Opens the account setup modal.</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">3</span>
-            <div class="step-content">
-              <h4>Select Provider</h4>
-              <p>Choose Gmail, Outlook, Yahoo, or Custom IMAP.</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">4</span>
-            <div class="step-content">
-              <h4>Enter Credentials</h4>
-              <p>Email address and <strong>App Password</strong> (not your regular password).</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">5</span>
-            <div class="step-content">
-              <h4>Test & Save</h4>
-              <p>Click "Test Connection" to verify, then "Save".</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Gmail App Password Setup</h3>
-        <div class="callout warning">
-          <span class="callout-icon">⚠️</span>
-          <div class="callout-content">
-            <h4>Required: App Password</h4>
-            <p>Gmail requires an App Password for IMAP. Your regular password will not work. 2-Factor Authentication must be enabled.</p>
-          </div>
-        </div>
-
-        <div class="steps">
-          <div class="step">
-            <span class="step-num">1</span>
-            <div class="step-content">
-              <h4>Enable 2-Factor Authentication</h4>
-              <p>Go to <code>myaccount.google.com/security</code> → 2-Step Verification</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">2</span>
-            <div class="step-content">
-              <h4>Generate App Password</h4>
-              <p>Visit <code>myaccount.google.com/apppasswords</code> → Select "Mail" → "Windows Computer"</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">3</span>
-            <div class="step-content">
-              <h4>Copy & Use</h4>
-              <p>Copy the 16-character password and paste it in SOLUS (not your Google password).</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Sync Controls</h3>
-        <p>The IMAP page provides several sync options:</p>
-        <table>
-          <thead>
-            <tr><th>Button</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><strong>⚡ Sync Recent</strong></td><td>Sync emails from the last 7 days only</td></tr>
-            <tr><td><strong>🔄 Sync All</strong></td><td>Full sync of all emails in date range</td></tr>
-            <tr><td><strong>🛟 Rescue Spam</strong></td><td>Find order emails in spam folder</td></tr>
-            <tr><td><strong>🖼️ Refresh Images</strong></td><td>Re-match products to local SKU images</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Section 4: Discord Bot Setup -->
-    <section class="section" id="discord-setup">
-      <div class="section-header">
-        <span class="section-num">4</span>
-        <h2>Discord Bot Setup</h2>
-      </div>
-
-      <div class="callout info">
-        <span class="callout-icon">💬</span>
-        <div class="callout-content">
-          <h4>Discord Mode Feature</h4>
-          <p>This section applies when using Discord mode. The Discord page appears in the sidebar only when Discord mode is active.</p>
-        </div>
-      </div>
-
-      <p>The SOLUS Discord integration allows you to import orders from automation bots (like ACO) that post order confirmations to Discord channels. The bot watches your specified channels and relays order data to SOLUS.</p>
-
-      <div class="subsection">
-        <h3>How It Works</h3>
-        <div class="card">
-          <div class="card-title">Architecture Overview</div>
-          <ol>
-            <li><strong>You invite the SOLUS bot</strong> to your Discord server</li>
-            <li><strong>You link your SOLUS license</strong> to your Discord account using a one-time token</li>
-            <li><strong>You tell the bot which channels to watch</strong> (where ACO posts orders)</li>
-            <li><strong>The bot captures order posts</strong> and stores them in the cloud</li>
-            <li><strong>SOLUS syncs orders</strong> from the cloud to your local app</li>
-          </ol>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Step 1: Invite the Bot</h3>
-        <div class="steps">
-          <div class="step">
-            <span class="step-num">1</span>
-            <div class="step-content">
-              <h4>Go to Discord Page</h4>
-              <p>In SOLUS, click <strong>Discord</strong> in the sidebar (requires Discord mode).</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">2</span>
-            <div class="step-content">
-              <h4>Click "Invite Bot to Server"</h4>
-              <p>Opens Discord's authorization page in your browser.</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">3</span>
-            <div class="step-content">
-              <h4>Select Your Server</h4>
-              <p>Choose the server where your order bot (ACO) posts. You need "Manage Server" permission.</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">4</span>
-            <div class="step-content">
-              <h4>Authorize Permissions</h4>
-              <p>The bot needs permission to read messages in channels you specify.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Step 2: Link Your Account</h3>
-        <div class="steps">
-          <div class="step">
-            <span class="step-num">1</span>
-            <div class="step-content">
-              <h4>Generate Link Token</h4>
-              <p>In SOLUS Discord page, click <strong>"Generate Token"</strong>. A 6-character code appears.</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">2</span>
-            <div class="step-content">
-              <h4>Use /link Command in Discord</h4>
-              <p>In any channel where the bot is present, type: <code>/link [TOKEN]</code></p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">3</span>
-            <div class="step-content">
-              <h4>Confirm Link</h4>
-              <p>The bot confirms the link. Your Discord username now appears in SOLUS.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="callout warning">
-          <span class="callout-icon">⏱️</span>
-          <div class="callout-content">
-            <h4>Token Expires in 5 Minutes</h4>
-            <p>Link tokens are single-use and expire quickly for security. Generate a new one if it expires.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Step 3: Watch Channels</h3>
-        <p>Tell the bot which channels contain order posts from your automation tools.</p>
-
-        <div class="card">
-          <div class="card-title">Discord Commands</div>
-          <table>
-            <thead>
-              <tr><th>Command</th><th>Description</th></tr>
-            </thead>
-            <tbody>
-              <tr><td><code>/link [token]</code></td><td>Link your Discord to SOLUS license</td></tr>
-              <tr><td><code>/unlink</code></td><td>Disconnect your Discord from SOLUS</td></tr>
-              <tr><td><code>/watch</code></td><td>Start monitoring the current channel for orders</td></tr>
-              <tr><td><code>/unwatch</code></td><td>Stop monitoring the current channel</td></tr>
-              <tr><td><code>/scan [hours]</code></td><td>Scan channel history for past orders (default: 24 hours)</td></tr>
-              <tr><td><code>/status</code></td><td>Show link status and watched channels</td></tr>
-              <tr><td><code>/theme [color]</code></td><td>Change embed color theme (purple, blue, green, red, orange, pink)</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="steps">
-          <div class="step">
-            <span class="step-num">1</span>
-            <div class="step-content">
-              <h4>Go to Your Order Channel</h4>
-              <p>Navigate to the Discord channel where ACO (or your bot) posts order confirmations.</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">2</span>
-            <div class="step-content">
-              <h4>Type /watch</h4>
-              <p>The bot confirms it's now watching this channel.</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="step-num">3</span>
-            <div class="step-content">
-              <h4>Repeat for Other Channels</h4>
-              <p>Watch multiple channels if you have orders posting to different places.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="callout tip">
-          <span class="callout-icon">💡</span>
-          <div class="callout-content">
-            <h4>Import Historical Orders</h4>
-            <p>Use <code>/scan 48</code> to scan the last 48 hours of channel history for orders you might have missed. The bot will parse and import any order posts it finds.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Step 4: Sync Orders</h3>
-        <p>Once channels are watched, the bot captures new orders automatically. Sync them to SOLUS:</p>
-
-        <table>
-          <thead>
-            <tr><th>Setting</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><strong>Auto-Sync</strong></td><td>Toggle automatic syncing on/off</td></tr>
-            <tr><td><strong>Sync Interval</strong></td><td>How often to check (5, 15, 30, or 60 minutes)</td></tr>
-            <tr><td><strong>Sync Now</strong></td><td>Immediately sync new orders</td></tr>
-            <tr><td><strong>Refresh Images</strong></td><td>Re-match products to local SKU images</td></tr>
-            <tr><td><strong>Clear Discord Orders</strong></td><td>Remove all Discord orders (keeps email orders)</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="subsection">
-        <h3>ACO Bot Support</h3>
-        <p>The SOLUS bot is designed to parse order posts from ACO (Automated Checkout) and similar bots. It extracts:</p>
-        <ul>
-          <li><strong>Profile Name</strong> — Which bot profile placed the order</li>
-          <li><strong>Bot Type</strong> — The automation tool used (shown as a badge)</li>
-          <li><strong>Retailer</strong> — Walmart, Target, etc.</li>
-          <li><strong>Order ID</strong> — The retailer's order number</li>
-          <li><strong>Item Name</strong> — Product ordered</li>
-          <li><strong>Status</strong> — Confirmed or Cancelled</li>
-        </ul>
-
-        <div class="callout tip">
-          <span class="callout-icon">💡</span>
-          <div class="callout-content">
-            <h4>Profile Tracking</h4>
-            <p>Discord mode excels at tracking performance by profile. See which profiles have the best stick rates in Profile Stats.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Section 5: Split UI Guide -->
-    <section class="section" id="split-ui">
-      <div class="section-header">
-        <span class="section-num">5</span>
-        <h2>Split UI Guide</h2>
-      </div>
-
-      <p>SOLUS adapts its entire interface based on your selected data mode. This ensures you only see relevant features and aren't cluttered with options that don't apply to your workflow.</p>
-
-      <div class="subsection">
-        <h3>Navigation Changes</h3>
-        <table>
-          <thead>
-            <tr><th>Nav Item</th><th>IMAP Mode</th><th>Discord Mode</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><strong>IMAP</strong> (Accounts)</td><td>✅ Visible</td><td>❌ Hidden</td></tr>
-            <tr><td><strong>Discord</strong></td><td>❌ Hidden</td><td>✅ Visible</td></tr>
-            <tr><td><strong>Deliveries</strong></td><td>✅ Visible</td><td>❌ Hidden</td></tr>
-            <tr><td><strong>Dashboard</strong></td><td>✅ Visible</td><td>✅ Visible</td></tr>
-            <tr><td><strong>Analytics</strong></td><td>✅ Visible</td><td>✅ Visible</td></tr>
-            <tr><td><strong>Account Stats</strong></td><td>✅ "Account Stats"</td><td>✅ "Profile Stats"</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="subsection">
-        <h3>Dashboard Differences</h3>
-        <div class="comparison-grid">
-          <div class="comparison-col">
-            <h4>📧 IMAP Mode Dashboard</h4>
-            <ul>
-              <li>Shows <strong>4 status cards</strong>: Confirmed, Shipped, Delivered, Cancelled</li>
-              <li>Retailer cards show all 4 status counts</li>
-              <li>Full spending and delivery metrics</li>
-            </ul>
-          </div>
-          <div class="comparison-col">
-            <h4>💬 Discord Mode Dashboard</h4>
-            <ul>
-              <li>Shows <strong>2 status cards</strong>: Confirmed, Cancelled</li>
-              <li>Shipped/Delivered hidden (not available from Discord)</li>
-              <li>Focus on stick rate and confirmation metrics</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Analytics Differences</h3>
-        <div class="comparison-grid">
-          <div class="comparison-col">
-            <h4>📧 IMAP Mode Analytics</h4>
-            <ul>
-              <li><strong>Carriers tab</strong> — Shipping carrier performance</li>
-              <li>Delivery time metrics</li>
-              <li>Full status breakdown charts</li>
-            </ul>
-          </div>
-          <div class="comparison-col">
-            <h4>💬 Discord Mode Analytics</h4>
-            <ul>
-              <li><strong>No Carriers tab</strong> — Hidden (no tracking data)</li>
-              <li>Focus on confirmation/cancellation rates</li>
-              <li>Stick rate emphasis</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Account Stats vs Profile Stats</h3>
-        <p>This page completely transforms based on your mode:</p>
-
-        <div class="comparison-grid">
-          <div class="comparison-col">
-            <h4>📧 Account Stats (IMAP)</h4>
-            <p style="font-size: 0.9rem; margin-bottom: 12px;">Groups orders by <strong>email address</strong></p>
-            <ul>
-              <li>Each card represents an email account</li>
-              <li>Shows orders placed from that email</li>
-              <li>Performance tier (Gold/Silver/Bronze)</li>
-              <li>Useful for tracking account health</li>
-            </ul>
-          </div>
-          <div class="comparison-col">
-            <h4>💬 Profile Stats (Discord)</h4>
-            <p style="font-size: 0.9rem; margin-bottom: 12px;">Groups orders by <strong>bot profile name</strong></p>
-            <ul>
-              <li>Each card represents a bot profile</li>
-              <li>Shows bot type badge (ACO, etc.)</li>
-              <li>Performance tier based on stick rate</li>
-              <li>Useful for optimizing profile performance</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Retailer Page Differences</h3>
-        <table>
-          <thead>
-            <tr><th>Feature</th><th>IMAP Mode</th><th>Discord Mode</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Order status columns</td><td>Confirmed, Shipped, Delivered, Cancelled</td><td>Confirmed, Cancelled only</td></tr>
-            <tr><td>Tracking button</td><td>✅ Shows carrier tracking</td><td>❌ Hidden</td></tr>
-            <tr><td>Profile info row</td><td>❌ Not shown</td><td>✅ Shows profile name & bot type</td></tr>
-            <tr><td>Price column</td><td>✅ Full price display</td><td>Shown if available (often $0)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Section 6: Dashboard -->
-    <section class="section" id="dashboard">
-      <div class="section-header">
-        <span class="section-num">6</span>
-        <h2>Dashboard</h2>
-      </div>
-
-      <p>The Dashboard is your home screen, providing an at-a-glance overview of your order activity. Its appearance adapts to your current data mode.</p>
-
-      <div class="subsection">
-        <h3>Summary Cards</h3>
-        <div class="feature-grid">
-          <div class="feature-item">
-            <h4><span class="status status-confirmed">Confirmed</span></h4>
-            <p>Orders acknowledged by the retailer. Shown in both modes.</p>
-          </div>
-          <div class="feature-item">
-            <h4><span class="status status-shipped">Shipped</span></h4>
-            <p>Orders in transit. <strong>IMAP mode only.</strong></p>
-          </div>
-          <div class="feature-item">
-            <h4><span class="status status-delivered">Delivered</span></h4>
-            <p>Orders delivered. <strong>IMAP mode only.</strong></p>
-          </div>
-          <div class="feature-item">
-            <h4><span class="status status-cancelled">Cancelled</span></h4>
-            <p>Orders cancelled. Shown in both modes.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Retailer Cards</h3>
-        <p>Each retailer with orders gets its own card showing order counts, total spent, and stick rate. Click any card to view detailed orders.</p>
-      </div>
-
-      <div class="subsection">
-        <h3>Time Period Filter</h3>
-        <ul>
-          <li><strong>7D</strong> — Last 7 days</li>
-          <li><strong>30D</strong> — Last 30 days</li>
-          <li><strong>90D</strong> — Last 90 days</li>
-          <li><strong>All</strong> — All time</li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- Section 7: Retailer Pages -->
-    <section class="section" id="retailers">
-      <div class="section-header">
-        <span class="section-num">7</span>
-        <h2>Retailer Pages</h2>
-      </div>
-
-      <p>Each retailer has a dedicated page showing all orders. Access by clicking a retailer card on Dashboard or via sidebar navigation.</p>
-
-      <div class="subsection">
-        <h3>Drop View</h3>
-        <p>Orders are grouped by "drops" — the date orders were placed. Each drop card shows:</p>
-        <ul>
-          <li>Date of the drop</li>
-          <li>Order count</li>
-          <li>Status breakdown</li>
-          <li>Stick rate</li>
-          <li>Total value</li>
-        </ul>
-      </div>
-
-      <div class="subsection">
-        <h3>Order Details</h3>
-        <p>Click an order to view full details including order ID, item name, quantity, price, status, and tracking (IMAP) or profile info (Discord).</p>
-      </div>
-
-      <div class="subsection">
-        <h3>Bulk Actions</h3>
-        <p>Select multiple orders using checkboxes, then use bulk actions: Mark Delivered, Delete, or Export.</p>
-      </div>
-    </section>
-
-    <!-- Section 8: Deliveries -->
-    <section class="section" id="deliveries">
-      <div class="section-header">
-        <span class="section-num">8</span>
-        <h2>Deliveries</h2>
-      </div>
-
-      <div class="callout info">
-        <span class="callout-icon">📧</span>
-        <div class="callout-content">
-          <h4>IMAP Mode Only</h4>
-          <p>The Deliveries page is only available in IMAP mode. Discord typically doesn't provide shipping/delivery updates.</p>
-        </div>
-      </div>
-
-      <p>Track packages in transit and manage delivered orders by shipping address.</p>
-
-      <div class="subsection">
-        <h3>Address Grouping</h3>
-        <p>Orders grouped by shipping address. Each card shows pending deliveries and delivered packages.</p>
-      </div>
-
-      <div class="subsection">
-        <h3>Jig Detection</h3>
-        <p>Enable in Settings to automatically link similar/"jigged" addresses, detect leetspeak patterns, and manually link addresses via drag-and-drop.</p>
-      </div>
-
-      <div class="subsection">
-        <h3>Tracking</h3>
-        <p>Click tracking buttons to open carrier pages. Supports FedEx, UPS, USPS, DHL, OnTrac.</p>
-      </div>
-    </section>
-
-    <!-- Section 9: Analytics -->
-    <section class="section" id="analytics">
-      <div class="section-header">
-        <span class="section-num">9</span>
-        <h2>Analytics</h2>
-      </div>
-
-      <p>Visual insights through charts and metrics. Available tabs adapt to your mode.</p>
-
-      <div class="subsection">
-        <h3>Analytics Tabs</h3>
-        <table>
-          <thead>
-            <tr><th>Tab</th><th>IMAP</th><th>Discord</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><strong>Overview</strong></td><td>✅</td><td>✅</td></tr>
-            <tr><td><strong>Retailers</strong></td><td>✅</td><td>✅</td></tr>
-            <tr><td><strong>Items</strong></td><td>✅</td><td>✅</td></tr>
-            <tr><td><strong>Carriers</strong></td><td>✅</td><td>❌ Hidden</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="subsection">
-        <h3>Key Metrics</h3>
-        <ul>
-          <li><strong>Total Orders</strong> — Count across all retailers</li>
-          <li><strong>Total Spent</strong> — Combined order value</li>
-          <li><strong>Stick Rate</strong> — Orders not cancelled (%)</li>
-          <li><strong>Avg Delivery Days</strong> — Time to delivery (IMAP only)</li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- Section 10: Account & Profile Stats -->
-    <section class="section" id="account-stats">
-      <div class="section-header">
-        <span class="section-num">10</span>
-        <h2>Account & Profile Stats</h2>
-      </div>
-
-      <p>This page transforms completely based on your data mode, showing the most relevant performance metrics for your workflow.</p>
-
-      <div class="subsection">
-        <h3>IMAP Mode: Account Stats</h3>
-        <p>Groups orders by email address. View performance metrics for each account:</p>
-        <ul>
-          <li>Order count and total spent</li>
-          <li>Stick rate for the account</li>
-          <li>Performance tier (Gold/Silver/Bronze)</li>
-          <li>Last order date</li>
-          <li>Expandable order list</li>
-        </ul>
-      </div>
-
-      <div class="subsection">
-        <h3>Discord Mode: Profile Stats</h3>
-        <p>Groups orders by bot profile name. Track which profiles perform best:</p>
-        <ul>
-          <li>Profile name with bot type badge</li>
-          <li>Order count and stick rate</li>
-          <li>Performance tier based on success rate</li>
-          <li>Useful for optimizing your bot profiles</li>
-        </ul>
-      </div>
-
-      <div class="subsection">
-        <h3>Performance Tiers</h3>
-        <table>
-          <thead>
-            <tr><th>Tier</th><th>Criteria</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><strong style="color: gold;">Gold</strong></td><td>90%+ stick rate</td></tr>
-            <tr><td><strong style="color: silver;">Silver</strong></td><td>70-89% stick rate</td></tr>
-            <tr><td><strong style="color: #cd7f32;">Bronze</strong></td><td>50-69% stick rate</td></tr>
-            <tr><td><strong style="color: #888;">At-Risk</strong></td><td>&lt;50% stick rate</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Section 11: Inventory -->
-    <section class="section" id="inventory">
-      <div class="section-header">
-        <span class="section-num">11</span>
-        <h2>Inventory & TCG Tracker</h2>
-      </div>
-
-      <p>Track delivered items and monitor TCG prices with TCGPlayer integration.</p>
-
-      <div class="subsection">
-        <h3>Inventory Management</h3>
-        <ul>
-          <li>Auto-add delivered orders</li>
-          <li>Manual item entry</li>
-          <li>Track quantities</li>
-          <li>Link to original orders</li>
-        </ul>
-      </div>
-
-      <div class="subsection">
-        <h3>TCG Price Tracking</h3>
-        <ul>
-          <li>Link to TCGPlayer listings</li>
-          <li>Track current/low/high prices</li>
-          <li>Price history charts</li>
-          <li>Bulk price refresh</li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- Section 12: Reports -->
-    <section class="section" id="reports">
-      <div class="section-header">
-        <span class="section-num">12</span>
-        <h2>Reports</h2>
-      </div>
-
-      <p>Generate customizable reports for analysis or sharing to Discord.</p>
-
-      <div class="subsection">
-        <h3>Creating Reports</h3>
-        <ol>
-          <li>Select date range (7/30/90 days or all-time)</li>
-          <li>Choose retailers to include</li>
-          <li>Select sections (Summary, Breakdown, Top Items, etc.)</li>
-          <li>Generate and share</li>
-        </ol>
-      </div>
-
-      <div class="subsection">
-        <h3>Sharing Options</h3>
-        <ul>
-          <li><strong>Discord</strong> — Send to webhook</li>
-          <li><strong>PDF</strong> — Export document</li>
-          <li><strong>Copy</strong> — Clipboard</li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- Section 13: Settings -->
-    <section class="section" id="settings">
-      <div class="section-header">
-        <span class="section-num">13</span>
-        <h2>Settings</h2>
-      </div>
-
-      <div class="subsection">
-        <h3>General Settings</h3>
-        <table>
-          <thead>
-            <tr><th>Setting</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><strong>Data Mode</strong></td><td>Switch between IMAP and Discord modes</td></tr>
-            <tr><td><strong>Theme</strong></td><td>Dark or Light mode</td></tr>
-            <tr><td><strong>Accent Color</strong></td><td>6 presets + custom color picker</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="subsection">
-        <h3>Sync Settings</h3>
-        <table>
-          <thead>
-            <tr><th>Setting</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><strong>Auto-Sync Interval</strong></td><td>How often to sync (or disabled)</td></tr>
-            <tr><td><strong>Sync on Startup</strong></td><td>Auto-sync when opening SOLUS</td></tr>
-            <tr><td><strong>Auto-Resume</strong></td><td>Retry failed syncs after delay</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="subsection">
-        <h3>Data Management</h3>
-        <ul>
-          <li><strong>Export Data</strong> — JSON, CSV, or PDF</li>
-          <li><strong>Clear Orders</strong> — By time range or all</li>
-          <li><strong>Clear All Data</strong> — Full reset</li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- Section 14: Troubleshooting -->
-    <section class="section" id="troubleshooting">
-      <div class="section-header">
-        <span class="section-num">14</span>
-        <h2>Troubleshooting</h2>
-      </div>
-
-      <div class="subsection">
-        <h3>IMAP Issues</h3>
-        <div class="card">
-          <div class="card-title">"Authentication failed"</div>
-          <ul>
-            <li>Use App Password, not regular password</li>
-            <li>Enable 2FA for Gmail</li>
-            <li>Enable IMAP in email settings</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Discord Issues</h3>
-        <div class="card">
-          <div class="card-title">"Link token expired"</div>
-          <ul>
-            <li>Tokens expire in 5 minutes</li>
-            <li>Generate a new token and use immediately</li>
-          </ul>
-        </div>
-
-        <div class="card">
-          <div class="card-title">No orders syncing</div>
-          <ul>
-            <li>Verify you've watched the correct channels with <code>/watch</code></li>
-            <li>Check bot has permission to read messages</li>
-            <li>Enable auto-sync or click "Sync Now"</li>
-            <li>Make sure you're in Discord mode (not IMAP mode)</li>
-          </ul>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Bot not responding to commands</div>
-          <ul>
-            <li>Ensure bot was properly invited to server</li>
-            <li>Check bot has permission to use slash commands</li>
-            <li>Try in a different channel</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <h3>Missing Images</h3>
-        <div class="card">
-          <div class="card-title">Orders showing placeholder images</div>
-          <ul>
-            <li>Use the SKU Mapper tool to map product names to SKUs</li>
-            <li>Click "Refresh Images" in IMAP or Discord page</li>
-            <li>Ensure matching images exist in <code>product-images/</code> folder</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <!-- Footer -->
-    <div style="text-align: center; padding: 48px 0; border-top: 1px solid var(--border); margin-top: 48px;">
-      <p style="font-size: 1.1rem; font-weight: 500; margin-bottom: 8px;">SOLUS v2.0.0</p>
-      <p style="color: var(--text-muted);">Order Analytics for Power Users</p>
-    </div>
-
   </div>
+</div>
+
+<!-- 01 GETTING STARTED -->
+<section id="getting-started">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 01</div>
+    <h2>Getting Started</h2>
+    <p>Activate your license, complete onboarding, and take your first steps with SOLUS.</p>
+  </div>
+
+  <h3>Activation</h3>
+  <div class="feature-card">
+    <p>When you first launch SOLUS, you will be prompted to enter your license key. Enter your key and click <strong>Activate License</strong>. Once activated, you have full access to all features.</p>
+    <p>SOLUS validates your license online. If the internet is temporarily unavailable, a 30-minute offline grace period keeps the app functional.</p>
+  </div>
+
+  <h3>License Plans</h3>
+  <table>
+    <thead><tr><th>Plan</th><th>Duration</th><th>Renewal</th></tr></thead>
+    <tbody>
+      <tr><td>Monthly</td><td>30 days</td><td>Auto-renews or expires</td></tr>
+      <tr><td>Yearly</td><td>365 days</td><td>Auto-renews or expires</td></tr>
+      <tr><td>Lifetime</td><td>Unlimited</td><td>Never expires</td></tr>
+    </tbody>
+  </table>
+
+  <div class="feature-card">
+    <p>View your license details at any time in <strong>Settings &gt; License</strong>. The display shows your masked key, plan type, status, activation date, expiration date, and days remaining. Days remaining is color-coded: <span class="status-badge badge-green">green</span> when more than 30 days remain, <span style="color:orange;">orange</span> under 30, <span style="color:var(--yellow);">yellow</span> under 7, and <span class="status-badge badge-red">red</span> when expired.</p>
+    <p>Click <strong>Disconnect License</strong> to deactivate your license on the current device.</p>
+  </div>
+
+  <h3>Onboarding Walkthrough</h3>
+  <p>After activation, a five-step guided walkthrough appears automatically:</p>
+  <div class="step-card">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <h4>Welcome</h4>
+      <p>Overview of what SOLUS does</p>
+    </div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <h4>Accounts</h4>
+      <p>How to connect your email accounts</p>
+    </div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <h4>Sync</h4>
+      <p>How to pull in order data</p>
+    </div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <h4>Dashboard</h4>
+      <p>Navigating the main interface</p>
+    </div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <h4>Analytics</h4>
+      <p>Understanding your charts and metrics</p>
+    </div>
+  </div>
+
+  <div class="tip-box">
+    <div class="tip-label">Tip</div>
+    <p>You can skip the walkthrough at any time. To replay it later, go to <strong>Settings &gt; General &gt; Show Walkthrough</strong>.</p>
+  </div>
+
+  <h3>First Steps</h3>
+  <div class="step-card">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <h4>Choose Your Data Mode</h4>
+      <p>IMAP (email sync) or Discord (ACO bot sync)</p>
+    </div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <h4>Connect Your Data Source</h4>
+      <p>Add email accounts or link your Discord</p>
+    </div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <h4>Run Your First Sync</h4>
+      <p>Pull in order data from your connected source</p>
+    </div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <h4>Explore Your Data</h4>
+      <p>Navigate the dashboard, retailer pages, and analytics</p>
+    </div>
+  </div>
+
+  <h3>Supported Platforms</h3>
+  <div class="feature-card">
+    <p>SOLUS runs on <strong>Windows</strong> (x64) and <strong>macOS</strong> (Apple Silicon and Intel). When a new version is available, a notification appears in the app with options to download and install.</p>
+    <p>On macOS, updates are downloaded as a DMG to your Downloads folder. On Windows, the installer runs automatically after download.</p>
+  </div>
+</div>
+</section>
+
+<!-- 02 DATA MODES -->
+<section id="data-modes">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 02</div>
+    <h2>Data Modes</h2>
+    <p>Choose how SOLUS imports your order data: via email or Discord.</p>
+  </div>
+
+  <div class="two-col">
+    <div class="feature-card">
+      <h4>IMAP Mode (Email Sync)</h4>
+      <p>Connects directly to your email accounts via IMAP and parses order confirmations, shipping updates, and delivery notifications. This mode tracks the full order lifecycle from confirmed through shipped to delivered. It enables the Delivery Hub, Live Track, carrier analytics, and address-based grouping.</p>
+      <p><strong>Best for:</strong> complete order tracking with delivery and carrier data.</p>
+    </div>
+    <div class="feature-card">
+      <h4>Discord Mode (ACO Bot Sync)</h4>
+      <p>Syncs orders captured by Discord auto-checkout bots through the SOLUS Discord relay server. This mode tracks confirmed, cancelled, and declined statuses. It enables the ACO Panel with profile mappings, webhook forwarding, and per-profile analytics.</p>
+      <p><strong>Best for:</strong> monitoring ACO bot checkouts across multiple profiles.</p>
+    </div>
+  </div>
+
+  <h3>Switching Modes</h3>
+  <div class="step-card">
+    <div class="step-num">1</div>
+    <div class="step-content"><p>Go to <strong>Settings &gt; General</strong></p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">2</div>
+    <div class="step-content"><p>Click <strong>IMAP Mode</strong> or <strong>Discord Mode</strong></p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">3</div>
+    <div class="step-content"><p>Confirm the switch</p></div>
+  </div>
+
+  <div class="feature-card">
+    <p>Your orders from the other mode are preserved separately. The sidebar navigation updates to show only the pages relevant to your active mode.</p>
+  </div>
+
+</div>
+</section>
+
+<!-- 03 DASHBOARD -->
+<section id="dashboard">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 03</div>
+    <h2>Dashboard</h2>
+    <p>Your home screen with a quick overview of all orders across every retailer.</p>
+  </div>
+
+  <h3>Retailer Cards</h3>
+  <div class="feature-card">
+    <p>Each supported retailer has a summary card displaying:</p>
+    <ul>
+      <li><strong>Confirmed</strong> -- Orders successfully placed</li>
+      <li><strong>Cancelled</strong> -- Orders that were cancelled</li>
+      <li><strong>Shipped</strong> -- Orders currently in transit (IMAP mode)</li>
+      <li><strong>Delivered</strong> -- Orders that have arrived (IMAP mode)</li>
+    </ul>
+    <p>In Discord mode, the "Shipped" column displays <strong>Declined</strong> instead, reflecting payment-declined checkout attempts.</p>
+    <p>Click any retailer card to jump directly to that retailer's detailed page.</p>
+  </div>
+
+  <h3>Customizable Layout</h3>
+  <div class="feature-card">
+    <p>Click the <strong>Customize</strong> gear icon in the top-right corner to personalize your dashboard.</p>
+    <p><strong>Retailer toggles:</strong> Show or hide cards for Walmart, Target, Pokemon Center, Sam's Club, Costco, and Best Buy based on which retailers you actively use.</p>
+    <p><strong>Section toggles:</strong> Show or hide the Overall Statistics bar and the Quick Stats bar.</p>
+    <p>Your layout preferences save automatically and persist across sessions. Hiding a retailer card does not delete any underlying data.</p>
+  </div>
+
+  <h3>Dashboard Alerts</h3>
+  <div class="feature-card">
+    <p>An alerts bar appears at the top when items need your attention:</p>
+    <ul>
+      <li><strong>Low Stick Rate Warning</strong> -- Accounts below 50% stick rate. Click to jump to Account Stats.</li>
+      <li><strong>Overdue Deliveries</strong> -- Orders awaiting delivery past their ETA. Click to jump to Delivery Hub.</li>
+      <li><strong>Recent Cancellations</strong> -- Orders cancelled in the last 24 hours. Click to view details.</li>
+    </ul>
+    <p>Alerts can be dismissed per session. They reappear on your next launch if conditions still apply.</p>
+  </div>
+
+  <h3>Quick Stats Bar</h3>
+  <div class="feature-card">
+    <p>A persistent bar below the alerts showing at-a-glance numbers:</p>
+    <ul>
+      <li><strong>In Transit</strong> -- Packages currently on the way</li>
+      <li><strong>Arriving Today</strong> -- Deliveries expected today</li>
+      <li><strong>Spending This Month</strong> -- Total confirmed order value for the current month</li>
+      <li><strong>Delivered This Week</strong> -- Packages that arrived in the last 7 days</li>
+    </ul>
+    <p>Each stat is clickable and navigates to the relevant page.</p>
+  </div>
+
+  <h3>Statistics Bar</h3>
+  <div class="feature-card">
+    <p>View aggregated totals across all retailers: total orders, total spent, overall stick rate, and confirmed/cancelled/shipped/delivered counts.</p>
+  </div>
+
+  <h3>Time Period Filter</h3>
+  <div class="feature-card">
+    <p>Toggle between <strong>7D</strong>, <strong>30D</strong>, <strong>90D</strong>, or <strong>All</strong> to scope the dashboard data to a specific window.</p>
+  </div>
+</div>
+</section>
+
+<!-- 04 IMAP ACCOUNTS AND EMAIL SYNC -->
+<section id="imap">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 04</div>
+    <h2>IMAP Accounts and Email Sync</h2>
+    <p>Connect your email accounts to automatically sync order confirmations, shipping updates, and delivery notifications.</p>
+  </div>
+
+  <h3>Supported Retailers</h3>
+  <table>
+    <thead><tr><th>Retailer</th><th>Order ID Format</th></tr></thead>
+    <tbody>
+      <tr><td><span class="retailer-dot dot-walmart"></span>Walmart</td><td>7-digit</td></tr>
+      <tr><td><span class="retailer-dot dot-target"></span>Target</td><td>15-digit</td></tr>
+      <tr><td><span class="retailer-dot dot-pokecenter"></span>Pokemon Center</td><td>Variable</td></tr>
+      <tr><td><span class="retailer-dot dot-samsclub"></span>Sam's Club</td><td>8-digit</td></tr>
+      <tr><td><span class="retailer-dot dot-costco"></span>Costco</td><td>10-digit</td></tr>
+      <tr><td><span class="retailer-dot dot-bestbuy"></span>Best Buy</td><td>BBY01-XXXXXX</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Supported Email Providers</h3>
+  <table>
+    <thead><tr><th>Provider</th><th>Domains</th><th>App Password</th></tr></thead>
+    <tbody>
+      <tr><td>Gmail</td><td>@gmail.com</td><td>Required</td></tr>
+      <tr><td>Yahoo</td><td>@yahoo.com</td><td>Required (2FA must be enabled)</td></tr>
+      <tr><td>Outlook</td><td>@outlook.com, @hotmail.com, @live.com</td><td>Required if 2FA is enabled</td></tr>
+      <tr><td>iCloud</td><td>@icloud.com, @me.com, @mac.com</td><td>Required</td></tr>
+    </tbody>
+  </table>
+  <div class="feature-card">
+    <p>The provider is auto-detected from your email address.</p>
+  </div>
+
+  <h3>Adding an Account</h3>
+  <div class="step-card">
+    <div class="step-num">1</div>
+    <div class="step-content"><p>Click <strong>+ Add Account</strong></p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">2</div>
+    <div class="step-content"><p>Select your email provider (or let it auto-detect)</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">3</div>
+    <div class="step-content"><p>Enter your email address</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">4</div>
+    <div class="step-content"><p>Enter your <strong>App Password</strong> (not your regular login password)</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">5</div>
+    <div class="step-content"><p>Click <strong>Test Connection</strong> to verify credentials</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">6</div>
+    <div class="step-content"><p>Click <strong>Add Account</strong></p></div>
+  </div>
+
+  <div class="warning-box">
+    <div class="tip-label">Important</div>
+    <p>Always use an app-specific password, never your regular email password. This is both a security best practice and a requirement for most providers with two-factor authentication enabled.</p>
+  </div>
+
+  <h3>App Password Setup by Provider</h3>
+  <div class="feature-card">
+    <h4>Gmail</h4>
+    <p>Go to your Google Account &gt; Security &gt; 2-Step Verification &gt; App Passwords. Generate a 16-character password and use it in SOLUS. IMAP must also be enabled in Gmail Settings &gt; Forwarding and POP/IMAP.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Outlook / Hotmail</h4>
+    <p>If you have 2FA enabled, generate an app password in your Microsoft account security settings. If 2FA is off, your regular password may work.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Yahoo</h4>
+    <p>Go to Account Security in your Yahoo account settings. Generate an app password for "Other App" and use the generated password in SOLUS.</p>
+  </div>
+  <div class="feature-card">
+    <h4>iCloud</h4>
+    <p>Go to appleid.apple.com, sign in, and generate an app-specific password under Security. iCloud also supports Hide My Email addresses, which SOLUS automatically detects and groups.</p>
+  </div>
+
+  <h3>Account Management</h3>
+  <div class="feature-card">
+    <p>Each account in the list shows its email with a provider badge, an editable nickname, last sync time, order count, and action buttons for Test Connection, View Sync Log, Sync, Edit Password, and Delete.</p>
+    <p>Click the nickname to rename an account (up to 30 characters) for easier identification when managing multiple accounts.</p>
+  </div>
+
+  <h3>Syncing</h3>
+  <table>
+    <thead><tr><th>Action</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Sync Recent</strong></td><td>Syncs from the last sync date, or the last 7 days for a first sync</td></tr>
+      <tr><td><strong>Sync All</strong></td><td>Full historical sync with a custom date range</td></tr>
+      <tr><td><strong>Rescue from Spam</strong></td><td>Finds order emails in spam and moves them to the inbox</td></tr>
+    </tbody>
+  </table>
+  <div class="feature-card">
+    <p>During sync, a progress bar shows the current percentage and a status message describing what SOLUS is doing. You can <strong>Pause</strong> (saves progress for later resumption) or <strong>Stop</strong> (abandons the current sync).</p>
+  </div>
+
+  <h3>How Sync Works</h3>
+  <div class="feature-card">
+    <p>SOLUS connects to your mailbox via IMAP and searches for order-related emails using 27 optimized search patterns across senders and subjects. Emails are fetched in batches (100 at a time for Gmail and Outlook, 50 for iCloud) with built-in retry logic and stall detection.</p>
+    <p>Each email is parsed to extract the order ID, item name, quantity, amount, status, tracking number, carrier, shipping address, and product images. Orders from multiple emails (confirmation, shipping update, delivery notification) are automatically merged into a single entry using the order ID as the key.</p>
+    <p>Only orders that have a matching confirmation email are saved. This prevents promotional emails and spam from creating false orders.</p>
+  </div>
+
+  <h3>Paused Syncs and Auto-Resume</h3>
+  <div class="feature-card">
+    <p>If a sync pauses due to connection issues, you will see a yellow highlight on the account with a "Paused (X remaining)" indicator. You can resume manually at any time.</p>
+    <p>If auto-resume is enabled (Settings &gt; General), SOLUS automatically retries the paused sync after your configured interval. Auto-resume retries up to 3 times before stopping permanently.</p>
+  </div>
+
+  <h3>Auto-Sync on Launch</h3>
+  <div class="feature-card">
+    <p>When enabled in Settings, SOLUS automatically syncs all accounts on startup, pulling orders from each account's last sync date (or 7 days back if never synced).</p>
+  </div>
+
+  <h3>Deep Scan Mode</h3>
+  <div class="feature-card">
+    <p>Enable Deep Scan in Settings &gt; General to search all emails in the date range rather than using targeted search patterns. This catches emails that might use unusual formatting but takes significantly longer.</p>
+  </div>
+
+  <h3>Bulk Import</h3>
+  <div class="feature-card">
+    <p>Click <strong>Import CSV</strong> to bulk import multiple email accounts from a CSV file. The CSV should contain email addresses and app passwords.</p>
+  </div>
+
+  <h3>Sync Log</h3>
+  <div class="feature-card">
+    <p>Click <strong>View Sync Log</strong> on any account to see detailed IMAP diagnostics including connection events, email counts, parsing results, and any errors.</p>
+  </div>
+</div>
+</section>
+
+<!-- 05 DISCORD ACO INTEGRATION -->
+<section id="discord">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 05</div>
+    <h2>Discord ACO Integration</h2>
+    <p>Track orders captured by Discord auto-checkout bots in your server channels.</p>
+  </div>
+
+  <h3>Supported ACO Bots</h3>
+  <div class="feature-card">
+    <p>Alpine, Valor, Hayha, Stellara, Refract, Shikari, TSB, and any generic bot format that the SOLUS Discord bot can detect.</p>
+  </div>
+
+  <h3>Linking Your Discord Account</h3>
+  <div class="step-card">
+    <div class="step-num">1</div>
+    <div class="step-content"><p>Go to the <strong>Discord</strong> page in the sidebar</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">2</div>
+    <div class="step-content"><p>Click <strong>Generate Link Token</strong> to create a 6-character code (valid for 5 minutes)</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">3</div>
+    <div class="step-content"><p>In your Discord server, run <code>/link &lt;token&gt;</code> with the SOLUS bot</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">4</div>
+    <div class="step-content"><p>Once linked, your Discord username appears and your watched channels load</p></div>
+  </div>
+
+  <h3>Order Statuses in Discord Mode</h3>
+  <table>
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><span class="status-badge badge-green">Confirmed</span></td><td>Order successfully placed by the bot</td></tr>
+      <tr><td><span class="status-badge badge-red">Cancelled</span></td><td>Order cancelled (retailer-initiated or manual)</td></tr>
+      <tr><td><span class="status-badge badge-yellow">Declined</span></td><td>Payment failed or was rejected (does not penalize stick rate)</td></tr>
+    </tbody>
+  </table>
+  <div class="tip-box">
+    <div class="tip-label">Tip</div>
+    <p>Declined orders are distinguished from true cancellations. A declined order represents a failed payment attempt, not a placed-and-then-cancelled order. This distinction keeps your stick rate and analytics accurate.</p>
+  </div>
+
+  <h3>ACO Panel</h3>
+  <div class="feature-card">
+    <p>The ACO Panel is your hub for managing Discord checkout data. It has two tabs: <strong>Users</strong> and <strong>Settings</strong>.</p>
+  </div>
+
+  <h4>Users Tab</h4>
+  <div class="feature-card">
+    <p>The Users tab shows all Discord profiles grouped by user.</p>
+    <p><strong>Profile Cards:</strong> Each card shows the Discord username, profile count, total order count, and per-site breakdown. Click a card to expand into a detail view with per-site stats, recent orders, and action buttons.</p>
+    <p><strong>Profile Mapping:</strong> Click <strong>+ Link Profile</strong> to associate a profile name with a Discord user:</p>
+    <ul>
+      <li>Enter the profile name (must match exactly what the ACO bot uses)</li>
+      <li>Enter the Discord User ID (17-20 digit number)</li>
+      <li>Optionally enter the Discord username</li>
+      <li>Click Save</li>
+    </ul>
+    <p>Profile mappings are stored server-side and enable @mention tagging when orders are forwarded via webhook.</p>
+    <p><strong>Searching and Filtering:</strong> Search by Discord username, user ID, or profile name. Filter by All, Mapped only, or Unmapped only. Filter by site and by performance tier.</p>
+    <p><strong>Export:</strong> Click <strong>Export</strong> to download ACO profile data as CSV. Filter by user type, performance tier, site, stick rate range, and order count range. Choose between Summary and Detailed export levels.</p>
+  </div>
+
+  <h4>Settings Tab</h4>
+  <div class="feature-card">
+    <h4>Saved Webhooks</h4>
+    <p>Manage your Discord webhook URLs. Add up to 10 webhooks, each with a name and URL. Test, edit, or delete any webhook. URLs must be valid Discord webhook URLs.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Watched Channels</h4>
+    <p>Assign a saved webhook to each channel the SOLUS bot is monitoring. A "Bot forwarding" indicator appears when server-side forwarding is active for that channel, meaning orders forward even when SOLUS is closed.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Auto-Forward</h4>
+    <p>Toggle automatic forwarding of new orders to assigned webhooks when SOLUS syncs. A sub-toggle controls whether declined and cancelled orders are included.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Sync Settings</h4>
+    <p>Shows last sync time and count. Buttons for Sync Now, Refresh Images (re-maps product images), and Clear Orders (deletes all Discord-source orders).</p>
+  </div>
+  <div class="feature-card">
+    <h4>Diagnostics</h4>
+    <p>Shows webhook count and Discord link status for quick troubleshooting.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Recent Forward Log</h4>
+    <p>An audit trail of forwarded orders (up to 200 stored, 50 shown). Each entry shows status, item name, profile, and timestamp. An "@mentioned" badge appears when a Discord mention was included.</p>
+  </div>
+
+  <h3>Server-Side Bot Forwarding</h3>
+  <div class="feature-card">
+    <p>When you assign a webhook to a channel, SOLUS syncs the URL to the server. The Discord bot then forwards orders automatically and instantly, even when SOLUS is closed. Forwarded embeds include the order status, retailer, item name, profile, product image, and SOLUS branding. If a profile mapping exists, the embed tags the Discord user. The bot refreshes its channel cache every 60 seconds.</p>
+  </div>
+
+  <h3>Auto-Sync in Discord Mode</h3>
+  <div class="feature-card">
+    <p>When auto-sync is enabled, SOLUS checks for new orders at your configured interval (default: 15 minutes). New orders are automatically forwarded if the auto-forward toggle is on. A toast notification shows the count of new orders and forwards.</p>
+  </div>
+</div>
+</section>
+
+<!-- 06 RETAILER PAGES -->
+<section id="retailer-pages">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 06</div>
+    <h2>Retailer Pages</h2>
+    <p>Dedicated pages for each retailer with detailed order information, drops, items, and bulk actions.</p>
+  </div>
+
+  <h3>Supported Retailers</h3>
+  <div class="feature-card">
+    <ul>
+      <li><span class="retailer-dot dot-walmart"></span><strong>Walmart</strong> -- Blue theme</li>
+      <li><span class="retailer-dot dot-target"></span><strong>Target</strong> -- Red theme</li>
+      <li><span class="retailer-dot dot-pokecenter"></span><strong>Pokemon Center</strong> -- Yellow/Amber theme</li>
+      <li><span class="retailer-dot dot-samsclub"></span><strong>Sam's Club</strong> -- Navy theme</li>
+      <li><span class="retailer-dot dot-costco"></span><strong>Costco</strong> -- Red theme</li>
+      <li><span class="retailer-dot dot-bestbuy"></span><strong>Best Buy</strong> -- Blue theme</li>
+    </ul>
+  </div>
+
+  <h3>Statistics Grid</h3>
+  <div class="feature-card">
+    <p>At the top of each retailer page, a statistics grid displays confirmed, cancelled, shipped, delivered, total orders, and total spent for that retailer.</p>
+  </div>
+
+  <h3>Drops View</h3>
+  <div class="feature-card">
+    <p>Orders are grouped by "drops" (order date). Each drop card shows:</p>
+    <ul>
+      <li>Up to 3 product images</li>
+      <li>Item name previews (up to 4 items)</li>
+      <li>Account count</li>
+      <li>Status breakdown (confirmed, cancelled, shipped, delivered)</li>
+      <li>Stick rate percentage</li>
+      <li>Total spent for that drop</li>
+      <li><strong>Resync</strong> button to re-fetch emails for that date</li>
+      <li><strong>Flex</strong> button to create a shareable visual card</li>
+    </ul>
+    <p>Click a drop to expand into its detail view, showing orders grouped by SKU with full order information.</p>
+  </div>
+
+  <h3>Items Grid</h3>
+  <div class="feature-card">
+    <p>Below the drops, an items grid shows each unique product with its image, name, quantity ordered, stick rate, and total spend. Click an item to filter the orders list to that product and see a detailed item modal.</p>
+  </div>
+
+  <h3>Item Detail Modal</h3>
+  <div class="feature-card">
+    <p>Clicking an item opens a modal showing the product image, item name, quantity and order count, per-status breakdown, and a list of all orders for that item with status badges, dates, amounts, and account information.</p>
+  </div>
+
+  <h3>Orders List</h3>
+  <div class="feature-card">
+    <p><strong>Search:</strong> Filter by item name, order ID, amount, tracking number, or date. Press <span class="kbd">/</span> to jump directly to the search bar.</p>
+    <p><strong>Advanced Filters:</strong> Expand the filter panel to access date range, amount range, carrier, status checkboxes, tracking availability toggle, and account/email filter. A badge shows the active filter count. Click <strong>Clear All Filters</strong> to reset.</p>
+    <p><strong>View Modes:</strong> Toggle between Grid and List view. In List view, toggle visible columns: item name, email/account, ETA, shipping address, tracking number, and per-unit price.</p>
+    <p><strong>Period Filter:</strong> Filter by All, 30 days, 60 days, or 90 days.</p>
+    <p><strong>Sorting:</strong> Sort by date, order ID, amount, status, or item name. Click a column header to toggle ascending/descending.</p>
+    <p>Filters persist per retailer while the app is open.</p>
+  </div>
+
+  <h3>Bulk Operations</h3>
+  <div class="feature-card">
+    <p>Hold <span class="kbd">Ctrl/Cmd</span> and click to select multiple drops, or use the <strong>Select All</strong> checkbox. A floating action bar appears showing the selection count with options to <strong>Mark Delivered</strong> or <strong>Export CSV</strong>.</p>
+  </div>
+
+  <h3>Target-Specific Features</h3>
+  <div class="feature-card">
+    <p>Target pages include additional image management tools:</p>
+    <ul>
+      <li><strong>Fetch Images</strong> -- Scrapes Target.com for product images on drops that are missing them</li>
+      <li><strong>Auto-Spread Images</strong> -- Fills missing images from other drops with the same product</li>
+      <li><strong>Clear Images</strong> -- Removes fetched images (hover a drop to reveal)</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+<!-- 07 FLEX CARDS -->
+<section id="flex-cards">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 07</div>
+    <h2>Flex Cards</h2>
+    <p>Create styled visual summaries of your drops for saving and sharing.</p>
+  </div>
+
+  <h3>Creating a Flex Card</h3>
+  <div class="step-card">
+    <div class="step-num">1</div>
+    <div class="step-content"><p>Navigate to any retailer page</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">2</div>
+    <div class="step-content"><p>Click the <strong>Flex</strong> button on a drop card</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">3</div>
+    <div class="step-content"><p>A modal appears with product images, order stats (confirmed, quantity, spent, stick rate), and item breakdown</p></div>
+  </div>
+
+  <h3>Visual Features</h3>
+  <div class="feature-card">
+    <p>The flex card includes a tiled SOLUS prism watermark background, a branded "SOLUS" label in the bottom-right corner, and the retailer name with drop date in the bottom-left corner.</p>
+    <p>For multi-item orders, a cart breakdown section shows each item with its thumbnail, name, order count, and spend. Quantity badges appear on product images only for multi-item orders; single-item drops display a clean image without badges.</p>
+  </div>
+
+  <h3>Saving</h3>
+  <div class="feature-card">
+    <p>Click <strong>Save PNG</strong> to save the card as an image file. The image is also automatically copied to your clipboard. If you have set a flex save folder in <strong>Settings &gt; General</strong>, the file saves directly to that folder. Otherwise, a standard download dialog appears.</p>
+    <p>File names follow the format <code>solus-{retailer}-{month}-{day}.png</code>.</p>
+  </div>
+
+  <h3>Sharing to Discord</h3>
+  <div class="feature-card">
+    <p>Click the <strong>Discord</strong> button to send the flex card to your configured webhook. Two messages are sent:</p>
+    <ul>
+      <li>A styled embed with the retailer name, drop date, item list, confirmed count, quantity, spend, and stick rate</li>
+      <li>The flex card image as an embedded attachment</li>
+    </ul>
+    <p>Configure your webhook in <strong>Settings &gt; Reports</strong> before using this feature.</p>
+  </div>
+</div>
+</section>
+
+<!-- 08 DELIVERY HUB -->
+<section id="delivery-hub">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 08</div>
+    <h2>Delivery Hub</h2>
+    <p>Track all incoming packages in one place. Available in IMAP mode.</p>
+  </div>
+
+  <div class="feature-card">
+    <p>The Delivery Hub has four tabs: <strong>In Transit</strong>, <strong>Recently Delivered</strong>, <strong>Calendar</strong>, and <strong>Live Track</strong>.</p>
+  </div>
+
+  <h3>In Transit</h3>
+  <div class="feature-card">
+    <h4>Summary Cards</h4>
+    <ul>
+      <li><strong>Today</strong> -- Packages arriving today</li>
+      <li><strong>This Week</strong> -- Arriving within 7 days</li>
+      <li><strong>In Transit</strong> -- All shipped orders</li>
+      <li><strong>Alerts</strong> -- Delivery issues (stale shipments, delayed orders)</li>
+    </ul>
+    <p>Click any card to filter to that category.</p>
+  </div>
+  <div class="feature-card">
+    <h4>View Modes</h4>
+    <ul>
+      <li><strong>Timeline</strong> -- Organized by delivery date: Today, Tomorrow, This Week, Later, No ETA</li>
+      <li><strong>By Address</strong> -- Grouped by shipping address</li>
+      <li><strong>By Retailer</strong> -- Grouped by store</li>
+    </ul>
+  </div>
+  <div class="feature-card">
+    <h4>Delivery Cards</h4>
+    <p>Each card shows the retailer badge, product image, item name, shipping address, carrier, tracking number, and ETA. The ETA is color-coded for arrivals today, tomorrow, or overdue. Expand a card for full order details. Action buttons include <strong>Track</strong> (opens carrier tracking in your browser) and <strong>Mark Delivered</strong>.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Bulk Actions</h4>
+    <p>Use checkboxes or Select All to choose multiple items. A floating action bar lets you mark all selected as delivered.</p>
+  </div>
+
+  <h3>Recently Delivered</h3>
+  <div class="feature-card">
+    <p>View orders that have already arrived. Filter by Last 7 Days, 30 Days, 90 Days, Year, or All Time.</p>
+  </div>
+
+  <h3>Calendar</h3>
+  <div class="feature-card">
+    <p>A visual calendar showing deliveries by date. Navigate months with arrows or jump to today. Each date cell shows up to 3 orders with item names and a "+N more" indicator for busy days. Click any day to see a popup with full delivery details for that date.</p>
+  </div>
+
+  <h3>Address Linking</h3>
+  <div class="feature-card">
+    <p>In the By Address view, you can drag and drop addresses to link them together. This is useful for grouping jig address variants. View and manage linked addresses in <strong>Settings &gt; Jig Detection</strong>.</p>
+  </div>
+</div>
+</section>
+
+<!-- 09 LIVE TRACK -->
+<section id="live-track">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 09</div>
+    <h2>Live Track</h2>
+    <p>Real-time package tracking powered by the FedEx API.</p>
+  </div>
+
+  <h3>How to Use</h3>
+  <div class="step-card">
+    <div class="step-num">1</div>
+    <div class="step-content"><p>Set your <strong>date range</strong> (defaults to the last 30 days)</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">2</div>
+    <div class="step-content"><p>Click <strong>Search</strong> to fetch live tracking data for all FedEx shipments in that range</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">3</div>
+    <div class="step-content"><p>Results display with real-time statuses, updated ETAs, and status descriptions</p></div>
+  </div>
+
+  <div class="tip-box">
+    <div class="tip-label">Tip</div>
+    <p>Live Track uses a manual search approach to conserve API credits. Data is only fetched when you click Search.</p>
+  </div>
+
+  <h3>Filters and Sorting</h3>
+  <div class="feature-card">
+    <p><strong>Status Filters:</strong> All, In Transit, Out for Delivery, Delivered, Exception, Pending, No Data</p>
+    <p><strong>Sort Options:</strong> ETA (soonest or latest first), Status, Retailer, Date (oldest or newest first)</p>
+  </div>
+
+  <h3>Status Updates</h3>
+  <div class="feature-card">
+    <p>When Live Track returns updated information, SOLUS can apply those updates to your orders. Delivered packages are marked as delivered, and updated ETAs are applied to in-transit orders.</p>
+  </div>
+
+  <h3>Cache</h3>
+  <div class="feature-card">
+    <p>Results are cached locally for faster repeat access. Click <strong>Clear Cache</strong> to reset if results seem stale.</p>
+  </div>
+</div>
+</section>
+
+<!-- 10 ANALYTICS -->
+<section id="analytics">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 10</div>
+    <h2>Analytics</h2>
+    <p>Deep dive into your ordering performance with comprehensive charts and insights.</p>
+  </div>
+
+  <h3>Summary Cards</h3>
+  <div class="feature-card">
+    <p>At the top of the Analytics page, summary cards show total orders, confirmed count, total spent, and overall stick rate for the selected period.</p>
+  </div>
+
+  <h3>Filters</h3>
+  <div class="feature-card">
+    <p><strong>Retailer Tabs:</strong> View data for All retailers or filter to any individual retailer.</p>
+    <p><strong>Period Filter:</strong> 7 Days, 30 Days, 90 Days, 1 Year, or All Time.</p>
+    <p><strong>Period Comparison:</strong> Click the <strong>Compare</strong> toggle to overlay the previous period's data as a dashed line on spending, stick rate, and cancel rate charts. For example, viewing 30 Days with Compare enabled overlays the prior 30-day period for trend analysis.</p>
+  </div>
+
+  <h3>Sub-Tabs</h3>
+  <div class="feature-card">
+    <p>Analytics is organized into four sub-tabs.</p>
+  </div>
+
+  <h4>Overview</h4>
+  <div class="feature-card">
+    <p>The main summary with spending over time and stick rate trend charts.</p>
+  </div>
+
+  <h4>Trends</h4>
+  <div class="feature-card">
+    <p><strong>Cancel Rate Trend</strong> -- Line chart in red showing daily cancellation rate, helping you identify spike patterns.</p>
+    <p><strong>Order Volume</strong> -- Stacked bar chart with green bars for confirmed and red for cancelled, showing both volume and success rate at a glance.</p>
+    <p><strong>Retailer Comparison</strong> -- Horizontal bar chart (visible when "All" retailers is selected). Toggle between three metrics: stick rate, total orders, and total spending.</p>
+  </div>
+
+  <h4>Patterns</h4>
+  <div class="feature-card">
+    <p><strong>Ordering Patterns Heatmap</strong> -- Shows order distribution by day of the week, with per-retailer tabs and color intensity based on volume. Includes peak day insights such as "Your busiest day at Walmart is Tuesday."</p>
+    <p><strong>Carrier Performance</strong> -- Three visualizations: a doughnut chart showing carrier distribution, a bar chart showing average delivery time per carrier, and a stats table with total shipments, average transit time, and on-time percentage.</p>
+  </div>
+
+  <h4>Insights</h4>
+  <div class="feature-card">
+    <p>A dedicated panel showing your top and bottom performers:</p>
+    <ul>
+      <li><strong>Top Items by Stick Rate</strong> -- Products with the highest confirmation rate (minimum 3 orders)</li>
+      <li><strong>Top Items by Spend</strong> -- Where you are spending the most</li>
+      <li><strong>Top Items by Volume</strong> -- Most-ordered products</li>
+      <li><strong>Worst Performers</strong> -- Items with the highest cancellation rates</li>
+      <li><strong>Biggest Drop Days</strong> -- Dates with the most orders</li>
+    </ul>
+    <p>Clickable item names navigate directly to the retailer page with that item searched.</p>
+  </div>
+
+  <h3>Chart Toggle Bar</h3>
+  <div class="feature-card">
+    <p>Use the toggle bar to show or hide individual chart sections for a cleaner view.</p>
+  </div>
+</div>
+</section>
+
+<!-- 11 ACCOUNT STATS -->
+<section id="account-stats">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 11</div>
+    <h2>Account Stats</h2>
+    <p>Analyze performance by individual email account or Discord profile.</p>
+  </div>
+
+  <div class="feature-card">
+    <p>The page title changes based on your active mode: <strong>Account Stats</strong> (IMAP) or <strong>Profile Stats</strong> (Discord).</p>
+  </div>
+
+  <h3>Filters</h3>
+  <div class="feature-card">
+    <ul>
+      <li><strong>Retailer</strong> -- All or any individual retailer</li>
+      <li><strong>Time Period</strong> -- 7D, 30D, 90D, All, or Custom date range</li>
+      <li><strong>Search</strong> -- Search by email, address, or profile name</li>
+      <li><strong>Tier Chips</strong> -- Filter to specific performance tiers</li>
+      <li><strong>View Toggle</strong> -- Grid (cards) or List (rows)</li>
+    </ul>
+  </div>
+
+  <h3>Sort Options</h3>
+  <div class="feature-card">
+    <p>Sort by stick rate, risk score, order count, total spent, or account name. Group by ship address for Pokemon Center.</p>
+  </div>
+
+  <h3>Metrics Per Account</h3>
+  <div class="feature-card">
+    <p>Each account card displays:</p>
+    <ul>
+      <li><strong>Rank</strong> -- Top 3 accounts get gold, silver, and bronze badges</li>
+      <li><strong>Email or Profile Name</strong> -- With editable nickname</li>
+      <li><strong>Stick Rate</strong> -- With tier color and trend arrow (improving, flat, or declining)</li>
+      <li><strong>Tier Label</strong> -- Diamond, Perfect, Good, Okay, or At Risk</li>
+      <li><strong>Benchmark</strong> -- Comparison vs tier average</li>
+      <li><strong>Risk Score</strong> -- 0 to 100, color-coded</li>
+      <li><strong>Mini Outcome Bar</strong> -- Visual confirmed/total ratio</li>
+      <li><strong>Detailed Metrics</strong> -- Confirmed/total orders, total spent, average order value, last order date</li>
+      <li>Expandable mini order list</li>
+    </ul>
+    <p>In Discord mode, cards also show bot type, decline count, decline rate, and health score. For Pokemon Center, cards include base address grouping, variant count, and expandable variant details.</p>
+  </div>
+
+  <h3>Tier System</h3>
+  <table>
+    <thead><tr><th>Tier</th><th>Stick Rate</th><th>Color</th><th>Requirements</th></tr></thead>
+    <tbody>
+      <tr><td><span class="status-badge badge-cyan">Diamond</span></td><td>100%</td><td>Ice-blue glow</td><td>3+ orders and 100% stick rate</td></tr>
+      <tr><td><span class="status-badge badge-purple">Perfect</span></td><td>80%+</td><td>Purple</td><td>--</td></tr>
+      <tr><td><span class="status-badge badge-green">Good</span></td><td>60%+</td><td>Jade green</td><td>--</td></tr>
+      <tr><td><span class="status-badge badge-yellow">Okay</span></td><td>40%+</td><td>Orange</td><td>--</td></tr>
+      <tr><td><span class="status-badge badge-red">At Risk</span></td><td>Below 40%</td><td>Red</td><td>--</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Risk Score</h3>
+  <div class="feature-card">
+    <p>Each account receives a composite score from 0 to 100 based on four factors:</p>
+  </div>
+  <table>
+    <thead><tr><th>Factor</th><th>Weight</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Stick Rate</td><td>40%</td><td>Higher stick rate increases score</td></tr>
+      <tr><td>Order Volume</td><td>25%</td><td>More orders means more reliable data (log scale, 20 orders = full credit)</td></tr>
+      <tr><td>Recent Trend</td><td>20%</td><td>Improving stick rate boosts score</td></tr>
+      <tr><td>Decline Rate</td><td>15%</td><td>High decline rate penalizes score</td></tr>
+    </tbody>
+  </table>
+  <div class="feature-card">
+    <p><strong>Score colors:</strong> <span style="color:var(--green);">Green (80-100)</span> is healthy, <span style="color:var(--yellow);">Yellow (60-79)</span> is acceptable, <span style="color:orange;">Orange (40-59)</span> is at risk, and <span style="color:var(--red);">Red (0-39)</span> is high risk.</p>
+  </div>
+
+  <h3>Recommendations</h3>
+  <div class="feature-card">
+    <p>Accounts with 5 or more orders receive actionable recommendations:</p>
+    <ul>
+      <li><span class="status-badge badge-green">Performing</span> -- Stick rate 80%+, decline rate below 10%</li>
+      <li><span class="status-badge badge-yellow">Needs Attention</span> -- Stick rate 70-80%, decline rate 10-20%, or inactive 14+ days</li>
+      <li><span class="status-badge badge-red">Consider Retiring</span> -- Stick rate below 50% or decline rate above 20%</li>
+    </ul>
+    <p>Accounts with fewer than 5 orders show "Need more data."</p>
+  </div>
+
+  <h3>Summary Cards</h3>
+  <div class="feature-card">
+    <p>At the top of the page: total account/profile count, base addresses (Pokemon Center), average stick rate with period-over-period delta, total spent or total declines, Diamond/Perfect counts, and accounts needing attention.</p>
+  </div>
+
+  <h3>Tier Distribution Bar</h3>
+  <div class="feature-card">
+    <p>A visual bar showing the count of accounts in each tier for a quick picture of overall account health.</p>
+  </div>
+
+  <h3>Advanced Filter Modal</h3>
+  <div class="feature-card">
+    <p>Click the filter icon to access minimum stick rate, minimum orders, date range, and tier selection. A badge shows the active filter count.</p>
+  </div>
+
+  <h3>Export</h3>
+  <div class="feature-card">
+    <p>Click <strong>Export</strong> to download account stats as CSV. Filter by user type, performance tier, site, stick rate range, and order count range. Choose Summary or Detailed export level.</p>
+  </div>
+</div>
+</section>
+
+<!-- 12 REPORTS -->
+<section id="reports">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 12</div>
+    <h2>Reports</h2>
+    <p>Generate, export, and share detailed reports from your order data.</p>
+  </div>
+
+  <h3>Configuring a Report</h3>
+  <div class="feature-card">
+    <p>Select your parameters before generating:</p>
+    <ul>
+      <li><strong>Time Period</strong> -- 7D, 30D, 90D, All Time, or Custom date range</li>
+      <li><strong>Retailer</strong> -- All retailers or a specific one</li>
+      <li><strong>Sections</strong> -- Toggle: Summary, Retailers, Top Items, Accounts, Carriers</li>
+    </ul>
+  </div>
+
+  <h3>Report Sections</h3>
+  <table>
+    <thead><tr><th>Section</th><th>Contents</th></tr></thead>
+    <tbody>
+      <tr><td>Summary Stats</td><td>Total orders, confirmed, cancelled, stick rate, total spent</td></tr>
+      <tr><td>Retailer Breakdown</td><td>Per-retailer order counts and spend</td></tr>
+      <tr><td>Top Performers</td><td>Best items by stick rate, spend, and volume</td></tr>
+      <tr><td>Account Scores</td><td>Risk scores and stick rates per account</td></tr>
+      <tr><td>Carrier Stats</td><td>Carrier distribution and average delivery times</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Generating and Previewing</h3>
+  <div class="feature-card">
+    <p>Click <strong>Generate Report</strong> to compile the data. A styled preview appears in-app matching SOLUS branding, with a timestamp showing when the report was generated.</p>
+  </div>
+
+  <h3>Export Options</h3>
+  <table>
+    <thead><tr><th>Option</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Download PDF</td><td>Save the report as a styled PDF file</td></tr>
+      <tr><td>Copy PNG</td><td>Copies a PNG screenshot to your clipboard for quick pasting</td></tr>
+      <tr><td>Export CSV</td><td>Downloads raw report data for spreadsheet analysis</td></tr>
+      <tr><td>Export JSON</td><td>Downloads structured report data</td></tr>
+      <tr><td>PDF Receipts</td><td>Batch export individual order receipts as PDF files</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Report Templates</h3>
+  <div class="step-card">
+    <div class="step-num">1</div>
+    <div class="step-content"><p>Click <strong>+ New Template</strong></p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">2</div>
+    <div class="step-content"><p>Name it (e.g., "Weekly Walmart Summary")</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">3</div>
+    <div class="step-content"><p>Select sections, time period, and retailer filter</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">4</div>
+    <div class="step-content"><p>Save</p></div>
+  </div>
+  <div class="feature-card">
+    <p>Load any template to instantly populate settings and generate. Templates are managed in <strong>Settings &gt; Reports</strong>.</p>
+  </div>
+
+  <h3>Share to Discord</h3>
+  <div class="feature-card">
+    <p>Click <strong>Share to Discord</strong> to send the report to your configured webhook. The message includes an embed with key stats and a PNG screenshot attachment. Configure your webhook in <strong>Settings &gt; Reports</strong>.</p>
+  </div>
+
+  <h3>PDF Receipt Export</h3>
+  <div class="feature-card">
+    <p>Export individual order receipts as PDF files:</p>
+    <ul>
+      <li>Set a <strong>PDF Save Folder</strong> in Settings &gt; Data</li>
+      <li>Click <strong>PDF Receipts</strong> in the report export bar</li>
+      <li>Confirmation is required for batches over 50 orders</li>
+    </ul>
+  </div>
+
+  <h3>CSV Column Customization</h3>
+  <div class="feature-card">
+    <p>Customize which columns appear in CSV exports via <strong>Settings &gt; Data</strong>. Available columns: Date, Retailer, Order ID, Item, Quantity, Amount, Per-Unit Cost, Tracking Number, Carrier, Tracking URL, Email, Status, Address, and ETA.</p>
+  </div>
+</div>
+</section>
+
+<!-- 13 INVENTORY AND PORTFOLIO -->
+<section id="inventory">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 13</div>
+    <h2>Inventory and Portfolio</h2>
+    <p>Track your inventory, costs, and profits with the full-featured inventory management system.</p>
+  </div>
+
+  <h3>Portfolio Overview</h3>
+  <div class="feature-card">
+    <p>The Portfolio page provides a unified view of your inventory with three sub-tabs: <strong>Stock</strong>, <strong>Sales</strong>, and <strong>Insights</strong>.</p>
+    <p><strong>KPI Summary Bar:</strong> Market Value, Cost Basis, Profit/Loss, ROI percentage, and Item Count.</p>
+  </div>
+
+  <h4>Stock Tab</h4>
+  <div class="feature-card">
+    <p>View and manage all inventory items.</p>
+    <p><strong>Controls:</strong> Search by name, filter by category (All Items, Price-Tracked, Manual Only), sort by name/quantity/investment/date, toggle between table and grid view, and adjust display density.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Adding Items - Manual</h4>
+    <p>Click <strong>+ Add Item</strong> and enter the SKU, name, quantity, cost per unit, current market value, condition, and optionally a TCGPlayer URL for price tracking.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Adding Items - Import from Orders</h4>
+    <p>Click <strong>Import</strong> to select items from your order history. Items are added with the order price as cost basis.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Cost Lots</h4>
+    <p>Each inventory item can have multiple cost lots, tracking separate purchase quantities at different prices. This enables accurate FIFO or weighted-average cost basis calculation when logging sales.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Item Details</h4>
+    <p>Click any item to see its product image, price history chart, cost versus market value comparison, associated orders, and a Log Sale button.</p>
+  </div>
+
+  <h4>Sales Tab</h4>
+  <div class="feature-card">
+    <p>Track items you have sold.</p>
+    <p><strong>Summary Cards:</strong> Items Sold, Total Revenue, Total Cost Basis, Realized Profit/Loss, and Average Margin.</p>
+    <p><strong>Platform Filter:</strong> All, eBay, TCGPlayer, Mercari, Facebook, Local, Other.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Logging a Sale</h4>
+    <ul>
+      <li>Click <strong>Log Sale</strong> on any inventory item</li>
+      <li>Enter quantity sold and sale price</li>
+      <li>Select the platform</li>
+      <li>Fees are auto-calculated based on platform presets (configurable in Settings)</li>
+      <li>Add date and optional notes</li>
+      <li>Click Save</li>
+    </ul>
+    <p>Profit is calculated automatically using your cost basis method (FIFO or weighted average). Inventory quantities update accordingly.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Returns</h4>
+    <p>Process returns to restore inventory and reverse fee calculations.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Charts</h4>
+    <p>Profit Waterfall chart and Top Movers chart visualize your sales performance.</p>
+  </div>
+
+  <h4>Insights Tab</h4>
+  <div class="feature-card">
+    <p>Automated intelligence about your inventory:</p>
+    <ul>
+      <li><strong>Key Metrics</strong> -- Four-column display of portfolio health indicators</li>
+      <li><strong>Portfolio Value Chart</strong> -- Value trend over time</li>
+      <li><strong>Aging Buckets</strong> -- How long items have been in stock</li>
+      <li><strong>Sell-Through Rate</strong> -- How quickly items move</li>
+      <li><strong>Category Breakdown</strong> -- Distribution by product type</li>
+      <li><strong>Actionable Alerts</strong> -- Recommendations such as items to restock, slow movers to discount, or price drops to investigate</li>
+    </ul>
+  </div>
+
+  <h3>Batch Operations</h3>
+  <div class="feature-card">
+    <p>Select multiple items for bulk actions: Log Bulk Sale, Batch Export, or Batch Delete.</p>
+  </div>
+
+  <h3>Legacy Inventory</h3>
+  <div class="feature-card">
+    <p>If you used the original inventory system (v1), your data is preserved. The v2 system includes enhanced lot tracking, structured fee calculations, and a full transaction ledger.</p>
+  </div>
+</div>
+</section>
+
+<!-- 14 TCG PRICE TRACKER -->
+<section id="tcg-tracker">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 14</div>
+    <h2>TCG Price Tracker</h2>
+    <p>Monitor TCGPlayer prices for your trading card inventory.</p>
+  </div>
+
+  <h3>Adding Items</h3>
+  <div class="feature-card">
+    <h4>By URL</h4>
+    <p>Click <strong>+ Add Item</strong>, paste a TCGPlayer product URL, and the item is added with its current price fetched automatically.</p>
+  </div>
+  <div class="feature-card">
+    <h4>By Search</h4>
+    <p>Click <strong>Search by Name</strong>, type a product name, and select from up to 20 candidates shown with images, set names, market prices, and confidence scores. Link a search result to an existing inventory item or add it as new.</p>
+  </div>
+
+  <h3>Price Monitoring</h3>
+  <div class="feature-card">
+    <p>Items with TCGPlayer links display current market price, price trend indicator (up or down), quantity held, and last refresh time.</p>
+  </div>
+
+  <h3>Auto-Refresh</h3>
+  <table>
+    <thead><tr><th>Interval</th><th>Best For</th></tr></thead>
+    <tbody>
+      <tr><td>Manual Only</td><td>Occasional checking</td></tr>
+      <tr><td>Every 5-15 min</td><td>Active monitoring during releases</td></tr>
+      <tr><td>Every 30-60 min</td><td>Regular daily tracking</td></tr>
+      <tr><td>Every 6 hours</td><td>Passive long-term tracking</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Proxy Support</h3>
+  <div class="step-card">
+    <div class="step-num">1</div>
+    <div class="step-content"><p>Click <strong>Manage Proxies</strong></p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">2</div>
+    <div class="step-content"><p>Create a new proxy list</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">3</div>
+    <div class="step-content"><p>Paste your proxies (one per line, supports HTTP and SOCKS formats)</p></div>
+  </div>
+  <div class="step-card">
+    <div class="step-num">4</div>
+    <div class="step-content"><p>Select the list as active</p></div>
+  </div>
+
+  <h3>TCG Analytics</h3>
+  <div class="feature-card">
+    <p>View price change data across your tracked items: 1-day change, 7-day change, and 30-day change. Batch matching can automatically link your inventory items to TCGPlayer listings.</p>
+  </div>
+
+  <h3>Sorting and Views</h3>
+  <div class="feature-card">
+    <p>Sort by name, value (high or low), quantity (high or low), or most recently added. Toggle between grid and list view.</p>
+  </div>
+</div>
+</section>
+
+<!-- 15 SETTINGS REFERENCE -->
+<section id="settings">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 15</div>
+    <h2>Settings Reference</h2>
+    <p>All configurable options organized by tab.</p>
+  </div>
+
+  <h3>General</h3>
+  <div class="feature-card">
+    <ul>
+      <li><strong>Data Mode:</strong> Switch between IMAP and Discord modes.</li>
+      <li><strong>Theme:</strong> Toggle between Dark and Light mode.</li>
+      <li><strong>Accent Color:</strong> Choose from preset colors (Purple, Blue, Green, Red, Orange, Pink) or enter a custom hex code. The accent applies across all UI elements.</li>
+      <li><strong>Auto-Sync on Launch:</strong> Automatically sync recent emails when the app starts.</li>
+      <li><strong>Auto-Sync Interval:</strong> How often auto-sync runs (5 to 120 minutes).</li>
+      <li><strong>Sync on Startup:</strong> Enable or disable automatic sync at launch.</li>
+      <li><strong>Auto-Resume Delay:</strong> How long to wait before retrying a paused sync (1 to 60 minutes, or off). Retries up to 3 times.</li>
+      <li><strong>Deep Scan:</strong> Search all emails in the date range rather than using targeted patterns.</li>
+      <li><strong>Flex Save Folder:</strong> Choose where flex card screenshots are saved.</li>
+      <li><strong>Walkthrough:</strong> Replay the onboarding tutorial.</li>
+    </ul>
+  </div>
+
+  <h3>License</h3>
+  <div class="feature-card">
+    <p>View license key (masked), plan type, status, activation date, expiration date, and days remaining. Disconnect your license to deactivate on this device.</p>
+  </div>
+
+  <h3>Data</h3>
+  <div class="feature-card">
+    <h4>Export Options</h4>
+    <ul>
+      <li>Export JSON -- Full data backup</li>
+      <li>Export CSV -- Orders with configurable columns</li>
+      <li>Export PDFs -- Batch order receipts (set save folder first)</li>
+    </ul>
+  </div>
+  <div class="feature-card">
+    <h4>Date Range and Column Selection</h4>
+    <p>Scope exports to a specific window. Toggle which columns appear in CSV exports.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Import</h4>
+    <ul>
+      <li>Import CSV -- Bulk import email accounts</li>
+      <li>Import EML -- Parse raw .eml email files for testing</li>
+    </ul>
+  </div>
+  <div class="feature-card">
+    <h4>Clear Data</h4>
+    <ul>
+      <li>Clear Orders -- Remove orders by timeframe (7, 14, 30, 60, 90 days, or all)</li>
+      <li>Clear All Data -- Full reset (requires double confirmation)</li>
+    </ul>
+  </div>
+
+  <h3>Jig Detection</h3>
+  <div class="feature-card">
+    <p>Group orders from jigged (modified) addresses together.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Built-in Leetspeak Patterns</h4>
+    <p>Automatically decodes common substitutions:</p>
+  </div>
+  <table>
+    <thead><tr><th>Character</th><th>Decoded As</th></tr></thead>
+    <tbody>
+      <tr><td><code>1</code></td><td>i</td></tr>
+      <tr><td><code>3</code></td><td>e</td></tr>
+      <tr><td><code>0</code></td><td>o</td></tr>
+      <tr><td><code>@</code> or <code>4</code></td><td>a</td></tr>
+      <tr><td><code>$</code> or <code>5</code></td><td>s</td></tr>
+      <tr><td><code>7</code></td><td>t</td></tr>
+      <tr><td><code>8</code></td><td>b</td></tr>
+      <tr><td><code>9</code></td><td>g</td></tr>
+    </tbody>
+  </table>
+  <div class="feature-card">
+    <p><strong>Custom Patterns:</strong> Add your own substitutions (e.g., <code>Mainne=Main</code>).</p>
+    <p><strong>AYCD Expressions:</strong> Paste AYCD jig expressions (e.g., <code>%cMain,Maain,Mainn%</code>).</p>
+    <p><strong>Manual Linking:</strong> View and unlink manually linked addresses. Link addresses by dragging in Delivery Hub &gt; By Address view.</p>
+  </div>
+
+  <h3>Reports</h3>
+  <div class="feature-card">
+    <p><strong>Discord Webhook URL:</strong> Paste your webhook for report and flex sharing. Test to verify.</p>
+    <p><strong>Report Templates:</strong> Manage saved templates.</p>
+  </div>
+
+  <h3>SKU Overrides</h3>
+  <div class="feature-card">
+    <p>Map product names to custom SKU identifiers. These merge with built-in mappings (your overrides take priority). Useful for normalizing item names that appear differently across retailers or email formats.</p>
+  </div>
+</div>
+</section>
+
+<!-- 16 KEYBOARD SHORTCUTS -->
+<section id="shortcuts">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 16</div>
+    <h2>Keyboard Shortcuts</h2>
+    <p>Quick keys for faster navigation and actions.</p>
+  </div>
+
+  <table>
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td><span class="kbd">/</span></td><td>Jump to search bar (on retailer pages)</td></tr>
+      <tr><td><span class="kbd">Escape</span></td><td>Close modals or clear search</td></tr>
+      <tr><td><span class="kbd">Enter</span></td><td>Activate license, save edits, trigger searches</td></tr>
+      <tr><td><span class="kbd">Ctrl/Cmd</span> + Click</td><td>Multi-select drops or orders</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<!-- 17 BEST PRACTICES -->
+<section id="best-practices">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 17</div>
+    <h2>Best Practices</h2>
+    <p>Tips and recommendations for getting the most out of SOLUS.</p>
+  </div>
+
+  <div class="feature-card">
+    <h4>Security</h4>
+    <p>Always use app-specific passwords. Never enter your regular email password into any third-party application.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Sync</h4>
+    <p>Enable auto-sync on launch to keep data current. For large mailboxes, set auto-resume to 5-10 minutes to handle connection interruptions gracefully.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Account Health</h4>
+    <p>Check Account Stats weekly to identify underperforming accounts early. Accounts with declining stick rates or high decline rates may need attention before they become problematic.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Jig Detection</h4>
+    <p>Enable jig detection to see your true stick rate per address. Without it, jigged address variants appear as separate accounts.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Inventory</h4>
+    <p>Import confirmed orders to inventory to track real profit and loss. Use cost lots to accurately track items purchased at different prices.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Reports</h4>
+    <p>Create templates for your weekly or monthly reports. Generate with one click and share to Discord or export as PDF.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Dashboard</h4>
+    <p>Hide retailer cards you do not use. A cleaner dashboard helps you focus on what matters.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Discord Mode</h4>
+    <p>Set up server-side forwarding by assigning webhooks to watched channels. Orders forward automatically even when SOLUS is closed. Map your profiles to enable @mention tagging in forwarded orders.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Live Track</h4>
+    <p>Use date range search to check real-time FedEx tracking status. Clear the cache if results seem outdated.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Flex Cards</h4>
+    <p>Set a flex save folder in Settings to avoid the download dialog every time. Images are also automatically copied to your clipboard.</p>
+  </div>
+</div>
+</section>
+
+<!-- 18 TROUBLESHOOTING -->
+<section id="troubleshooting">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 18</div>
+    <h2>Troubleshooting</h2>
+    <p>Common issues and their solutions.</p>
+  </div>
+
+  <h3>Sync Issues</h3>
+  <div class="feature-card">
+    <h4>Sync not finding emails?</h4>
+    <p>Check that the date range includes the order dates. Try "Rescue from Spam" as emails may have been filtered. Verify the app password is correct. Open the Sync Log for detailed error messages. If using iCloud, ensure IMAP access is enabled in your iCloud settings.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Sync keeps pausing?</h4>
+    <p>Connection interruptions are common with large mailboxes. Enable auto-resume in Settings to automatically retry after a delay. If the problem persists, try syncing a smaller date range.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Sync is very slow?</h4>
+    <p>iCloud is the slowest provider due to conservative rate limits. Gmail with large mailboxes may take several minutes. Deep Scan mode is significantly slower than targeted mode. Consider syncing smaller date ranges.</p>
+  </div>
+
+  <h3>Order Issues</h3>
+  <div class="feature-card">
+    <h4>Orders showing wrong status?</h4>
+    <p>Re-sync the affected date range to pull the latest email updates. Status depends on retailer email timing; some retailers delay shipping notifications.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Duplicate orders appearing?</h4>
+    <p>SOLUS merges orders by order ID. If duplicates appear, they likely have different order IDs. Check the original emails to verify.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Wrong price or item name on Walmart orders?</h4>
+    <p>SOLUS uses multiple extraction strategies for Walmart pricing. If the wrong amount appears, re-sync the affected date. The parser prioritizes the order total section over promotional savings amounts.</p>
+  </div>
+
+  <h3>Analytics Issues</h3>
+  <div class="feature-card">
+    <h4>High cancellation rate?</h4>
+    <p>Check Account Stats to identify problematic accounts or addresses. Review jig detection settings. Use the Risk Score to surface high-risk accounts.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Charts not loading?</h4>
+    <p>Switch to a different tab and back. Ensure enough data exists for the selected period.</p>
+  </div>
+
+  <h3>Discord Issues</h3>
+  <div class="feature-card">
+    <h4>Discord forwarding not working?</h4>
+    <p>Re-assign the webhook in ACO Panel Settings (change to None, then back). Wait 60 seconds for the bot to pick up the change. Verify the webhook URL is valid with the Test button.</p>
+  </div>
+  <div class="feature-card">
+    <h4>Profile @mentions not tagging?</h4>
+    <p>Ensure the profile name matches exactly (case-insensitive). Wait 5 minutes after adding a new mapping for the bot cache to refresh. Verify the Discord User ID is correct (17-20 digits).</p>
+  </div>
+  <div class="feature-card">
+    <h4>Declined orders counted as cancellations?</h4>
+    <p>Update to version 2.3.3 or later, which correctly distinguishes payment declines from true cancellations. Existing misclassified orders are automatically reclassified on update.</p>
+  </div>
+
+  <h3>Live Track Issues</h3>
+  <div class="feature-card">
+    <h4>Live Track showing stale data?</h4>
+    <p>Click <strong>Clear Cache</strong> and run a new search.</p>
+  </div>
+  <div class="feature-card">
+    <h4>No tracking data found?</h4>
+    <p>Live Track currently supports FedEx shipments. UPS and USPS tracking data comes from email parsing only.</p>
+  </div>
+
+  <h3>General Issues</h3>
+  <div class="feature-card">
+    <h4>App won't start after update?</h4>
+    <p>On Windows, Smart App Control may block unsigned installers. Right-click the installer, select Properties, and check Unblock, or temporarily disable Smart App Control in Windows Settings &gt; Privacy &amp; Security &gt; Windows Security.</p>
+  </div>
+  <div class="feature-card">
+    <h4>License validation failed?</h4>
+    <p>Check your internet connection. SOLUS has a 30-minute offline grace period. If the issue persists, try disconnecting and re-activating your license.</p>
+  </div>
+</div>
+</section>
+
+<!-- 19 GLOSSARY -->
+<section id="glossary">
+<div class="guide-container">
+  <div class="section-header">
+    <div class="section-num">Section 19</div>
+    <h2>Glossary</h2>
+    <p>Key terms and definitions used throughout SOLUS.</p>
+  </div>
+
+  <table>
+    <thead><tr><th>Term</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>ACO</strong></td><td>Auto-Checkout. Automated purchasing via Discord bots.</td></tr>
+      <tr><td><strong>App Password</strong></td><td>A unique password generated by your email provider specifically for third-party apps. Different from your login password.</td></tr>
+      <tr><td><strong>Cost Basis</strong></td><td>The total amount paid for inventory items, used to calculate profit when selling.</td></tr>
+      <tr><td><strong>Deep Scan</strong></td><td>An IMAP sync mode that searches all emails rather than using targeted patterns.</td></tr>
+      <tr><td><strong>Decline</strong></td><td>A failed payment attempt by an ACO bot. Does not count against stick rate.</td></tr>
+      <tr><td><strong>Drop</strong></td><td>A group of orders placed on the same date for the same retailer.</td></tr>
+      <tr><td><strong>ETA</strong></td><td>Estimated Time of Arrival for a shipped package.</td></tr>
+      <tr><td><strong>FIFO</strong></td><td>First In, First Out. A cost basis method where the oldest inventory is assumed sold first.</td></tr>
+      <tr><td><strong>Flex Card</strong></td><td>A styled visual summary of a drop, designed for sharing.</td></tr>
+      <tr><td><strong>IMAP</strong></td><td>Internet Message Access Protocol. The standard for accessing email from a server.</td></tr>
+      <tr><td><strong>Jig</strong></td><td>A modified shipping address using character substitutions to appear unique to retailers.</td></tr>
+      <tr><td><strong>Leetspeak</strong></td><td>Character substitutions (e.g., 1 for i, 3 for e) commonly used in jigged addresses.</td></tr>
+      <tr><td><strong>Lot</strong></td><td>A quantity of inventory purchased at a specific cost. Used for accurate cost basis tracking.</td></tr>
+      <tr><td><strong>Profile</strong></td><td>A named identity used by an ACO bot, mapped to a Discord user for tracking.</td></tr>
+      <tr><td><strong>SKU</strong></td><td>Stock Keeping Unit. A unique identifier for a product.</td></tr>
+      <tr><td><strong>Stick Rate</strong></td><td>The percentage of orders that were confirmed versus total attempted. Higher is better.</td></tr>
+      <tr><td><strong>Tier</strong></td><td>A performance classification (Diamond, Perfect, Good, Okay, At Risk) based on stick rate.</td></tr>
+      <tr><td><strong>WAVG</strong></td><td>Weighted Average. A cost basis method using the average cost across all lots.</td></tr>
+      <tr><td><strong>Webhook</strong></td><td>A Discord URL that receives automated messages from SOLUS.</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<!-- SUPPORT -->
+<section>
+<div class="guide-container">
+  <div class="divider"></div>
+  <div class="feature-card" style="text-align:center;">
+    <h4>Need Help?</h4>
+    <p>Go to <strong>Settings &gt; General</strong> and click <strong>Send Feedback</strong>. Describe your issue, optionally attach debug logs and screenshots, and include your Discord username or email for follow-up.</p>
+  </div>
+  <p style="text-align:center; color:var(--text-muted); margin-top:32px; font-size:13px; font-style:italic;">SOLUS v4.0 -- Built for resellers, by resellers.</p>
+  <div class="spacer"></div>
+</div>
+</section>
+
 </body>
 </html>

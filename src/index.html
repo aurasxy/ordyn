@@ -5502,8 +5502,10 @@
 
               <div class="discord-sync-actions">
                 <button class="btn btn-primary btn-sm" id="discordSyncNowBtn" onclick="syncDiscordOrders()">Sync Now</button>
+                <button class="btn btn-sm" onclick="fullResyncDiscord()" title="Re-fetch all orders from server (including previously synced)">Full Resync</button>
                 <button class="btn btn-sm btn-accent" onclick="relinkDiscordImages()">Refresh Images</button>
                 <button class="btn btn-sm btn-red" onclick="clearDiscordOrders()">Clear Discord Orders</button>
+                <button class="btn btn-sm" onclick="resetDiscordSync()" style="color:#f97316;border-color:rgba(249,115,22,0.4);background:rgba(249,115,22,0.1)" title="Reset server sync state so all orders come back as unfetched">Reset Server Sync</button>
                 <span id="discordLastSync" class="discord-last-sync">Last synced: Never</span>
               </div>
               <div id="discordSyncProgress" style="display:none;margin-top:8px">
@@ -5540,7 +5542,7 @@
                 <option value="mapped">Mapped</option>
                 <option value="unmapped">Unmapped</option>
               </select>
-              <select id="acoSiteFilter" class="form-input form-input-sm" style="width:auto;font-size:12px" onchange="renderAcoUsers()">
+              <select id="acoSiteFilter" class="form-input form-input-sm" style="width:auto;font-size:12px" onchange="updateAcoStatusToggles();renderAcoUsers()">
                 <option value="all">All Sites</option>
                 <option value="Walmart">Walmart</option>
                 <option value="Target">Target</option>
@@ -5551,6 +5553,29 @@
               </select>
               <button class="btn btn-primary btn-sm" onclick="showAddMappingForm()" style="font-size:11px;padding:5px 14px">+ Link Profile</button>
               <button class="btn btn-sm" onclick="showAcoExportModal()" style="font-size:11px;padding:5px 14px">Export</button>
+              <button class="btn btn-sm" onclick="toggleAcoAdvancedFilters()" id="acoAdvFilterToggle" style="font-size:11px;padding:5px 10px;color:var(--text-secondary)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                Filters
+              </button>
+            </div>
+            <div id="acoAdvFilters" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:var(--radius-md);background:var(--bg-secondary);border:1px solid var(--border-color)">
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:4px">
+                  <label style="font-size:11px;color:var(--text-secondary);white-space:nowrap">Min Orders</label>
+                  <input type="number" id="acoFilterMinOrders" class="form-input form-input-sm" value="0" min="0" style="width:60px;font-size:11px;padding:3px 6px" oninput="renderAcoUsers()" onchange="renderAcoUsers()">
+                </div>
+                <div style="display:flex;align-items:center;gap:4px">
+                  <label style="font-size:11px;color:var(--text-secondary);white-space:nowrap">From</label>
+                  <input type="date" id="acoFilterFromDate" class="form-input form-input-sm" style="font-size:11px;padding:3px 6px" onchange="if(!document.getElementById('acoFilterToDate').value){document.getElementById('acoFilterToDate').value=localDateStr(new Date())} renderAcoUsers()">
+                </div>
+                <div style="display:flex;align-items:center;gap:4px">
+                  <label style="font-size:11px;color:var(--text-secondary);white-space:nowrap">To</label>
+                  <input type="date" id="acoFilterToDate" class="form-input form-input-sm" style="font-size:11px;padding:3px 6px" onchange="renderAcoUsers()">
+                </div>
+                <div id="acoStatusToggles" style="display:none;align-items:center;gap:6px;border-left:1px solid var(--border-color);padding-left:10px">
+                </div>
+                <button class="btn btn-sm" onclick="clearAcoAdvancedFilters()" style="font-size:10px;padding:3px 10px;margin-left:auto">Clear</button>
+              </div>
             </div>
 
             <!-- ACO Export Modal -->
@@ -5764,6 +5789,7 @@
                   <button class="btn btn-primary btn-sm" onclick="syncDiscordOrders()" id="acoSyncNowBtn" style="font-size:11px;padding:5px 14px">Sync Now</button>
                   <button class="btn btn-sm" onclick="relinkDiscordImages()" style="font-size:11px;padding:5px 14px">Refresh Images</button>
                   <button class="btn btn-sm" onclick="clearDiscordOrders()" style="font-size:11px;padding:5px 14px;color:var(--danger);border-color:rgba(239,68,68,0.3)">Clear Orders</button>
+                  <button class="btn btn-sm" onclick="resetDiscordSync()" style="font-size:11px;padding:5px 14px;color:var(--warning);border-color:rgba(249,115,22,0.3)" title="Reset server sync state so all orders come back as unfetched">Reset Server Sync</button>
                 </div>
               </div>
             </div>
@@ -6881,6 +6907,34 @@
           <button class="btn btn-secondary" id="fetchTcgBtn" onclick="fetchTcgProduct()">Fetch</button>
         </div>
       </div>
+      <!-- Manual item name (portfolio only, no TCG fetch required) -->
+      <div class="form-group" id="invManualNameGroup" style="display:none;">
+        <label class="form-label">Item Name</label>
+        <input type="text" class="form-input" id="invManualName" placeholder="e.g. Prismatic Evolutions ETB">
+        <!-- Match to existing item from orders -->
+        <div id="invMatchSection" style="margin-top:10px;">
+          <button class="btn btn-sm btn-secondary" type="button" onclick="toggleInvItemMatch()" id="invMatchToggleBtn" style="font-size:12px;padding:4px 10px;">Match to existing item</button>
+          <div id="invMatchPanel" style="display:none;margin-top:8px;">
+            <input type="text" class="form-input" id="invMatchSearch" placeholder="Search your orders..." oninput="filterInvItemMatch()" style="font-size:12px;margin-bottom:8px;">
+            <div id="invMatchResults" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+          </div>
+          <div id="invMatchedItem" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg-tertiary);border:1px solid var(--accent);border-radius:8px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <img id="invMatchedImg" src="" style="width:40px;height:40px;object-fit:contain;border-radius:6px;background:var(--bg-card);" onerror="this.style.display='none'">
+              <div style="flex:1;min-width:0;">
+                <div id="invMatchedName" style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                <div id="invMatchedRetailer" style="font-size:11px;color:var(--text-muted);"></div>
+              </div>
+              <button class="btn btn-sm" onclick="clearInvItemMatch()" style="font-size:11px;padding:2px 8px;color:var(--red);">Clear</button>
+            </div>
+          </div>
+        </div>
+        <!-- Optional custom image URL -->
+        <div style="margin-top:10px;">
+          <label class="form-label" style="font-size:11px;color:var(--text-muted);">Image URL (optional)</label>
+          <input type="text" class="form-input" id="invManualImage" placeholder="https://..." style="font-size:12px;">
+        </div>
+      </div>
       <div id="invFetchResult" style="display:none;">
         <div style="display:flex;gap:16px;padding:16px;background:var(--bg-tertiary);border-radius:8px;margin-bottom:16px;">
           <img id="invFetchImg" src="" style="width:80px;height:80px;object-fit:contain;background:var(--bg-card);border-radius:8px;" onerror="this.onerror=null;this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💎</text></svg>'">
@@ -6892,18 +6946,19 @@
             </div>
           </div>
         </div>
-        <div id="invQuantityCostFields" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-          <div class="form-group">
-            <label class="form-label">Quantity</label>
-            <input type="number" class="form-input" id="invQuantity" value="1" min="1">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Cost Per Item ($)</label>
-            <input type="number" class="form-input" id="invCostPerItem" value="0" min="0" step="0.01">
-          </div>
+      </div>
+      <div id="invQuantityCostFields" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="form-group">
+          <label class="form-label">Quantity</label>
+          <input type="number" class="form-input" id="invQuantity" value="1" min="1">
         </div>
-        
-        <div class="form-group" id="invLinkOrdersGroup">
+        <div class="form-group">
+          <label class="form-label">Cost Per Item ($)</label>
+          <input type="number" class="form-input" id="invCostPerItem" value="0" min="0" step="0.01">
+        </div>
+      </div>
+
+      <div class="form-group" id="invLinkOrdersGroup">
           <label class="form-label">Link to Orders (Optional)</label>
           <select class="form-input" id="invLinkedRetailer" onchange="onInvRetailerSelected()">
             <option value="">Don't link to orders</option>
@@ -6935,7 +6990,6 @@
             <div><span style="color:var(--text-muted);">Orders:</span> <strong id="invDropOrderCount">0</strong></div>
           </div>
         </div>
-      </div>
       <div id="invFetchError" style="display:none;padding:16px;background:rgba(248,113,113,0.1);border:1px solid var(--red);border-radius:8px;color:var(--red);font-size:13px;margin-bottom:16px;"></div>
       <div id="invFetchLoading" style="display:none;text-align:center;padding:20px;color:var(--text-muted);">
         <div style="margin-bottom:8px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg></div>
@@ -8991,7 +9045,7 @@ function computeOrderStatuses() {
   }
   const m = new Map(), p = { cancelled: 5, delivered: 3, shipped: 2, confirmed: 1, declined: 0 };
   orders.forEach(o => {
-    const key = `${o.retailer}-${normalizeOrderId(o.orderId)}`;
+    const key = `${o.source || 'email'}-${o.retailer}-${normalizeOrderId(o.orderId)}`;
     const e = m.get(key);
     if (!e) {
       m.set(key, { ...o, finalStatus: o.status || 'confirmed', confirmedDate: o.status === 'confirmed' ? o.date : null });
@@ -9026,6 +9080,8 @@ function computeOrderStatuses() {
       // Preserve quantity and items (prefer confirmed email's data, or first non-zero)
       if (o.quantity && o.quantity > 0 && (o.status === 'confirmed' || !e.quantity || e.quantity === 0)) e.quantity = o.quantity;
       if (o.items && o.items.length > 0 && (o.status === 'confirmed' || !e.items || e.items.length === 0)) e.items = o.items;
+      if (o.profileName && !e.profileName) e.profileName = o.profileName;
+      if (o.acoBotType && !e.acoBotType) e.acoBotType = o.acoBotType;
     }
   });
   _computedOrdersCache = Array.from(m.values());
@@ -9060,7 +9116,7 @@ function getStatsFor(list) {
 function renderDashboard() {
   let all = computeOrderStatuses();
 
-  // Apply source filter
+  // Apply source filter & exclude declined (failed checkout attempts — only relevant in ACO panel)
   all = applySourceFilter(all);
 
   // Apply period filter
@@ -9090,8 +9146,8 @@ function renderDashboard() {
   $('coConfirmed').textContent = coS.confirmed; $('coCancelled').textContent = coS.cancelled; $('coShipped').textContent = coS.shipped; $('coDelivered').textContent = coS.delivered;
   $('bbConfirmed').textContent = bbS.confirmed; $('bbCancelled').textContent = bbS.cancelled; $('bbShipped').textContent = bbS.shipped; $('bbDelivered').textContent = bbS.delivered;
   $('totalConfirmed').textContent = totS.confirmed; $('totalCancelled').textContent = totS.cancelled; $('totalShipped').textContent = totS.shipped; $('totalDelivered').textContent = totS.delivered;
-  $('totalOrders').textContent = totS.total; $('totalSpent').textContent = '$' + totS.spent.toFixed(2);
-  $('navWalmartCount').textContent = wm.length; $('navTargetCount').textContent = tg.length; $('navPokecenterCount').textContent = pc.length; $('navSamsclubCount').textContent = sc.length; $('navCostcoCount').textContent = co.length; $('navBestbuyCount').textContent = bb.length;
+  $('totalOrders').textContent = totS.total - (totS.declined || 0); $('totalSpent').textContent = '$' + totS.spent.toFixed(2);
+  $('navWalmartCount').textContent = wm.length - (wmS.declined || 0); $('navTargetCount').textContent = tg.length - (tgS.declined || 0); $('navPokecenterCount').textContent = pc.length - (pcS.declined || 0); $('navSamsclubCount').textContent = sc.length - (scS.declined || 0); $('navCostcoCount').textContent = co.length - (coS.declined || 0); $('navBestbuyCount').textContent = bb.length - (bbS.declined || 0);
   
   // Update delivery hub count
   const shippedOrders = applySourceFilter(computeOrderStatuses()).filter(o => o.finalStatus === 'shipped');
@@ -10555,7 +10611,7 @@ function renderAnalytics() {
   let heatmapOrders = filteredOrders;
   if (heatmapRetailer !== 'all' && heatmapRetailer !== analyticsRetailer) {
     // If heatmap has its own filter, use all orders filtered by heatmap retailer
-    heatmapOrders = applySourceFilter(computeOrderStatuses()).filter(o => o.retailer === heatmapRetailer);
+    heatmapOrders = applySourceFilter(computeOrderStatuses()).filter(o => o.retailer === heatmapRetailer && o.finalStatus !== 'declined');
   }
   renderOrderingHeatmap(heatmapOrders);
 
@@ -12070,8 +12126,8 @@ function getDrops(list) {
     const imgMap = new Map(); // url -> {url, name, qty, sku}
 
     ords.forEach(o => {
-      // Check if cancelled - we'll show images from all orders but only count confirmed quantities
-      const isCancelled = o.finalStatus === 'cancelled';
+      // Check if cancelled/declined - we'll show images from all orders but only count confirmed quantities
+      const isCancelled = o.finalStatus === 'cancelled' || o.finalStatus === 'declined';
 
       // Handle multicart items
       if (o.items && o.items.length > 0) {
@@ -12340,7 +12396,7 @@ function renderRetailerPage(retailer) {
     if (deliveredBox) deliveredBox.style.display = '';
   }
   $(`${pre}StatDelivered`).textContent = stats.delivered;
-  $(`${pre}StatTotal`).textContent = stats.total;
+  $(`${pre}StatTotal`).textContent = stats.total - (stats.declined || 0);
   $(`${pre}StatSpent`).textContent = '$' + stats.spent.toFixed(2);
   
   // Render drops grid (landing view)
@@ -12350,7 +12406,7 @@ function renderRetailerPage(retailer) {
       $(`${pre}DropsEmpty`).style.display = 'block';
     } else {
       $(`${pre}DropsEmpty`).style.display = 'none';
-      let html = `<div class="view-all-drops" onclick="openAllOrders('${retailer}')"><div class="view-all-content"><div class="view-all-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="view-all-text">View All Orders</div><div class="view-all-count">${all.length} orders</div></div></div>`;
+      let html = `<div class="view-all-drops" onclick="openAllOrders('${retailer}')"><div class="view-all-content"><div class="view-all-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="view-all-text">View All Orders</div><div class="view-all-count">${all.filter(o => o.finalStatus !== 'declined').length} orders</div></div></div>`;
 
       html += drops.map(dr => {
         let imgs = '';
@@ -12384,7 +12440,9 @@ function renderRetailerPage(retailer) {
         const hideShipDeliv = currentDataMode === 'discord';
         const shippedCount = hideShipDeliv ? '' : (dr.stats.shipped > 0 ? ` <span class="drop-count-shipped">\u{1F4E6}${dr.stats.shipped}</span>` : '');
         const deliveredCount = hideShipDeliv ? '' : (dr.stats.delivered > 0 ? ` <span class="drop-count-delivered">\u{1F3E0}${dr.stats.delivered}</span>` : '');
-        return `<div class="drop-card" data-drop-date="${dr.date}" onclick="openDropDetail('${retailer}','${dr.date}')"><div class="drop-header"><div class="drop-date">${formatDropDate(dr.date)}</div><div class="drop-label">${dr.orders.length} order${dr.orders.length!==1?'s':''}</div></div>${imgs}${fetchImgBtn}${itemPreview}${accountsLine}<div class="drop-counts"><span class="drop-count-confirmed">\u2713${dr.stats.confirmed}</span> <span class="drop-count-cancelled">\u2717${dr.stats.cancelled}</span>${shippedCount}${deliveredCount}</div><div class="drop-footer"><div class="drop-total">${dr.stats.rate}% stick</div><div class="drop-spent">$${dr.stats.spent.toFixed(2)}</div><button class="btn-resync" onclick="event.stopPropagation();resyncDrop('${retailer}','${dr.date}')" title="Resync this drop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg></button><button class="btn-flex" onclick="event.stopPropagation();showFlexModal('${retailer}','${dr.date}')">Flex</button></div></div>`;
+        const effectiveCount = dr.orders.length - (dr.stats.declined || 0);
+        const declinedBadge = dr.stats.declined > 0 ? ` <span class="drop-count-declined" style="color:var(--text-tertiary);font-size:11px">(${dr.stats.declined} decl)</span>` : '';
+        return `<div class="drop-card" data-drop-date="${dr.date}" onclick="openDropDetail('${retailer}','${dr.date}')"><div class="drop-header"><div class="drop-date">${formatDropDate(dr.date)}</div><div class="drop-label">${effectiveCount} order${effectiveCount!==1?'s':''}${declinedBadge}</div></div>${imgs}${fetchImgBtn}${itemPreview}${accountsLine}<div class="drop-counts"><span class="drop-count-confirmed">\u2713${dr.stats.confirmed}</span> <span class="drop-count-cancelled">\u2717${dr.stats.cancelled}</span>${shippedCount}${deliveredCount}</div><div class="drop-footer"><div class="drop-total">${effectiveCount > 0 ? dr.stats.rate + '% stick' : 'All declined'}</div><div class="drop-spent">$${dr.stats.spent.toFixed(2)}</div><button class="btn-resync" onclick="event.stopPropagation();resyncDrop('${retailer}','${dr.date}')" title="Resync this drop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg></button><button class="btn-flex" onclick="event.stopPropagation();showFlexModal('${retailer}','${dr.date}')">Flex</button></div></div>`;
       }).join('');
 
       $(`${pre}DropsGrid`).innerHTML = html;
@@ -12401,7 +12459,10 @@ function renderRetailerPage(retailer) {
     // Render drop detail header
     const dropData = drops.find(d => d.date === retailerViewDrop);
     const accountCount = new Set(displayOrders.map(o => o.email).filter(Boolean)).size;
-    $(`${pre}DropHeader`).innerHTML = `<div class="drop-detail-date">${formatDropDate(retailerViewDrop)}</div><div class="drop-detail-meta">${displayOrders.length} order${displayOrders.length !== 1 ? 's' : ''} \u00B7 ${accountCount} account${accountCount !== 1 ? 's' : ''}</div><div class="drop-detail-stats"><span class="drop-count-confirmed">\u2713${stats.confirmed}</span><span class="drop-count-cancelled">\u2717${stats.cancelled}</span>${currentDataMode !== 'discord' && (stats.shipped + stats.delivered > 0) ? `<span class="drop-count-shipped">\u{1F4E6}${stats.shipped + stats.delivered}</span>` : ''}<span>\u00B7 ${stats.total > 0 ? ((stats.confirmed / stats.total * 100).toFixed(0)) : 0}% stick</span><span>\u00B7 $${stats.spent.toFixed(2)}</span></div>`;
+        const detailEffective = stats.total - (stats.declined || 0);
+    const detailEffectiveOrders = displayOrders.filter(o => o.finalStatus !== 'declined').length;
+    const detailDeclinedNote = stats.declined > 0 ? ` <span style="color:var(--text-tertiary);font-size:12px">(${stats.declined} declined)</span>` : '';
+    $(`${pre}DropHeader`).innerHTML = `<div class="drop-detail-date">${formatDropDate(retailerViewDrop)}</div><div class="drop-detail-meta">${detailEffectiveOrders} order${detailEffectiveOrders !== 1 ? 's' : ''}${detailDeclinedNote} \u00B7 ${accountCount} account${accountCount !== 1 ? 's' : ''}</div><div class="drop-detail-stats"><span class="drop-count-confirmed">\u2713${stats.confirmed}</span><span class="drop-count-cancelled">\u2717${stats.cancelled}</span>${currentDataMode !== 'discord' && (stats.shipped + stats.delivered > 0) ? `<span class="drop-count-shipped">\u{1F4E6}${stats.shipped + stats.delivered}</span>` : ''}<span>\u00B7 ${detailEffective > 0 ? ((stats.confirmed / detailEffective * 100).toFixed(0)) : 0}% stick</span><span>\u00B7 $${stats.spent.toFixed(2)}</span></div>`;
     $(`${pre}DropHeader`).style.display = 'block';
     $(`${pre}ItemsSubtitle`).textContent = `(${formatDropDate(retailerViewDrop)})`;
   } else {
@@ -14851,7 +14912,7 @@ async function renderAccountStats() {
     if (addressOption) addressOption.style.display = currentDataMode === 'discord' ? 'none' : '';
   }
 
-  // Get all orders with computed statuses
+  // Get all orders with computed statuses (exclude declined — failed checkout attempts)
   let allOrders = applySourceFilter(computeOrderStatuses());
 
   // Filter by period (or custom date range)
@@ -17762,6 +17823,10 @@ function showAddInventoryModal(context) {
   }
   $('confirmAddInvBtn').textContent = isPortfolioContext ? 'Add to Stock' : isTCGContext ? 'Add to Tracker' : 'Add to Inventory';
 
+  // Update TCG URL label for portfolio (optional) vs required
+  const tcgLabel = $('invTcgUrlGroup').querySelector('.form-label');
+  if (tcgLabel) tcgLabel.textContent = isPortfolioContext ? 'TCGPlayer URL (optional — for price tracking)' : 'TCGPlayer URL';
+
   // Show/hide sections based on context
   if (isTCGContext) {
     // TCG Tracker: Only show TCG URL, hide quantity/cost and order linking
@@ -17769,8 +17834,9 @@ function showAddInventoryModal(context) {
     $('invQuantityCostFields').style.display = 'none';
     $('invLinkOrdersGroup').style.display = 'none';
   } else if (isPortfolioContext) {
-    // Portfolio: Show ALL fields - TCG URL (optional), quantity/cost, order linking
+    // Portfolio: Show ALL fields - TCG URL (optional), manual name, quantity/cost, order linking
     $('invTcgUrlGroup').style.display = 'block';
+    $('invManualNameGroup').style.display = 'block';
     $('invQuantityCostFields').style.display = 'grid';
     $('invLinkOrdersGroup').style.display = 'block';
   } else {
@@ -17782,10 +17848,20 @@ function showAddInventoryModal(context) {
 
   $('addInventoryModal').classList.add('show');
   $('invTcgUrl').value = '';
+  $('invManualName').value = '';
+  $('invManualImage').value = '';
+  if (!isPortfolioContext) $('invManualNameGroup').style.display = 'none';
+  // Reset match panel
+  $('invMatchPanel').style.display = 'none';
+  $('invMatchedItem').style.display = 'none';
+  $('invMatchResults').innerHTML = '';
+  $('invMatchToggleBtn').textContent = 'Match to existing item';
+  window._invMatchedItemData = null;
   $('invFetchResult').style.display = 'none';
   $('invFetchError').style.display = 'none';
   $('invFetchLoading').style.display = 'none';
-  $('confirmAddInvBtn').disabled = true;
+  // Portfolio allows manual entry without TCG fetch; others require fetch
+  $('confirmAddInvBtn').disabled = !isPortfolioContext;
   $('invQuantity').value = 1;
   $('invCostPerItem').value = '';
   $('invLinkedRetailer').value = '';
@@ -17800,6 +17876,77 @@ function closeAddInventoryModal() {
   $('addInventoryModal').classList.remove('show');
   // Reset context
   window.addInventoryContext = null;
+  window._invMatchedItemData = null;
+}
+
+// ── Match to Existing Item (Portfolio Add) ──
+function _getUniqueOrderItems() {
+  const seen = new Map();
+  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  for (const o of orders) {
+    if (!o.item || o.item === 'Unknown Item') continue;
+    const key = o.item.toLowerCase().trim();
+    if (!seen.has(key)) {
+      const img = getSkuImage(o.sku, null, o.imageUrl) || o.imageUrl || '';
+      seen.set(key, { name: o.item, imageUrl: img, sku: o.sku || null, retailer: o.retailer, retailerLabel: retailerNames[o.retailer] || o.retailer });
+    }
+  }
+  return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function toggleInvItemMatch() {
+  const panel = $('invMatchPanel');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    $('invMatchToggleBtn').textContent = 'Hide item list';
+    $('invMatchSearch').value = '';
+    filterInvItemMatch();
+    $('invMatchSearch').focus();
+  } else {
+    panel.style.display = 'none';
+    $('invMatchToggleBtn').textContent = 'Match to existing item';
+  }
+}
+
+function filterInvItemMatch() {
+  const query = ($('invMatchSearch').value || '').toLowerCase().trim();
+  const items = _getUniqueOrderItems();
+  const filtered = query ? items.filter(i => i.name.toLowerCase().includes(query)) : items.slice(0, 50);
+  const container = $('invMatchResults');
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-size:12px;text-align:center;">No matching items found</div>';
+    return;
+  }
+  container.innerHTML = filtered.slice(0, 50).map((item, idx) => {
+    const imgHtml = item.imageUrl ? `<img src="${item.imageUrl}" style="width:32px;height:32px;object-fit:contain;border-radius:4px;background:var(--bg-card);flex-shrink:0;" onerror="this.style.display='none'">` : '';
+    return `<div onclick="selectInvItemMatch(${idx})" data-inv-match-idx="${idx}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:var(--bg-card);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">${imgHtml}<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.name}</div><div style="font-size:10px;color:var(--text-muted);">${item.retailerLabel}</div></div></div>`;
+  }).join('');
+  // Stash filtered list for selection
+  window._invMatchFiltered = filtered.slice(0, 50);
+}
+
+function selectInvItemMatch(idx) {
+  const item = window._invMatchFiltered?.[idx];
+  if (!item) return;
+  // Fill in the name field
+  $('invManualName').value = item.name;
+  // Store matched data (image + sku only)
+  window._invMatchedItemData = { name: item.name, imageUrl: item.imageUrl, sku: item.sku };
+  // Show matched item preview
+  $('invMatchedItem').style.display = 'block';
+  const img = $('invMatchedImg');
+  if (item.imageUrl) { img.src = item.imageUrl; img.style.display = ''; } else { img.style.display = 'none'; }
+  $('invMatchedName').textContent = item.name;
+  $('invMatchedRetailer').textContent = item.retailerLabel;
+  // Collapse the search panel
+  $('invMatchPanel').style.display = 'none';
+  $('invMatchToggleBtn').textContent = 'Match to existing item';
+}
+
+function clearInvItemMatch() {
+  window._invMatchedItemData = null;
+  $('invMatchedItem').style.display = 'none';
+  $('invManualName').value = '';
 }
 
 let selectedDropItems = [];
@@ -18050,12 +18197,26 @@ async function fetchTcgProduct() {
 }
 
 async function confirmAddInventoryItem() {
+  const isPortfolio = window.addInventoryContext === 'portfolio';
+  const isTCGContext = window.addInventoryContext === 'tcg-tracker';
+
+  // Portfolio allows manual entry without TCG fetch
+  if (!fetchedProduct && isPortfolio) {
+    const manualName = ($('invManualName').value || '').trim();
+    if (!manualName) {
+      toast('Enter an item name or fetch from TCGPlayer', 'error');
+      return;
+    }
+    const matched = window._invMatchedItemData || {};
+    const customImg = ($('invManualImage').value || '').trim();
+    const img = customImg || matched.imageUrl || null;
+    fetchedProduct = { name: manualName, productId: null, image: img, imageUrl: img, sku: matched.sku || null, setName: null, marketPrice: 0 };
+  }
+
   if (!fetchedProduct) {
     console.log('[INV] No fetched product to add');
     return;
   }
-
-  const isTCGContext = window.addInventoryContext === 'tcg-tracker';
 
   // For TCG Tracker, always use defaults: qty=1, cost=0, no linking
   const quantity = isTCGContext ? 1 : (parseInt($('invQuantity').value) || 1);
@@ -18065,10 +18226,8 @@ async function confirmAddInventoryItem() {
 
   // Get selected item names for reference (only for inventory)
   const linkedItems = isTCGContext ? [] : selectedDropItems.map(idx => window.dropItemsData?.[idx]?.name).filter(Boolean);
-  
+
   console.log('[INV] Adding item:', fetchedProduct.name, { quantity, costPerItem, linkedRetailer, linkedDrop, linkedItems });
-  
-  const isPortfolio = window.addInventoryContext === 'portfolio';
 
   // Check if this TCGPlayer product already exists in inventory (check V2 first for portfolio)
   const existingV2 = isPortfolio ? inventoryV2.find(i => i.tcgplayerId === fetchedProduct.productId) : null;
@@ -22003,6 +22162,13 @@ async function saveDiscordSyncSettings() {
   }
 }
 
+async function fullResyncDiscord() {
+  if (!confirm('This will re-fetch ALL orders from the server, including previously synced ones. Continue?')) return;
+  await window.electronAPI.invoke('discord-full-resync');
+  toast('Full resync queued — syncing now...', 'info');
+  await syncDiscordOrders();
+}
+
 async function syncDiscordOrders() {
   const btn = $('discordSyncNowBtn');
   const origText = btn.textContent;
@@ -22187,11 +22353,27 @@ async function clearDiscordOrders() {
   }
 }
 
+async function resetDiscordSync() {
+  const confirmed = await customConfirm('Reset Server Sync', 'This resets the server-side fetch state so all your Discord orders come back as unfetched on the next sync. Use this after clearing local orders to do a full re-import.', 'Reset', true);
+  if (!confirmed) return;
+  try {
+    const result = await window.api.resetDiscordSync();
+    if (result && result.success) {
+      toast('Server sync reset — ' + (result.resetCount || 0) + ' orders marked unfetched', 'success');
+    } else {
+      toast(result?.error || 'Failed to reset sync', 'error');
+    }
+  } catch (err) {
+    toast('Failed to reset server sync', 'error');
+  }
+}
+
 // ==================== ACO PANEL (Redesigned) ====================
 
 let acoMappingsCache = [];
 let _acoCurrentTab = 'users';
 let _acoSelectedUser = null;
+let _acoSelectedProfile = null;      // unmapped profile name for detail view
 let _acoExpandedSites = new Set();   // "profileName|siteName" keys for expanded sections
 let _acoDetailSiteFilter = 'all';    // site filter for detail view
 let _acoDetailProfileSort = 'total-desc'; // profile sort for detail view
@@ -22613,6 +22795,119 @@ function getAcoUserGroups() {
   return { users, unmapped, rName };
 }
 
+function toggleAcoAdvancedFilters() {
+  const el = document.getElementById('acoAdvFilters');
+  if (!el) return;
+  const isHidden = el.style.display === 'none';
+  el.style.display = isHidden ? '' : 'none';
+  const btn = document.getElementById('acoAdvFilterToggle');
+  if (btn) btn.style.color = isHidden ? 'var(--accent)' : 'var(--text-secondary)';
+}
+
+function updateAcoStatusToggles() {
+  const container = document.getElementById('acoStatusToggles');
+  if (!container) return;
+  const site = document.getElementById('acoSiteFilter')?.value || 'all';
+  if (site === 'all') {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+  container.style.display = 'flex';
+  const isPkc = site === 'Pokemon Center';
+  // Labels: PKC uses declined/declines, others use cancelled/cancels
+  const negLabel = isPkc ? 'declines' : 'cancels';
+  const negColor = isPkc ? 'var(--red)' : '#EAB308';
+  const negAccent = isPkc ? 'var(--red)' : '#EAB308';
+  container.innerHTML = `
+    <label style="font-size:11px;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:3px;white-space:nowrap">
+      <input type="checkbox" id="acoFilterNoNeg" onchange="if(this.checked){document.getElementById('acoFilterOnlyNeg').checked=false;document.getElementById('acoFilterHasBoth').checked=false;} renderAcoUsers()" style="accent-color:var(--green);width:13px;height:13px">
+      No ${negLabel}
+    </label>
+    <label style="font-size:11px;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:3px;white-space:nowrap">
+      <input type="checkbox" id="acoFilterOnlyNeg" onchange="if(this.checked){document.getElementById('acoFilterNoNeg').checked=false;document.getElementById('acoFilterHasBoth').checked=false;} renderAcoUsers()" style="accent-color:${negAccent};width:13px;height:13px">
+      Only ${negLabel}
+    </label>
+    <label style="font-size:11px;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:3px;white-space:nowrap" title="${isPkc ? 'Profiles with both confirmed checkouts AND declines across drops' : 'Profiles with both confirmed checkouts AND cancellations'}">
+      <input type="checkbox" id="acoFilterHasBoth" onchange="if(this.checked){document.getElementById('acoFilterNoNeg').checked=false;document.getElementById('acoFilterOnlyNeg').checked=false;} renderAcoUsers()" style="accent-color:var(--accent);width:13px;height:13px">
+      Has both
+    </label>
+  `;
+}
+
+function clearAcoAdvancedFilters() {
+  const minEl = document.getElementById('acoFilterMinOrders');
+  const fromEl = document.getElementById('acoFilterFromDate');
+  const toEl = document.getElementById('acoFilterToDate');
+  if (minEl) minEl.value = '0';
+  if (fromEl) fromEl.value = '';
+  if (toEl) toEl.value = '';
+  // Clear dynamic toggles
+  const noNeg = document.getElementById('acoFilterNoNeg');
+  const onlyNeg = document.getElementById('acoFilterOnlyNeg');
+  const hasBoth = document.getElementById('acoFilterHasBoth');
+  if (noNeg) noNeg.checked = false;
+  if (onlyNeg) onlyNeg.checked = false;
+  if (hasBoth) hasBoth.checked = false;
+  renderAcoUsers();
+}
+
+function _acoGetStatusFilterContext() {
+  const site = document.getElementById('acoSiteFilter')?.value || 'all';
+  if (site === 'all') return { active: false };
+  const isPkc = site === 'Pokemon Center';
+  const noNeg = document.getElementById('acoFilterNoNeg')?.checked || false;
+  const onlyNeg = document.getElementById('acoFilterOnlyNeg')?.checked || false;
+  const hasBoth = document.getElementById('acoFilterHasBoth')?.checked || false;
+  return { active: noNeg || onlyNeg || hasBoth, isPkc, noNeg, onlyNeg, hasBoth };
+}
+
+function _acoFilterProfileByAdvanced(profile) {
+  const minOrders = parseInt(document.getElementById('acoFilterMinOrders')?.value || '0', 10) || 0;
+  const fromDate = document.getElementById('acoFilterFromDate')?.value || '';
+  const toDate = document.getElementById('acoFilterToDate')?.value || '';
+  const ctx = _acoGetStatusFilterContext();
+
+  // Collect all orders across sites
+  let allOrders = [];
+  for (const sd of Object.values(profile.sites || {})) {
+    allOrders = allOrders.concat(sd.orders || []);
+  }
+
+  // Date filter: only count orders within range
+  if (fromDate || toDate) {
+    allOrders = allOrders.filter(o => {
+      if (!o.date) return false;
+      if (fromDate && o.date < fromDate) return false;
+      if (toDate && o.date > toDate) return false;
+      return true;
+    });
+    if (allOrders.length === 0) return false;
+  }
+
+  const total = (fromDate || toDate) ? allOrders.length : profile.total;
+  if (minOrders > 0 && total < minOrders) return false;
+
+  // Status toggles (site-specific)
+  if (ctx.active) {
+    // For PKC: "negative" = declined. For others: "negative" = cancelled.
+    const hasConfirmed = allOrders.some(o => o.status === 'confirmed' || o.status === 'shipped' || o.status === 'delivered');
+    const hasNeg = ctx.isPkc
+      ? allOrders.some(o => o.status === 'declined')
+      : allOrders.some(o => o.status === 'cancelled');
+
+    if (ctx.noNeg && hasNeg) return false;
+    if (ctx.onlyNeg && !hasNeg) return false;
+    if (ctx.hasBoth && !(hasConfirmed && hasNeg)) return false;
+  }
+
+  return true;
+}
+
+function _acoFilterUserByAdvanced(user) {
+  return user.profiles.some(p => _acoFilterProfileByAdvanced(p));
+}
+
 function renderAcoUsers() {
   const listEl = document.getElementById('acoUsersList');
   if (!listEl) return;
@@ -22644,6 +22939,16 @@ function renderAcoUsers() {
     userList = userList.map(u => ({ ...u, profiles: u.profiles.filter(p => p.sites && Object.keys(p.sites).includes(siteFilter)) })).filter(u => u.profiles.length > 0);
     userList.forEach(u => { u.profileCount = u.profiles.length; u.totalOrders = u.profiles.reduce((s, p) => s + p.total, 0); });
     filteredUnmapped = filteredUnmapped.filter(p => p.sites && Object.keys(p.sites).includes(siteFilter));
+  }
+
+  // Apply advanced filters (min orders, date range, decline toggles)
+  const hasAdvFilters = (parseInt(document.getElementById('acoFilterMinOrders')?.value || '0', 10) || 0) > 0
+    || document.getElementById('acoFilterFromDate')?.value
+    || document.getElementById('acoFilterToDate')?.value
+    || _acoGetStatusFilterContext().active;
+  if (hasAdvFilters) {
+    userList = userList.filter(u => _acoFilterUserByAdvanced(u));
+    filteredUnmapped = filteredUnmapped.filter(p => _acoFilterProfileByAdvanced(p));
   }
 
   const hasResults = userList.length > 0 || filteredUnmapped.length > 0;
@@ -22708,9 +23013,9 @@ function renderAcoUsers() {
       const botBadge = p.botType ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:rgba(139,92,246,0.15);color:#8b5cf6">${escapeHtml(p.botType)}</span>` : '';
       const isChecked = _acoBulkSelection.has(p.name);
 
-      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border-color)">
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border-color);cursor:pointer;transition:background 0.15s" onmouseenter="this.style.background='var(--bg-secondary)'" onmouseleave="this.style.background=''" onclick="showAcoProfileDetail('${safeName}')">
         <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-          <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleAcoBulkSelect('${safeName}', this.checked)" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;flex-shrink:0">
+          <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="event.stopPropagation();toggleAcoBulkSelect('${safeName}', this.checked)" onclick="event.stopPropagation()" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;flex-shrink:0">
           <div style="width:32px;height:32px;border-radius:50%;background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--text-primary);flex-shrink:0">${escapeHtml(p.name.charAt(0).toUpperCase())}</div>
           <div style="min-width:0;flex:1">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -22720,7 +23025,10 @@ function renderAcoUsers() {
             <div style="font-size:11px;color:var(--text-secondary);margin-top:1px">${p.total} orders${siteStr}</div>
           </div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();showAddMappingForm('${safeName}')" style="font-size:10px;padding:4px 12px">Link</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();showAddMappingForm('${safeName}')" style="font-size:10px;padding:4px 12px">Link</button>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
       </div>`;
     }
   }
@@ -22983,19 +23291,237 @@ function showAcoUserDetail(discordUserId) {
   listEl.style.display = 'none';
   const searchBar = document.getElementById('acoSearchBar');
   if (searchBar) searchBar.style.display = 'none';
+  const advFilters = document.getElementById('acoAdvFilters');
+  if (advFilters) advFilters.style.display = 'none';
   detailEl.style.display = '';
 }
 
 function toggleAcoTierFilter(tier, userId) {
   if (_acoDetailTierFilter.has(tier)) _acoDetailTierFilter.delete(tier);
   else _acoDetailTierFilter.add(tier);
-  showAcoUserDetail(userId);
+  if (_acoSelectedProfile) showAcoProfileDetail(_acoSelectedProfile);
+  else showAcoUserDetail(userId);
+}
+
+function showAcoProfileDetail(profileName) {
+  _acoSelectedProfile = profileName;
+  _acoSelectedUser = null;
+  const detailEl = document.getElementById('acoUserDetail');
+  const listEl = document.getElementById('acoUsersList');
+  if (!detailEl || !listEl) return;
+
+  const { unmapped } = getAcoUserGroups();
+  const profile = unmapped.find(p => p.name === profileName);
+  if (!profile) { hideAcoUserDetail(); return; }
+
+  const safeName = escapeHtml(profileName).replace(/'/g, '&#39;');
+  const tierColors = { diamond: '#B9F2FF', perfect: '#8b5cf6', good: '#00A86B', okay: '#F97316', 'at-risk': '#EF4444' };
+  const tierLabels = { diamond: 'Diamond', perfect: 'Perfect', good: 'Good', okay: 'Okay', 'at-risk': 'At Risk' };
+
+  // Read advanced filter values
+  const advFromDate = document.getElementById('acoFilterFromDate')?.value || '';
+  const advToDate = document.getElementById('acoFilterToDate')?.value || '';
+  const ctx = _acoGetStatusFilterContext();
+  const hasDateFilter = !!(advFromDate || advToDate);
+  const hasStatusFilter = ctx.active;
+
+  function filterOrders(orders) {
+    let filtered = orders;
+    if (advFromDate || advToDate) {
+      filtered = filtered.filter(o => {
+        if (!o.date) return false;
+        if (advFromDate && o.date < advFromDate) return false;
+        if (advToDate && o.date > advToDate) return false;
+        return true;
+      });
+    }
+    if (ctx.active) {
+      if (ctx.noNeg) {
+        filtered = filtered.filter(o => ctx.isPkc ? o.status !== 'declined' : o.status !== 'cancelled');
+      }
+      if (ctx.onlyNeg) {
+        filtered = filtered.filter(o => ctx.isPkc ? o.status === 'declined' : o.status === 'cancelled');
+      }
+      // hasBoth doesn't filter individual orders, it filters at the profile level
+    }
+    return filtered;
+  }
+
+  // Collect all unique site names for filter dropdown
+  const allSites = new Set();
+  for (const s of Object.keys(profile.sites)) allSites.add(s);
+  const sortedAllSites = [...allSites].sort();
+  const siteFilterOptions = sortedAllSites.map(s => `<option value="${escapeHtml(s)}"${_acoDetailSiteFilter === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('');
+
+  // Compute filtered stats from filtered orders
+  let pTotal = 0, pConfirmed = 0, pDeclined = 0, pCancelled = 0, pSpent = 0;
+  const sortedSites = Object.entries(profile.sites)
+    .filter(([siteName]) => _acoDetailSiteFilter === 'all' || siteName === _acoDetailSiteFilter)
+    .sort((a, b) => b[1].total - a[1].total);
+
+  // Build filtered site data map
+  const filteredSiteData = {};
+  for (const [siteName, sd] of sortedSites) {
+    const orders = filterOrders(sd.orders || []);
+    const conf = orders.filter(o => o.status === 'confirmed' || o.status === 'shipped' || o.status === 'delivered').length;
+    const decl = orders.filter(o => o.status === 'declined').length;
+    const canc = orders.filter(o => o.status === 'cancelled').length;
+    const spent = orders.reduce((s, o) => s + (o.amount || 0), 0);
+    filteredSiteData[siteName] = { orders, total: orders.length, confirmed: conf, declined: decl, cancelled: canc, spent };
+    pTotal += orders.length;
+    pConfirmed += conf;
+    pDeclined += decl;
+    pCancelled += canc;
+    pSpent += spent;
+  }
+
+  const stickRate = pTotal > 0 ? Math.round((pConfirmed / pTotal) * 100) : 0;
+  const tier = getAccountStatsTier(stickRate, pTotal);
+  const tierColor = tierColors[tier] || '#888';
+  const tierLabel = tierLabels[tier] || tier;
+  const diamondGlow = tier === 'diamond' ? 'text-shadow:0 0 8px rgba(185,242,255,0.6);' : '';
+  const botBadge = profile.botType ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:rgba(139,92,246,0.15);color:#8b5cf6;margin-left:6px">${escapeHtml(profile.botType)}</span>` : '';
+
+  // Filter info label
+  const filterParts = [];
+  if (advFromDate) filterParts.push('from ' + advFromDate);
+  if (advToDate) filterParts.push('to ' + advToDate);
+  if (ctx.noNeg) filterParts.push(ctx.isPkc ? 'no declines' : 'no cancels');
+  if (ctx.onlyNeg) filterParts.push(ctx.isPkc ? 'declines only' : 'cancels only');
+  if (ctx.hasBoth) filterParts.push(ctx.isPkc ? 'has checkouts + declines' : 'has checkouts + cancels');
+  const filterLabel = filterParts.length > 0 ? `<div style="font-size:10px;color:var(--accent);margin-bottom:8px;padding:4px 8px;border-radius:var(--radius-sm);background:rgba(99,102,241,0.08);display:inline-block">Filtered: ${filterParts.join(' &middot; ')}</div>` : '';
+
+  // Per-site expandable sections
+  let siteSectionsHtml = '';
+  for (const [siteName] of sortedSites) {
+    const fsd = filteredSiteData[siteName];
+    if (fsd.total === 0 && (hasDateFilter || hasStatusFilter)) continue;
+    const siteStick = fsd.total > 0 ? Math.round((fsd.confirmed / fsd.total) * 100) : 0;
+    const siteKey = profile.name + '|' + siteName;
+    const isExpanded = _acoExpandedSites.has(siteKey);
+    const safeKey = escapeHtml(siteKey).replace(/'/g, '&#39;');
+    const subCounts = [];
+    if (fsd.declined > 0) subCounts.push(`<span style="color:var(--red)">${fsd.declined} decl</span>`);
+    if (fsd.cancelled > 0) subCounts.push(`<span style="color:#EAB308">${fsd.cancelled} canc</span>`);
+    const subCountStr = subCounts.length > 0 ? ' &middot; ' + subCounts.join(' &middot; ') : '';
+
+    const chevronSvg = isExpanded
+      ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>'
+      : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>';
+
+    let ordersHtml = '';
+    if (isExpanded) {
+      for (const o of fsd.orders) {
+        const isConf = o.status === 'confirmed' || o.status === 'shipped' || o.status === 'delivered';
+        const isDec = o.status === 'declined';
+        const isCanc = o.status === 'cancelled';
+        const badgeColor = isConf ? 'var(--green)' : (isDec || isCanc) ? 'var(--red)' : '#EAB308';
+        const badgeBg = isConf ? 'rgba(34,197,94,0.12)' : (isDec || isCanc) ? 'rgba(239,68,68,0.12)' : 'rgba(234,179,8,0.12)';
+        const badgeLabel = isConf ? (o.status === 'delivered' ? 'Delivered' : o.status === 'shipped' ? 'Shipped' : 'Confirmed') : isDec ? 'Declined' : isCanc ? 'Cancelled' : 'Pending';
+        ordersHtml += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;border-bottom:1px solid rgba(255,255,255,0.04)">
+          <span style="font-size:10px;padding:1px 6px;border-radius:6px;background:${badgeBg};color:${badgeColor};flex-shrink:0;min-width:58px;text-align:center">${badgeLabel}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-primary)">${escapeHtml(o.item || 'Unknown')}</span>
+          <span style="color:var(--text-secondary);flex-shrink:0;font-family:monospace;font-size:11px">${o.amount ? '$' + o.amount.toFixed(2) : ''}</span>
+          <span style="color:var(--text-tertiary);font-size:11px;flex-shrink:0;min-width:65px;text-align:right">${o.date || ''}</span>
+        </div>`;
+      }
+      if (fsd.orders.length === 0) {
+        ordersHtml = '<div style="padding:8px 0;text-align:center;color:var(--text-tertiary);font-size:11px">No orders</div>';
+      }
+    }
+
+    siteSectionsHtml += `<div style="margin-top:8px">
+      <div onclick="toggleAcoSiteOrders('${safeKey}')" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:var(--radius-sm);cursor:pointer;transition:background 0.15s;background:${isExpanded ? 'rgba(255,255,255,0.04)' : 'transparent'}" onmouseenter="this.style.background='rgba(255,255,255,0.06)'" onmouseleave="this.style.background='${isExpanded ? 'rgba(255,255,255,0.04)' : 'transparent'}'">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="color:var(--text-tertiary);flex-shrink:0">${chevronSvg}</span>
+          <span style="font-weight:600;font-size:12px;color:var(--text-primary)">${escapeHtml(siteName)}</span>
+          <span style="font-size:11px;color:var(--text-secondary)">(${fsd.total})${subCountStr}</span>
+        </div>
+        <span style="font-size:11px;color:var(--text-secondary)">${siteStick}% stick</span>
+      </div>
+      ${isExpanded ? `<div style="padding:2px 8px 4px 26px">${ordersHtml}</div>` : ''}
+    </div>`;
+  }
+
+  if (!siteSectionsHtml) {
+    siteSectionsHtml = '<div style="padding:12px 0;text-align:center;color:var(--text-secondary);font-size:12px">No orders match the current filters</div>';
+  }
+
+  detailEl.innerHTML = `
+    <div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-sm" onclick="hideAcoUserDetail()" style="font-size:12px;padding:4px 12px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><polyline points="15 18 9 12 15 6"/></svg>
+          Back to Users
+        </button>
+        <select onchange="_acoDetailSiteFilter=this.value;showAcoProfileDetail('${safeName}')" style="font-size:11px;padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border-color);background:var(--bg-secondary);color:var(--text-primary);cursor:pointer">
+          <option value="all"${_acoDetailSiteFilter === 'all' ? ' selected' : ''}>All Sites</option>
+          ${siteFilterOptions}
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();showAddMappingForm('${safeName}')" style="font-size:11px;padding:5px 12px">Link to User</button>
+      </div>
+    </div>
+
+    ${filterLabel}
+
+    <div style="margin-bottom:16px;padding:12px 16px;border-radius:var(--radius-md);background:rgba(255,255,255,0.04);border:1px solid var(--border-color)">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="width:40px;height:40px;border-radius:50%;background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:var(--text-primary);flex-shrink:0">${escapeHtml(profile.name.charAt(0).toUpperCase())}</div>
+        <div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-weight:700;font-size:16px;color:var(--text-primary)">${escapeHtml(profile.name)}</span>
+            ${botBadge}
+          </div>
+          <div style="font-size:11px;color:var(--text-tertiary)">Unmapped profile</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+          <div style="text-align:center"><div style="font-size:15px;font-weight:700;color:var(--text-primary)">${pTotal}</div><div style="font-size:10px;color:var(--text-secondary)">orders</div></div>
+          <div style="text-align:center"><div style="font-size:15px;font-weight:700;color:var(--green)">${pConfirmed}</div><div style="font-size:10px;color:var(--text-secondary)">confirmed</div></div>
+          <div style="text-align:center"><div style="font-size:15px;font-weight:700;color:var(--accent)">${stickRate}%</div><div style="font-size:10px;color:var(--text-secondary)">stick</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:700;font-size:14px;color:var(--text-primary)">${escapeHtml(profile.name)}</span>
+          ${botBadge}
+        </div>
+        <span style="font-weight:700;font-size:14px;padding:1px 8px;border-radius:8px;background:${tierColor}22;color:${tierColor};${diamondGlow}">${tierLabel}</span>
+      </div>
+      <div class="card-body" style="padding:12px 16px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px 16px;margin-bottom:8px">
+          <div><span style="font-weight:700;font-size:16px;color:var(--text-primary)">${pTotal}</span> <span style="font-size:11px;color:var(--text-secondary)">total</span></div>
+          <div><span style="font-weight:700;font-size:16px;color:var(--green)">${pConfirmed}</span> <span style="font-size:11px;color:var(--text-secondary)">confirmed</span></div>
+          <div><span style="font-weight:700;font-size:16px;color:var(--red)">${pDeclined}</span> <span style="font-size:11px;color:var(--text-secondary)">declined</span></div>
+          <div><span style="font-weight:700;font-size:16px;color:#EAB308">${pCancelled}</span> <span style="font-size:11px;color:var(--text-secondary)">cancelled</span></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px;margin-bottom:8px">
+          <div><span style="font-weight:700;font-size:16px;color:var(--accent)">${stickRate}%</span> <span style="font-size:11px;color:var(--text-secondary)">stick</span></div>
+          <div><span style="font-weight:700;font-size:16px;color:var(--text-primary)">$${pSpent.toFixed(2)}</span> <span style="font-size:11px;color:var(--text-secondary)">spent</span></div>
+          <div><span style="font-weight:700;font-size:14px;padding:1px 8px;border-radius:8px;background:${tierColor}22;color:${tierColor};${diamondGlow}">${tierLabel}</span></div>
+        </div>
+        ${siteSectionsHtml}
+      </div>
+    </div>
+  `;
+
+  listEl.style.display = 'none';
+  const searchBar = document.getElementById('acoSearchBar');
+  if (searchBar) searchBar.style.display = 'none';
+  const advFilters = document.getElementById('acoAdvFilters');
+  if (advFilters) advFilters.style.display = 'none';
+  detailEl.style.display = '';
 }
 
 function toggleAcoSiteOrders(siteKey) {
   if (_acoExpandedSites.has(siteKey)) _acoExpandedSites.delete(siteKey);
   else _acoExpandedSites.add(siteKey);
-  if (_acoSelectedUser) showAcoUserDetail(_acoSelectedUser);
+  if (_acoSelectedProfile) showAcoProfileDetail(_acoSelectedProfile);
+  else if (_acoSelectedUser) showAcoUserDetail(_acoSelectedUser);
 }
 
 function toggleAcoBulkSelect(profileName, checked) {
@@ -23255,6 +23781,7 @@ function csvEsc(val) {
 
 function hideAcoUserDetail() {
   _acoSelectedUser = null;
+  _acoSelectedProfile = null;
   _acoExpandedSites.clear();
   _acoDetailSiteFilter = 'all';
   _acoDetailProfileSort = 'total-desc';
@@ -23265,6 +23792,9 @@ function hideAcoUserDetail() {
   if (listEl) listEl.style.display = '';
   const searchBar = document.getElementById('acoSearchBar');
   if (searchBar) searchBar.style.display = '';
+  const advFilters = document.getElementById('acoAdvFilters');
+  const advToggle = document.getElementById('acoAdvFilterToggle');
+  if (advFilters && advToggle && advToggle.style.color === 'var(--accent)') advFilters.style.display = '';
   renderAcoUsers();
 }
 
@@ -24247,8 +24777,16 @@ if (window.api.onSyncProgress) {
 
         if (data.phase === 'done' || data.phase === 'error') {
           fillEl.style.width = '100%';
-          textEl.textContent = data.phase === 'done' ? `Done — ${data.count || 0} added` : 'Error';
-          setTimeout(() => { progressEl.style.display = 'none'; fillEl.style.width = '0%'; }, 2000);
+          if (data.phase === 'done') {
+            const parts = [];
+            if (data.count > 0) parts.push(`${data.count} new`);
+            if (data.existing > 0) parts.push(`${data.existing} existing`);
+            if (data.declined > 0) parts.push(`${data.declined} declined`);
+            textEl.textContent = parts.length > 0 ? `Done — ${parts.join(', ')}` : 'Done — no new orders';
+          } else {
+            textEl.textContent = 'Error';
+          }
+          setTimeout(() => { progressEl.style.display = 'none'; fillEl.style.width = '0%'; }, 3000);
         } else {
           progressEl.style.display = '';
           if (data.total && data.current) {

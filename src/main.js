@@ -1059,6 +1059,8 @@ function mergeOrderEntries(orderList) {
     }
     if (o.email && !existing.email) existing.email = o.email;
     if (o.accountId && !existing.accountId) existing.accountId = o.accountId;
+    if (o.profileName && !existing.profileName) existing.profileName = o.profileName;
+    if (o.acoBotType && !existing.acoBotType) existing.acoBotType = o.acoBotType;
   }
 
   return Array.from(map.values());
@@ -1066,10 +1068,11 @@ function mergeOrderEntries(orderList) {
 
 function saveOrder(order) {
   const orders = store.get('orders', []);
-  // Match by retailer + normalized orderId - all stages merge into one entry
+  // Match by source + retailer + normalized orderId — Discord and email orders stay separate
   const nid = normalizeOrderId(order.orderId);
   order.orderId = nid;
-  const existingIdx = orders.findIndex(o => normalizeOrderId(o.orderId) === nid && o.retailer === order.retailer);
+  const orderSource = order.source || 'email';
+  const existingIdx = orders.findIndex(o => normalizeOrderId(o.orderId) === nid && o.retailer === order.retailer && (o.source || 'email') === orderSource);
   if (existingIdx >= 0) {
     const existing = orders[existingIdx];
     // Merge using same priority logic
@@ -1102,6 +1105,8 @@ function saveOrder(order) {
     if (order.items && order.items.length > 0 && (order.status === 'confirmed' || !existing.items || existing.items.length === 0)) {
       existing.items = order.items;
     }
+    if (order.profileName && !existing.profileName) existing.profileName = order.profileName;
+    if (order.acoBotType && !existing.acoBotType) existing.acoBotType = order.acoBotType;
     orders[existingIdx] = existing;
   } else {
     orders.push(order);
@@ -1121,9 +1126,11 @@ function saveOrdersBatch(newOrders) {
   let added = 0;
 
   // Build lookup map for O(1) matching instead of O(n) findIndex per order
+  // Key includes source so Discord and email orders with same orderId stay separate
   const orderIndex = new Map();
   for (let i = 0; i < orders.length; i++) {
-    const key = `${orders[i].retailer}-${normalizeOrderId(orders[i].orderId)}`;
+    const src = orders[i].source || 'email';
+    const key = `${src}-${orders[i].retailer}-${normalizeOrderId(orders[i].orderId)}`;
     orderIndex.set(key, i);
   }
 
@@ -1132,9 +1139,9 @@ function saveOrdersBatch(newOrders) {
     if (!order.source) {
       order.source = 'email';
     }
-    // Match by retailer + normalized orderId (strips hyphens for consistent matching)
+    // Match by source + retailer + normalized orderId — Discord and email are kept separate
     const nid = normalizeOrderId(order.orderId);
-    const lookupKey = `${order.retailer}-${nid}`;
+    const lookupKey = `${order.source}-${order.retailer}-${nid}`;
     const existingIdx = orderIndex.has(lookupKey) ? orderIndex.get(lookupKey) : -1;
     if (existingIdx >= 0) {
       const existing = orders[existingIdx];
@@ -1175,6 +1182,8 @@ function saveOrdersBatch(newOrders) {
       }
       if (order.email && !existing.email) existing.email = order.email;
       if (order.accountId && !existing.accountId) existing.accountId = order.accountId;
+      if (order.profileName && !existing.profileName) existing.profileName = order.profileName;
+      if (order.acoBotType && !existing.acoBotType) existing.acoBotType = order.acoBotType;
       orders[existingIdx] = existing;
     } else {
       const newIdx = orders.length;
@@ -10033,7 +10042,11 @@ ipcMain.handle('sync-discord-orders', async () => {
       mainWindow.webContents.send('sync-progress', { discordSync: true, phase: 'fetch', message: 'Fetching orders from Discord...' });
     }
 
-    const syncResult = await callDiscordAcoApi('sync-orders', { licenseKey });
+    // Check if this is a full resync (re-fetch all orders including previously fetched)
+    const fullResync = store.get('_pendingFullResync', false);
+    if (fullResync) store.delete('_pendingFullResync');
+
+    const syncResult = await callDiscordAcoApi('sync-orders', { licenseKey, fullResync });
     const rows = syncResult.orders || [];
 
     if (!rows || rows.length === 0) {
@@ -10218,14 +10231,17 @@ ipcMain.handle('sync-discord-orders', async () => {
         // Single item order
         const { sku: matchedSku, image: matchedImage } = shouldMap ? findSkuAndImage(itemName) : { sku: null, image: null };
 
+        const itemPrice = parseFloat(row.amount) || 0;
+        const qty = row.quantity || 1;
         return {
           orderId: normalizeOrderId(row.order_id || `discord-${row.message_id}`),
           retailer: row.retailer,
           item: itemName,
           imageUrl: matchedImage || row.image_url,
           sku: matchedSku,
-          amount: parseFloat(row.amount) || 0,
-          quantity: row.quantity || 1,
+          amount: itemPrice * qty,
+          subtotal: itemPrice * qty,
+          quantity: qty,
           status: effectiveStatus,
           date: row.order_date ? row.order_date.split('T')[0] : localDateStr(),
           email: row.account_email || 'discord-aco',
@@ -10239,10 +10255,11 @@ ipcMain.handle('sync-discord-orders', async () => {
     });
 
     // Build set of existing order keys BEFORE save, to determine genuinely new orders
+    // Include source in key so Discord orders don't collide with email orders
     const existingOrderKeys = new Set();
     const preExistingOrders = store.get('orders', []);
     for (const o of preExistingOrders) {
-      existingOrderKeys.add(`${o.retailer}-${normalizeOrderId(o.orderId)}`);
+      existingOrderKeys.add(`${o.source || 'email'}-${o.retailer}-${normalizeOrderId(o.orderId)}`);
     }
 
     // Save in chunks to avoid blocking the main process on large imports
@@ -10269,16 +10286,21 @@ ipcMain.handle('sync-discord-orders', async () => {
 
     // Filter to only genuinely new orders (not already in store before this sync)
     const newOrders = convertedOrders.filter(o => {
-      const key = `${o.retailer}-${normalizeOrderId(o.orderId)}`;
+      const key = `${o.source || 'discord'}-${o.retailer}-${normalizeOrderId(o.orderId)}`;
       return !existingOrderKeys.has(key);
     });
 
-    console.log('[DISCORD ACO] Sync complete. Total added:', totalAdded);
+    // Count declined vs non-declined in this batch
+    const declinedCount = convertedOrders.filter(o => o.status === 'declined').length;
+    const confirmedCount = convertedOrders.length - declinedCount;
+    const existingCount = convertedOrders.length - totalAdded;
+
+    console.log(`[DISCORD ACO] Sync complete. Total added: ${totalAdded}, existing: ${existingCount}, declined: ${declinedCount}, confirmed: ${confirmedCount}`);
     store.set('discordAco.lastSyncCount', totalAdded);
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('sync-progress', { discordSync: true, phase: 'done', count: totalAdded });
+      mainWindow.webContents.send('sync-progress', { discordSync: true, phase: 'done', count: totalAdded, total: convertedOrders.length, declined: declinedCount, existing: existingCount });
     }
-    return { success: true, count: totalAdded };
+    return { success: true, count: totalAdded, total: convertedOrders.length, declined: declinedCount };
   } catch (error) {
     console.error('[DISCORD ACO] sync-discord-orders error:', error);
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -10350,6 +10372,19 @@ ipcMain.handle('clear-discord-orders', async () => {
     return { success: true, removed };
   } catch (error) {
     console.error('[DISCORD ACO] clear-discord-orders error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Reset server-side sync state (clear fetched_at flags)
+ipcMain.handle('reset-discord-sync', async () => {
+  try {
+    const licenseKey = getDiscordAcoLicenseKey();
+    if (!licenseKey) return { success: false, error: 'No license key' };
+    const result = await callDiscordAcoApi('reset-sync', { licenseKey });
+    return result;
+  } catch (error) {
+    console.error('[DISCORD ACO] reset-discord-sync error:', error);
     return { success: false, error: error.message };
   }
 });
@@ -10568,6 +10603,11 @@ ipcMain.handle('get-aco-forward-log', async () => {
 
 ipcMain.handle('clear-aco-forward-log', async () => {
   store.set('acoForwardLog', []);
+  return { success: true };
+});
+
+ipcMain.handle('discord-full-resync', async () => {
+  store.set('_pendingFullResync', true);
   return { success: true };
 });
 

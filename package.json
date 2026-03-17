@@ -1,10 +1,10 @@
 {
   "name": "ordyn",
-  "version": "2.3.4",
+  "version": "2.3.5",
   "description": "SOLUS - Order Analytics for Walmart, Target, Pokemon Center & more",
   "main": "src-protected/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron src/main.js",
     "start:protected": "electron . --main=src-protected/main.js",
     "build": "electron-builder",
     "build:win": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --x64",

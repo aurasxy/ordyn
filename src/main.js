@@ -1150,6 +1150,9 @@ function saveOrdersBatch(newOrders) {
       // Merge: upgrade status, keep confirmed data, add shipping fields
       const newPri = STATUS_PRIORITY[order.status] || 0;
       const curPri = STATUS_PRIORITY[existing.status] || 0;
+      if (order.retailer === 'target') {
+        console.log(`[TARGET MERGE] Order ${nid}: existing=${existing.status}(pri=${curPri}) new=${order.status}(pri=${newPri}) upgrade=${newPri > curPri}`);
+      }
       if (newPri > curPri) existing.status = order.status;
       if (order.item && (order.status === 'confirmed' || !existing.item)) existing.item = order.item;
       if (order.imageUrl && (order.status === 'confirmed' || !existing.imageUrl)) existing.imageUrl = order.imageUrl;
@@ -1686,8 +1689,8 @@ function getRetailer(from, subject, content = '') {
 
 // Status patterns
 const STATUS_PATTERNS = {
-  confirmed: [/thanks for your (?:order|pre-?order)/i, /(?:order|pre-?order).*confirm/i, /received\s+your\s+(?:order|pre-?order)/i, /(?:order|pre-?order).*received/i, /your (?:order|pre-?order)/i, /(?:order|pre-?order) placed/i, /prepping your pre-?order/i, /thanks for shopping/i],
-  shipped: [/your package shipped/i, /has shipped/i, /on its way/i, /package is on the way/i, /out for delivery/i, /shipped.*!/i, /^shipped:/i],
+  confirmed: [/thanks for your (?:order|pre-?order)/i, /(?:order|pre-?order).*confirm/i, /received\s+your\s+(?:order|pre-?order)/i, /(?:order|pre-?order).*received/i, /(?:order|pre-?order) placed/i, /thanks for shopping/i],
+  shipped: [/your package shipped/i, /has shipped/i, /is being shipped/i, /we(?:'re|.re)?\s+shipping/i, /prepping your pre-?order/i, /on its way/i, /on the way/i, /package is on the way/i, /out for delivery/i, /in transit/i, /tracking (?:number|info|update|#)/i, /track your (?:package|order|shipment)/i, /shipment (?:confirmation|update|notice)/i, /shipped.*!/i, /^shipped:/i, /has left (?:the |our )?(?:warehouse|facility)/i],
   delivered: [/^arrived:/i, /^delivered:/i, /your package arrived/i, /package arrived/i, /items? arrived/i, /has arrived/i, /(?:was|been|got|successfully)\s+delivered/i, /your package was delivered/i, /has been delivered/i, /delivery complete/i, /left at front door/i, /left at door/i, /order\s+delivered/i, /package\s+delivered/i, /items?\s+delivered/i],
   cancelled: [/delivery was cancell?ed/i, /order (?:has been |was |is )?cancell?ed/i, /was cancell?ed/i, /been cancell?ed/i, /we(?:'ve)? cancell?ed/i, /items? cancell?ed/i, /couldn't process/i, /unable to process/i, /cancellation confirmation/i]
 };
@@ -1696,22 +1699,25 @@ function determineStatus(content, subject) {
   // Check CANCELLED subject patterns FIRST — "Order Cancellation Confirmation" must not match as confirmed
   if (/cancell?ed/i.test(subject) || /cancellation/i.test(subject)) return 'cancelled';
 
-  // Subject-based confirmations (these are definitive)
-  // Covers: "Thanks for your order", "Order confirmation", "We've received your order",
-  // "Your order has been received", "Your order has been placed", "Order placed",
-  // "We're prepping your preorder", "Your preorder items arrive today"
-  if (/thanks for your.*(?:order|pre-?order)/i.test(subject) || /(?:order|pre-?order).*confirm/i.test(subject) ||
-      /received\s+your\s+(?:order|pre-?order)/i.test(subject) || /(?:order|pre-?order).*(?:received|placed)/i.test(subject) ||
-      /prepping your pre-?order/i.test(subject) || /here'?s your (?:order|pre-?order)/i.test(subject) ||
-      /thanks for shopping/i.test(subject)) return 'confirmed';
-
-  // "preorder items arrive today" = shipping status (items are on the way)
-  if (/pre-?order items arrive/i.test(subject)) return 'shipped';
-
+  // Check SHIPPED/DELIVERED subject patterns BEFORE confirmed — a shipping email must never match as confirmed
   if (/^arrived:/i.test(subject) || /has been delivered/i.test(subject) || /was delivered/i.test(subject) ||
       /order delivered/i.test(subject) || /package delivered/i.test(subject) || /delivery complete/i.test(subject) ||
       /^delivered:/i.test(subject)) return 'delivered';
-  if (/^shipped:/i.test(subject) || /has shipped/i.test(subject) || /on its way/i.test(subject)) return 'shipped';
+  if (/^shipped:/i.test(subject) || /has shipped/i.test(subject) || /is being shipped/i.test(subject) ||
+      /on its way/i.test(subject) || /on the way/i.test(subject) || /in transit/i.test(subject) ||
+      /tracking (?:number|info|update|#)/i.test(subject) || /shipment/i.test(subject) ||
+      /out for delivery/i.test(subject) || /we(?:'re|.re)?\s+shipping/i.test(subject) ||
+      /prepping your pre-?order/i.test(subject)) return 'shipped';
+  // "preorder items arrive today" = shipping status (items are on the way)
+  if (/pre-?order items arrive/i.test(subject)) return 'shipped';
+
+  // Subject-based confirmations (these are definitive — checked AFTER shipped/delivered)
+  // Covers: "Thanks for your order", "Order confirmation", "We've received your order",
+  // "Your order has been received", "Your order has been placed", "Order placed"
+  if (/thanks for your.*(?:order|pre-?order)/i.test(subject) || /(?:order|pre-?order).*confirm/i.test(subject) ||
+      /received\s+your\s+(?:order|pre-?order)/i.test(subject) || /(?:order|pre-?order).*(?:received|placed)/i.test(subject) ||
+      /here'?s your (?:order|pre-?order)/i.test(subject) ||
+      /thanks for shopping/i.test(subject)) return 'confirmed';
 
   const text = subject + ' ' + content;
   // Check delivered/shipped BEFORE cancelled — prevents delivery emails with "cancel" in footer from being misclassified
@@ -2152,26 +2158,28 @@ function parseTargetEmail(parsed, accountEmail) {
   }
   
   // Find order ID - Target uses 15-digit order numbers
-  const orderMatch = html.match(/order\s*#?\s*:?\s*(\d{15})/i) || 
-                     text.match(/order\s*#?\s*:?\s*(\d{15})/i) || 
+  const orderMatch = html.match(/order\s*#?\s*:?\s*(\d{15})/i) ||
+                     text.match(/order\s*#?\s*:?\s*(\d{15})/i) ||
                      subject.match(/#?(\d{15})/);
+  console.log(`[TARGET] Order ID search: subject="${subject.substring(0, 80)}", found=${orderMatch ? orderMatch[1] : 'NONE'}, htmlLen=${html.length}, textLen=${text.length}`);
   if (!orderMatch) return null;
   const orderId = orderMatch[1];
-  
+
   // Determine status
   let status = null;
   const subjectLower = subject.toLowerCase();
   const textLower = text.toLowerCase();
-  
+
   if (subjectLower.includes('cancel') || textLower.includes('has been canceled') || textLower.includes('been cancelled')) {
     status = 'cancelled';
   } else if (subjectLower.includes('arrived') || subjectLower.includes('delivered') || textLower.includes('have arrived') || textLower.includes('was delivered')) {
     status = 'delivered';
-  } else if (/\bship/i.test(subjectLower) || subjectLower.includes('on the way') || textLower.includes('has shipped') || textLower.includes('is on the way') || /pre-?order items arrive/i.test(subjectLower)) {
+  } else if (/\bship/i.test(subjectLower) || subjectLower.includes('on the way') || textLower.includes('has shipped') || textLower.includes('is on the way') || /pre-?order items arrive/i.test(subjectLower) || /prepping your pre-?order/i.test(subjectLower)) {
     status = 'shipped';
-  } else if (subjectLower.includes('thanks for') || subjectLower.includes("here's your order") || subjectLower.includes('order confirmed') || textLower.includes('thanks for your order') || textLower.includes('order has been placed') || /prepping your pre-?order/i.test(subjectLower) || subjectLower.includes("here's your pre")) {
+  } else if (subjectLower.includes('thanks for') || subjectLower.includes("here's your order") || subjectLower.includes('order confirmed') || textLower.includes('thanks for your order') || textLower.includes('order has been placed') || subjectLower.includes("here's your pre")) {
     status = 'confirmed';
   }
+  console.log(`[TARGET] Order ${orderId}: status=${status}, subject="${subject.substring(0, 80)}", prepping=${/prepping/i.test(subjectLower)}`);
   if (!status) return null;
 
   // Extract amount
@@ -3504,17 +3512,29 @@ function parseBestBuyEmail(parsed, accountEmail) {
     return null;
   }
 
-  // Status determination
-  let status = 'confirmed';
-  if (subjectLower.includes('delivered') || subjectLower.includes('has been delivered')) {
+  // Status determination — check shipped/delivered BEFORE falling back to confirmed
+  let status = null;
+  if (subjectLower.includes('cancel')) {
+    status = 'cancelled';
+  } else if (subjectLower.includes('delivered') || subjectLower.includes('has been delivered')) {
     status = 'delivered';
   } else if (subjectLower.includes('tracking') || subjectLower.includes('shipped') ||
-             subjectLower.includes('on the way') || subjectLower.includes('out for delivery')) {
+             subjectLower.includes('on the way') || subjectLower.includes('out for delivery') ||
+             subjectLower.includes('in transit') || subjectLower.includes('shipment')) {
     status = 'shipped';
-  } else if (subjectLower.includes('cancel')) {
-    status = 'cancelled';
   } else if (subjectLower.includes('ready for pickup')) {
     status = 'shipped'; // Treat pickup ready as shipped
+  } else if (subjectLower.includes('order') || subjectLower.includes('purchase') || subjectLower.includes('thank')) {
+    status = 'confirmed';
+  }
+  // Fallback: use content-based detection
+  if (!status) {
+    const bbContent = text + ' ' + html;
+    status = determineStatus(bbContent, subject);
+  }
+  if (!status) {
+    debugLog(`[BESTBUY] No status detected, skipping: ${subject.substring(0, 60)}`);
+    return null;
   }
 
   debugLog(`[BESTBUY] Order ${orderId} status: ${status}`);
@@ -3694,14 +3714,28 @@ function parseCostcoEmail(parsed, accountEmail) {
     return null;
   }
 
-  // Status determination
-  let status = 'confirmed';
-  if (subjectLower.includes('shipped') || subjectLower.includes('out for delivery')) {
-    status = 'shipped';
+  // Status determination — check shipped/delivered BEFORE falling back to confirmed
+  let status = null;
+  if (subjectLower.includes('cancel')) {
+    status = 'cancelled';
   } else if (subjectLower.includes('delivered')) {
     status = 'delivered';
-  } else if (subjectLower.includes('cancel')) {
-    status = 'cancelled';
+  } else if (subjectLower.includes('shipped') || subjectLower.includes('out for delivery') ||
+             subjectLower.includes('on the way') || subjectLower.includes('on its way') ||
+             subjectLower.includes('in transit') || subjectLower.includes('tracking') ||
+             subjectLower.includes('shipment')) {
+    status = 'shipped';
+  } else if (subjectLower.includes('order') || subjectLower.includes('thank') || subjectLower.includes('purchase')) {
+    status = 'confirmed';
+  }
+  // Fallback: use content-based detection
+  if (!status) {
+    const costcoContent = text + ' ' + html;
+    status = determineStatus(costcoContent, subject);
+  }
+  if (!status) {
+    debugLog(`[COSTCO] No status detected, skipping: ${subject.substring(0, 60)}`);
+    return null;
   }
 
   debugLog(`[COSTCO] Order ${orderId} status: ${status}`);
@@ -4137,18 +4171,20 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
       lastSavedOrderCount = allOrders.length;
     }
 
-    // Pre-populate confirmedOrderIds from existing orders in database
+    // Pre-populate confirmedOrderIds from ALL existing orders in database
     // This allows delivered/shipped/cancelled emails to match orders from previous syncs
+    // Previously only loaded 'confirmed' status for non-self-validating retailers, which caused
+    // shipped/delivered emails to be filtered out if the order had already been upgraded
     const existingDbOrders = store.get('orders', []);
     // Retailers whose parsers already validate orders (promo filter + unique order ID format)
     // These don't need a separate confirmation email to be considered real orders
     const selfValidatingRetailers = new Set(['bestbuy', 'costco', 'walmart']);
     existingDbOrders.forEach(o => {
-      if (o.status === 'confirmed' || selfValidatingRetailers.has(o.retailer)) {
+      if (o.status && o.status !== 'declined') {
         confirmedOrderIds.add(`${o.retailer}-${o.orderId}`);
       }
     });
-    logDebug('info', `Pre-loaded ${confirmedOrderIds.size} confirmed order IDs from database`);
+    logDebug('info', `Pre-loaded ${confirmedOrderIds.size} order IDs from database`);
 
     imap.once('ready', () => {
       logDebug('info', 'IMAP connection ready');
@@ -5078,6 +5114,11 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
                   if (order) {
                     order.accountId = accountId;
                     const key = `${order.retailer}-${order.orderId}-${order.status}`;
+                    // Log every Target order decision for debugging status detection
+                    if (order.retailer === 'target') {
+                      const inConfirmedSet = confirmedOrderIds.has(`${order.retailer}-${order.orderId}`);
+                      console.log(`[TARGET SYNC] Order ${order.orderId}: status=${order.status}, seenKey="${key}", isDupe=${seenKeys.has(key)}, inConfirmedSet=${inConfirmedSet}, subject="${(order.subject || '').substring(0, 60)}"`);
+                    }
                     if (!seenKeys.has(key)) {
                       seenKeys.add(key);
                       allOrders.push(order);
@@ -5130,6 +5171,16 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
               clearInterval(checkDone);
 
               const filteredOrders = allOrders.filter(o => confirmedOrderIds.has(`${o.retailer}-${o.orderId}`));
+
+              // Log all Target orders and their filter status for debugging
+              const targetOrders = allOrders.filter(o => o.retailer === 'target');
+              if (targetOrders.length > 0) {
+                console.log(`[TARGET SYNC SUMMARY] Total Target orders parsed: ${targetOrders.length}`);
+                targetOrders.forEach(o => {
+                  const passed = confirmedOrderIds.has(`${o.retailer}-${o.orderId}`);
+                  console.log(`[TARGET SYNC SUMMARY]   ${o.orderId} status=${o.status} passedFilter=${passed} subject="${(o.subject || '').substring(0, 60)}"`);
+                });
+              }
 
               // Log orders that were parsed but dropped by confirmation filter
               const droppedOrders = allOrders.filter(o => !confirmedOrderIds.has(`${o.retailer}-${o.orderId}`));

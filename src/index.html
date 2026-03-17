@@ -6534,7 +6534,7 @@
                 <button class="btn btn-sm btn-secondary" onclick="togglePortfolioView()" id="portfolioViewToggle" title="Toggle table/grid view">Table</button>
                 <button class="btn btn-sm btn-secondary" onclick="toggleDensity()" id="densityToggle" title="Toggle density">Density</button>
                 <button class="btn btn-sm btn-primary" onclick="showAddInventoryModal('portfolio')">+ Add Item</button>
-                <button class="btn btn-sm btn-secondary" onclick="showImportFromOrdersModal()">Import</button>
+                <button class="btn btn-sm btn-secondary" onclick="window.addInventoryContext='portfolio';showImportFromOrdersModal()">Import</button>
                 <button class="btn btn-sm btn-secondary" onclick="refreshAllPortfolioPrices()">Refresh Prices</button>
               </div>
             </div>
@@ -6546,7 +6546,7 @@
                 <div style="font-size:48px;opacity:0.3;margin-bottom:16px;">&#128230;</div>
                 <div style="font-size:var(--text-xl);font-weight:600;margin-bottom:8px;">No inventory items yet</div>
                 <div style="font-size:var(--text-base);color:var(--text-secondary);max-width:380px;line-height:1.6;margin-bottom:16px;">Track your collection by importing from synced orders or adding items manually.</div>
-                <div style="display:flex;gap:10px;"><button class="btn btn-primary" onclick="showImportFromOrdersModal()">Import from Orders</button><button class="btn btn-secondary" onclick="showAddInventoryModal('portfolio')">+ Add Manually</button></div>
+                <div style="display:flex;gap:10px;"><button class="btn btn-primary" onclick="window.addInventoryContext='portfolio';showImportFromOrdersModal()">Import from Orders</button><button class="btn btn-secondary" onclick="showAddInventoryModal('portfolio')">+ Add Manually</button></div>
               </div>
             </div>
           </div>
@@ -18581,9 +18581,9 @@ let selectedImportItems = new Set(); // Set of itemKeys
 let expandedImportDrops = new Set(); // Set of expanded drop dates
 
 function showImportFromOrdersModal() {
-  // Get all confirmed orders (not cancelled)
-  const allOrders = computeOrderStatuses();
-  const confirmedOrders = allOrders.filter(o => o.finalStatus !== 'cancelled');
+  // Get all confirmed orders (not cancelled/declined), respecting current source filter
+  const allOrders = applySourceFilter(computeOrderStatuses());
+  const confirmedOrders = allOrders.filter(o => o.finalStatus !== 'cancelled' && o.finalStatus !== 'declined');
 
   // Group by drop date (original order/confirmed date, normalized to YYYY-MM-DD)
   const dropMap = new Map();

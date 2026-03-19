@@ -12,6 +12,10 @@ process.stderr?.on?.('error', (err) => { if (err.code !== 'EPIPE') throw err; })
 // ==================== TEST MODE ISOLATION ====================
 // When SOLUS_TEST_MODE is set, redirect userData to an isolated directory
 // so automated tests never touch real user data.
+// Ensure app name is 'ordyn' even when launched via `electron src/main.js` (dev mode)
+// This keeps userData at AppData/Roaming/ordyn/ so license cache and settings are found
+if (app.getName() !== 'ordyn') app.setName('ordyn');
+
 const SOLUS_TEST_MODE = process.env.SOLUS_TEST_MODE === '1';
 if (SOLUS_TEST_MODE && process.env.SOLUS_TEST_USER_DATA) {
   app.setPath('userData', process.env.SOLUS_TEST_USER_DATA);
@@ -4231,39 +4235,46 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           return;
         }
 
-        // Optimized search patterns - trimmed from 47 to 27 based on full-body analysis of 12,960 emails
-        // Removed 12 dead patterns (0 matches in 365 days) and 8 redundant patterns (covered by broader FROM matches)
-        // Verified zero coverage loss — all retailer emails still matched by remaining patterns
+        // Search patterns — FROM-first approach
+        // FROM searches are fast and broad, catching ALL email types from a retailer in one query.
+        // Broad keywords cover iCloud HME variants (_at_, _em_, _com_) automatically.
+        // Specific addresses added for edge cases where broad match might miss.
         const allSearches = [
-          // FROM patterns - broad matches cover all iCloud HME variants (_at_, _em_, _com_)
+          // === FROM patterns (primary) ===
+          // Walmart
           { from: 'walmart', retailer: 'walmart' },
+          { from: 'prod.walmart.com', retailer: 'walmart' },
+          { from: 'help@walmart.com', retailer: 'walmart' },
+          // Target
           { from: 'target', retailer: 'target' },
+          { from: 'orders@oe.target.com', retailer: 'target' },
+          { from: 'oe1.target.com', retailer: 'target' },
+          // Pokemon Center (MIME-encoded Pokémon = Pok=C3=A9mon, so 'pokemon' may not match)
           { from: 'pokemon', retailer: 'pokecenter' },
+          { from: 'em.pokemon.com', retailer: 'pokecenter' },
+          { from: 'em_pokemon', retailer: 'pokecenter' },
+          { from: 'pokemoncenter', retailer: 'pokecenter' },
+          { from: 'narvar', retailer: 'pokecenter' },
+          // Costco
           { from: 'costco', retailer: 'costco' },
+          // Best Buy
           { from: 'bestbuy', retailer: 'bestbuy' },
-          // SUBJECT patterns - catch orders including forwarded/HME emails
-          { subject: 'Thanks for your order', retailer: null },
-          { subject: 'Arrived', retailer: 'target' },
-          { subject: 'Delivered', retailer: null },
-          { subject: "Here's your order", retailer: 'target' },
-          { subject: 'PokemonCenter.com', retailer: 'pokecenter' },
+          { from: 'email.bestbuy.com', retailer: 'bestbuy' },
+          { from: 'emailinfo.bestbuy.com', retailer: 'bestbuy' },
+          // Sam's Club
+          { from: 'samsclub', retailer: 'samsclub' },
+          { from: "sam's club", retailer: 'samsclub' },
+          // === SUBJECT fallback (critical for iCloud HME where FROM searches fail) ===
           { subject: 'PokemonCenter', retailer: 'pokecenter' },
+          { subject: 'Pokemon Center', retailer: 'pokecenter' },
+          { subject: 'on its way', retailer: null },
+          { subject: 'Thanks for your order', retailer: null },
           { subject: 'Thank you for shopping', retailer: 'pokecenter' },
-          { subject: 'Thank you', retailer: null },
-          { subject: 'thanks for your order', retailer: 'walmart' },
-          { subject: 'thanks for your delivery', retailer: 'walmart' },
-          { subject: 'delivery order', retailer: 'walmart' },
-          { subject: 'Your Walmart', retailer: 'walmart' },
-          { subject: 'Walmart', retailer: 'walmart' },
+          { subject: 'has been canceled', retailer: null },
+          { subject: 'has been cancelled', retailer: null },
           { subject: 'Shipped:', retailer: null },
-          { subject: 'Arriving', retailer: null },
-          { subject: 'out for delivery', retailer: null },
-          { subject: 'Your delivery', retailer: null },
-          { subject: 'shopping', retailer: null },
-          { subject: 'Your order', retailer: 'target' },
-          { subject: 'Costco.com Order', retailer: 'costco' },
-          { subject: 'Costco shipment', retailer: 'costco' },
-          { subject: 'has been delivered', retailer: 'bestbuy' }
+          { subject: 'Delivered', retailer: null },
+          { subject: 'has shipped', retailer: null },
         ];
 
         // Filter to target retailer's patterns only (for resync-drop)
@@ -4283,12 +4294,7 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
 
         function runNextSearch() {
           if (searchIndex >= searches.length) {
-            // All targeted searches done - run safety net if not in deep scan mode
-            if (!deepScanEnabled) {
-              runSafetyNet();
-            } else {
-              finishSearchPhase();
-            }
+            finishSearchPhase();
             return;
           }
 
@@ -4412,7 +4418,8 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           sendProgress(`Found ${totalEmails} emails`, 0, totalEmails);
           const patternsWithResults = Object.values(searchResults).filter(c => c > 0).length;
           addUserLog(`Searched ${searches.length} patterns, ${patternsWithResults} matched`);
-          addUserLog(`Found ${totalEmails} emails to process`);
+          addUserLog(`Found ${totalEmails} emails to pre-filter`);
+
           fetchAll(allResultIds);
         }
 
@@ -4462,27 +4469,19 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
         // Use batched fetching always to allow mid-sync pause/stop
         let BATCH_SIZE, BATCH_DELAY;
         if (isICloud) {
-          BATCH_SIZE = 50;
-          BATCH_DELAY = 1000; // 1 second delay
-        } else if (isGmail && isLargeSync) {
           BATCH_SIZE = 100;
-          BATCH_DELAY = 500; // 500ms delay between batches to avoid rate limits
+          BATCH_DELAY = 300; // iCloud is fine with 100-batch, 300ms keeps it stable
+        } else if (isGmail) {
+          BATCH_SIZE = 500; // Gmail handles large batches fine via IMAP
+          BATCH_DELAY = 50;  // Minimal delay — Gmail doesn't rate-limit IMAP fetches
         } else {
-          BATCH_SIZE = 100; // Always batch to allow pause/stop mid-sync
-          BATCH_DELAY = 100; // Small delay between batches
+          BATCH_SIZE = 250; // Default — generous batches for most providers
+          BATCH_DELAY = 50;  // Minimal delay
         }
 
-        if (isICloud) {
-          logDebug('info', 'iCloud detected - using batched fetch', { batchSize: BATCH_SIZE, delayMs: BATCH_DELAY });
-          addUserLog(`iCloud mode: processing in batches of ${BATCH_SIZE}`);
-        } else if (isGmail && isLargeSync) {
-          logDebug('info', 'Gmail large sync detected - using batched fetch to avoid rate limiting', {
-            batchSize: BATCH_SIZE,
-            delayMs: BATCH_DELAY,
-            totalEmails: ids.length
-          });
-          addUserLog(`Large sync mode: processing ${ids.length} emails in batches of ${BATCH_SIZE}`);
-        }
+        logDebug('info', `Fetch config: batch=${BATCH_SIZE}, delay=${BATCH_DELAY}ms, provider=${isGmail ? 'gmail' : isICloud ? 'icloud' : 'other'}`, {
+          batchSize: BATCH_SIZE, delayMs: BATCH_DELAY, totalEmails: ids.length
+        });
 
         // Stall detection for auto-reconnect (Gmail and iCloud large syncs)
         let lastEmailTime = Date.now();
@@ -5013,18 +5012,45 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
             if (subjectMatch) {
               const subjectLower = subjectMatch[1].toLowerCase();
 
+              // NEGATIVE filter — skip non-order emails early (marketing, promos, account alerts)
+              const isExcluded = subjectLower.includes('we miss you') ||
+                                 subjectLower.includes("don't miss") ||
+                                 subjectLower.includes('verify your') ||
+                                 subjectLower.includes('update your password') ||
+                                 subjectLower.includes('account security') ||
+                                 subjectLower.includes('member exclusive') ||
+                                 subjectLower.includes('limited time') ||
+                                 subjectLower.includes('early access') ||
+                                 subjectLower.includes('save now') ||
+                                 subjectLower.includes('shop now') ||
+                                 subjectLower.includes('$10 off') ||
+                                 subjectLower.includes('$40 off') ||
+                                 subjectLower.includes('you saved additional') ||
+                                 subjectLower.includes('only at best buy') ||
+                                 subjectLower.includes('information required') ||
+                                 subjectLower.includes('have your medication');
+
+              if (isExcluded) {
+                skippedNonOrder++;
+                processedCount++;
+                sendProgress(`${processedCount}/${totalEmails}`, processedCount, totalEmails);
+                return;
+              }
+
+              // POSITIVE filter — must contain order-related keywords
               const isOrderEmail = subjectLower.includes('order') ||
                                    subjectLower.includes('shipped') ||
                                    subjectLower.includes('deliver') ||
                                    subjectLower.includes('arriving') ||
                                    subjectLower.includes('on the way') ||
+                                   subjectLower.includes('on its way') ||
                                    subjectLower.includes('out for delivery') ||
+                                   subjectLower.includes('in transit') ||
                                    subjectLower.includes('confirmed') ||
                                    subjectLower.includes('cancelled') ||
                                    subjectLower.includes('canceled') ||
-                                   subjectLower.includes('refund') ||
-                                   subjectLower.includes('return') ||
                                    subjectLower.includes('tracking') ||
+                                   subjectLower.includes('shipment') ||
                                    subjectLower.includes('arrived') ||
                                    subjectLower.includes('thank you') ||
                                    subjectLower.includes('thanks for') ||
@@ -5032,6 +5058,10 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
                                    subjectLower.includes('shopping') ||
                                    subjectLower.includes('pickup') ||
                                    subjectLower.includes('pick up') ||
+                                   subjectLower.includes('prepping') ||
+                                   subjectLower.includes('preparing to ship') ||
+                                   subjectLower.includes('track status') ||
+                                   subjectLower.includes('running late') ||
                                    subjectLower.includes('receipt') ||
                                    subjectLower.includes('purchase') ||
                                    subjectLower.includes('substitut');

@@ -1031,9 +1031,13 @@ function mergeOrderEntries(orderList) {
       existing.amount = o.amount;
     }
 
-    // Prefer confirmed order's date for drop grouping
-    if (o.status === 'confirmed' && o.date) existing.date = o.date;
-    if (o.date && !existing.date) existing.date = o.date;
+    // Prefer confirmed order's date for drop grouping — confirmed date ALWAYS wins.
+    // Shipped/delivered dates are often the ship date, not the order date.
+    if (o.status === 'confirmed' && o.date) {
+      existing.date = o.date;
+    } else if (o.date && !existing.date) {
+      existing.date = o.date;
+    }
 
     // Merge cancellation info
     if (o.cancelReason && !existing.cancelReason) existing.cancelReason = o.cancelReason;
@@ -1414,6 +1418,25 @@ function getTrackingUrl(carrier, trackingNumber) {
 function extractTrackingNumber(content) {
   if (!content) return null;
 
+  // Phase 0: Extract tracking from carrier URLs (highest confidence — the URL IS the tracking)
+  const urlPatterns = [
+    /fedextrack[^"']*trknbr=(\d{12,15})/i,                         // FedEx tracking URL
+    /fedex\.com[^"']*tracknumbers=(\d{12,15})/i,                   // FedEx alt URL
+    /tools\.usps\.com[^"']*tLabels=(\d{20,22})/i,                  // USPS tracking URL
+    /usps\.com[^"']*tLabels=(9[0-4]\d{18,22})/i,                   // USPS alt URL
+    /ups\.com[^"']*tracknum=(1Z[A-Z0-9]{16})/i,                    // UPS tracking URL
+    /ups\.com[^"']*trackNums=(1Z[A-Z0-9]{16})/i,                   // UPS alt URL
+    /ontrac\.com[^"']*tracking\/(C\d{14,20})/i,                    // OnTrac tracking URL
+    /lasership\.com[^"']*track\/([A-Z0-9]{10,20})/i,               // LaserShip tracking URL
+    /dhl\.com[^"']*tracking-id=([A-Z0-9]{10,30})/i,                // DHL tracking URL
+  ];
+  for (const pattern of urlPatterns) {
+    const match = content.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
   // Phase 1: Look for definitive carrier-specific patterns (highest confidence)
   const definitivePatterns = [
     /\b(1Z[A-Z0-9]{16})\b/i,           // UPS - very distinctive
@@ -1424,7 +1447,7 @@ function extractTrackingNumber(content) {
     /\b(1LS\d{10,15})\b/i,             // LaserShip
     /\b(LS\d{10,15})\b/i,              // LaserShip alternate
     /\b(JD\d{18,})\b/i,                // DHL
-    /\b(TBA\d{10,})\b/i,               // Amazon
+    /\b(TBA\d{10,})\b/i,              // Amazon
   ];
 
   for (const pattern of definitivePatterns) {
@@ -1439,14 +1462,10 @@ function extractTrackingNumber(content) {
 
   // FedEx context search - look for 12-15 digit numbers near "fedex" or tracking links
   if (contentLower.includes('fedex') || contentLower.includes('fed ex')) {
-    // Look specifically for FedEx tracking number patterns
-    // FedEx often has tracking near their links or "Track your package" text
     const fedexPatterns = [
       /fedex[^0-9]{0,50}(\d{12,15})\b/i,          // "FedEx" followed by 12-15 digits
       /\b(\d{12,15})[^0-9]{0,50}fedex/i,          // 12-15 digits followed by "FedEx"
       /track[^0-9]{0,30}(\d{12,15})\b/i,          // "track" near digits (if FedEx mentioned)
-      /\b(\d{12})\b/,                              // Fallback: any 12-digit (FedEx Ground)
-      /\b(\d{15})\b/,                              // Fallback: any 15-digit (FedEx Express)
     ];
     for (const pattern of fedexPatterns) {
       const match = content.match(pattern);
@@ -1464,7 +1483,6 @@ function extractTrackingNumber(content) {
 
   // USPS context search
   if (contentLower.includes('usps') || contentLower.includes('postal')) {
-    // USPS tracking numbers
     const uspsPatterns = [
       /\b(9[0-4]\d{18,22})\b/,           // Standard USPS (starts with 90-94)
       /\b(\d{20,22})\b/,                  // Long format
@@ -1480,12 +1498,6 @@ function extractTrackingNumber(content) {
   if (genericMatch && genericMatch[1]) {
     return genericMatch[1];
   }
-
-  // Phase 4: Last resort - very generic patterns (only if nothing else matched)
-  // These are commented out to avoid false positives with order IDs, timestamps, etc.
-  // Uncomment only if tracking is often missed:
-  // const fallbackMatch = content.match(/\b(\d{12,15})\b/);
-  // if (fallbackMatch) return fallbackMatch[1];
 
   return null;
 }
@@ -1572,11 +1584,13 @@ function parseAddress(rawAddress) {
   }
   
   // Generate address key for grouping
+  // Strip letter/unit suffixes from street number so 7-a, 7-b, 7-c all group under 7
   const streetNum = result.line1.match(/^(\d+)/);
-  const streetName = result.line1.replace(/^\d+\s*/, '').toLowerCase()
+  const streetName = result.line1.replace(/^\d+[a-z\-]*\s*/i, '').toLowerCase()
     .replace(/\b(street|st|avenue|ave|road|rd|drive|dr|lane|ln|court|ct|boulevard|blvd|way|place|pl)\b\.?/gi, '')
+    .replace(/\b(apt|apartment|unit|unt|ste|suite|#)\s*[\w\d-]*/gi, '')
     .replace(/[^a-z0-9]/g, '');
-  
+
   if (result.zip && streetNum) {
     result.addressKey = `${result.zip}-${streetNum[1]}-${streetName}`.substring(0, 50);
   }
@@ -1964,7 +1978,6 @@ function parseWalmartEmail(parsed, accountEmail) {
       /quantity[:\s]*(\d+)/i,
       /qty[:\s]*(\d+)/i,
       /\((\d+)\)\s*<\/td>/i,
-      />\s*(\d+)\s*</
     ];
     for (const pattern of qtyPatterns) {
       const qtyMatch = content.match(pattern);
@@ -2053,22 +2066,20 @@ function parseWalmartEmail(parsed, accountEmail) {
     }
   }
 
-  let orderDate = emailDate;
+  // Date extraction: try to find "Order date:" in email content first (most accurate).
+  // For shipped/delivered, don't fall back to emailDate — it would be the SHIP date, not the
+  // order date, causing orders to split across days. Leave null so the confirmed email's
+  // date wins during merge.
+  let orderDate = null;
   const dateMatch = content.match(/order\s*date[:\s]*([A-Za-z]+,?\s*[A-Za-z]+\s+\d{1,2},?\s*\d{4})/i);
   if (dateMatch) {
     try { const d = new Date(dateMatch[1]); if (!isNaN(d)) orderDate = localDateStr(d); } catch (e) { /* Date parse failed - non-critical */ }
   }
-  
-  let email = accountEmail;
-  if (parsed.to) {
-    if (typeof parsed.to.text === 'string') {
-      const em = parsed.to.text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-      if (em) email = em[1];
-    } else if (parsed.to.value && parsed.to.value[0]) {
-      email = parsed.to.value[0].address;
-    }
-  }
-  
+  // Only fall back to emailDate for confirmed/cancelled (emailDate ≈ order date)
+  if (!orderDate && (isConfirmation || status === 'cancelled')) orderDate = emailDate;
+
+  const email = accountEmail; // Already resolved to original recipient by extractOriginalRecipient()
+
   // Extract tracking number using smart context-aware extraction
   const tracking = extractTrackingNumber(content);
 
@@ -2109,7 +2120,7 @@ function parseWalmartEmail(parsed, accountEmail) {
     }
   }
 
-  console.log(`[WALMART] Order ${orderId}: ${status}, item="${itemName || 'UNKNOWN'}", qty=${quantity}, tracking=${tracking || 'none'}, address=${shippingAddress || 'none'}`);
+  console.log(`[WALMART] Order ${orderId}: ${status}, amount=$${amount}, item="${itemName || 'UNKNOWN'}", qty=${quantity}, date=${orderDate || 'null'}, tracking=${tracking || 'none'}`);
   
   return {
     orderId, email, item: itemName || null, amount, date: orderDate,
@@ -2584,8 +2595,9 @@ function parseTargetEmail(parsed, accountEmail) {
     productImage = productImages[0];
   }
   
-  // Extract order date
-  let orderDate = emailDate;
+  // Extract order date — try "Placed" or "Order date:" patterns first.
+  // For shipped/delivered, don't fall back to emailDate (would be ship date, not order date).
+  let orderDate = null;
   const datePatterns = [
     /Placed\s+([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})/i,
     /Order date[:\s]*([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})/i
@@ -2602,26 +2614,34 @@ function parseTargetEmail(parsed, accountEmail) {
       } catch (e) { /* Date parse failed - non-critical */ }
     }
   }
+  // Only fall back to emailDate for confirmed/cancelled (emailDate ≈ order date)
+  if (!orderDate && (status === 'confirmed' || status === 'cancelled')) orderDate = emailDate;
 
   // Extract quantity
+  // Extract quantity — look for patterns near order item context, not random qty mentions.
+  // Target emails have "Qty N" near the item. Avoid matching pack counts in product names
+  // (e.g. "6 Booster Packs" should not set qty=6 when the order is for 2 of them).
   let quantity = 1;
-  const qtyMatch = text.match(/qty[:\s]*(\d+)/i) || text.match(/quantity[:\s]*(\d+)/i);
+  // Pattern 1: "Qty N" or "Quantity N" in text (most reliable in Target emails)
+  const qtyMatch = text.match(/\bqty[:\s]*(\d+)/i) || text.match(/\bquantity[:\s]*(\d+)/i);
   if (qtyMatch) {
     const q = parseInt(qtyMatch[1]);
-    if (q > 0 && q < 100) quantity = q;
+    if (q > 0 && q <= 20) quantity = q; // Cap at 20 — single Target orders rarely exceed this
   }
-  
-  // Extract recipient email (for iCloud Hide My Email support)
-  let email = accountEmail;
-  if (parsed.to) {
-    if (typeof parsed.to.text === 'string') {
-      const em = parsed.to.text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-      if (em) email = em[1];
-    } else if (parsed.to.value && parsed.to.value[0]) {
-      email = parsed.to.value[0].address;
+  // Pattern 2: "Subtotal (N items)" — indicates total items in the order
+  if (quantity === 1) {
+    const subtotalMatch = text.match(/subtotal\s*\((\d+)\s*items?\)/i);
+    if (subtotalMatch) {
+      const q = parseInt(subtotalMatch[1]);
+      if (q > 0 && q <= 20) quantity = q;
     }
   }
-  
+
+  console.log(`[TARGET] Order ${orderId}: qty=${quantity}, qtyMatch=${qtyMatch ? qtyMatch[0] : 'none'}`);
+
+  // Already resolved to original recipient by extractOriginalRecipient()
+  const email = accountEmail; // Already resolved to original recipient by extractOriginalRecipient()
+
   // Final validation - reject bad item names
   const badItemPatterns = [
     /^we.?re\s+getting/i,
@@ -2749,9 +2769,9 @@ function parsePokemonCenterEmail(parsed, accountEmail) {
 
   // Determine status from subject first
   let status = null;
-  if (subjectLower.includes('delivered') || fromLower.includes('narvar')) {
+  if (subjectLower.includes('delivered') || (fromLower.includes('narvar') && (subjectLower.includes('delivered') || subjectLower.includes('arrived')))) {
     status = 'delivered';
-  } else if (subjectLower.includes('shipped') || subjectLower.includes('on its way')) {
+  } else if (subjectLower.includes('shipped') || subjectLower.includes('on its way') || (fromLower.includes('narvar') && !subjectLower.includes('cancel'))) {
     status = 'shipped';
   } else if (subjectLower.includes('thank you') || subjectLower.includes('order confirmation') || subjectLower.includes('thanks for')) {
     status = 'confirmed';
@@ -2814,15 +2834,19 @@ function parsePokemonCenterEmail(parsed, accountEmail) {
     subtotal = parseFloat(subtotalMatch[1].replace(/,/g, ''));
   }
 
-  // Extract date - search combined content
+  // Extract date - search combined content for "Date Ordered:" pattern
   let orderDate = null;
-  const dateMatch = combinedContent.match(/Date Ordered:?\s*<\/b>\s*([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})/i) ||
-                    combinedContent.match(/Date Ordered:?\s*([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})/i);
-  if (dateMatch) {
+  const pcDateMatch = combinedContent.match(/Date Ordered:?\s*<\/b>\s*([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})/i) ||
+                      combinedContent.match(/Date Ordered:?\s*([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})/i);
+  if (pcDateMatch) {
     try {
-      const d = new Date(dateMatch[1]);
+      const d = new Date(pcDateMatch[1]);
       if (!isNaN(d)) orderDate = localDateStr(d);
     } catch (e) { /* Date parse failed - non-critical */ }
+  }
+  // Only fall back to email date for confirmed/cancelled
+  if (!orderDate && (status === 'confirmed' || status === 'cancelled')) {
+    orderDate = toLocalDateString(parsed.date);
   }
 
   // Helper to validate item name
@@ -3104,17 +3128,8 @@ function parsePokemonCenterEmail(parsed, accountEmail) {
     if (qtyMatch) quantity = parseInt(qtyMatch[1]) || 1;
   }
   
-  // Extract recipient email (for iCloud Hide My Email support)
-  let email = accountEmail;
-  if (parsed.to) {
-    if (typeof parsed.to.text === 'string') {
-      const em = parsed.to.text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-      if (em) email = em[1];
-    } else if (parsed.to.value && parsed.to.value[0]) {
-      email = parsed.to.value[0].address;
-    }
-  }
-  
+  const email = accountEmail; // Already resolved to original recipient by extractOriginalRecipient()
+
   // Extract tracking number using smart context-aware extraction
   const content = text + ' ' + html;
   const tracking = extractTrackingNumber(content);
@@ -3229,7 +3244,7 @@ function parseSamsClubEmail(parsed, accountEmail) {
   const html = parsed.html || '';
   const text = parsed.text || '';
   const subject = parsed.subject || '';
-  const content = html || text;
+  const content = (text || '') + ' ' + (html || '');
 
   debugLog(`[SAMSCLUB] Parsing email: subject="${subject.substring(0, 60)}" html=${html.length} text=${text.length}`);
 
@@ -3398,25 +3413,12 @@ function parseSamsClubEmail(parsed, accountEmail) {
     }
   }
 
-  // Tracking extraction - format: "Fedex 486905809252" or similar
+  // Tracking extraction — use shared function for URL-based + carrier-context detection
   let tracking = null, carrier = null, trackingUrl = null;
-  match = content.match(/(Fedex|FedEx|UPS|USPS|OnTrac|DHL|LSO)\s+(\d{10,22})/i);
-  if (match) {
-    carrier = match[1];
-    tracking = match[2];
-    // Normalize carrier name
-    if (carrier.toLowerCase() === 'fedex') carrier = 'FedEx';
+  tracking = extractTrackingNumber(content);
+  if (tracking) {
+    carrier = detectCarrier(tracking, content);
     trackingUrl = getTrackingUrl(carrier, tracking);
-  }
-
-  // If no explicit tracking found, try generic pattern
-  if (!tracking) {
-    match = content.match(/tracking[:\s#]*([A-Z0-9]{10,22})/i);
-    if (match) {
-      tracking = match[1];
-      carrier = detectCarrier(tracking, content);
-      if (carrier) trackingUrl = getTrackingUrl(carrier, tracking);
-    }
   }
 
   // ETA/Delivery date - format: "Mon, Dec 15 at 03:27 PM"
@@ -3438,8 +3440,9 @@ function parseSamsClubEmail(parsed, accountEmail) {
     }
   }
 
-  // Order date from email date (local timezone)
-  const orderDate = toLocalDateString(parsed.date);
+  // Order date — only use email date for confirmed/cancelled (ship date ≠ order date)
+  const emailDate = toLocalDateString(parsed.date);
+  const orderDate = (status === 'confirmed' || status === 'cancelled') ? emailDate : null;
 
   return {
     orderId,
@@ -3474,18 +3477,9 @@ function parseBestBuyEmail(parsed, accountEmail) {
   const html = parsed.html || '';
   const text = parsed.text || '';
   const subject = parsed.subject || '';
-  const content = html || text;
+  const content = (text || '') + ' ' + (html || '');
 
-  // Extract actual recipient email (for HME relay addresses)
-  let email = accountEmail;
-  if (parsed.to) {
-    if (typeof parsed.to.text === 'string') {
-      const em = parsed.to.text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-      if (em) email = em[1];
-    } else if (parsed.to.value && parsed.to.value[0]) {
-      email = parsed.to.value[0].address;
-    }
-  }
+  const email = accountEmail; // Already resolved to original recipient by extractOriginalRecipient()
 
   debugLog(`[BESTBUY] Parsing email: subject="${subject.substring(0, 60)}" html=${html.length} text=${text.length}`);
 
@@ -3570,12 +3564,20 @@ function parseBestBuyEmail(parsed, accountEmail) {
     if (match) quantity = parseInt(match[1], 10);
   }
 
-  // Price extraction
+  // Price extraction — context-aware: look for "Total" labels first, then fallback
   let amount = 0;
-  // Look for price pattern - Best Buy shows item price
-  match = content.match(/\$\s*([\d,]+\.\d{2})/);
-  if (match) {
-    amount = parseFloat(match[1].replace(/,/g, ''));
+  const bbPricePatterns = [
+    /Order\s*Total[:\s]*\$\s*([\d,]+\.\d{2})/i,
+    /Total\s*Charged[:\s]*\$\s*([\d,]+\.\d{2})/i,
+    /(?:^|[\s>])Total[:\s]*\$\s*([\d,]+\.\d{2})/im,
+    /\$\s*([\d,]+\.\d{2})/,  // Fallback: first dollar amount
+  ];
+  for (const pattern of bbPricePatterns) {
+    match = content.match(pattern);
+    if (match) {
+      const val = parseFloat(match[1].replace(/,/g, ''));
+      if (!isNaN(val) && val > 0 && val < 50000) { amount = val; break; }
+    }
   }
 
   // Image extraction - Best Buy uses pisces.bbystatic.com
@@ -3603,13 +3605,13 @@ function parseBestBuyEmail(parsed, accountEmail) {
     const cityStateZip = match[3].trim();
     shippingAddress = `${street}, ${cityStateZip}`;
     addressLine1 = street;
-    // Parse city, state zip
-    const cszMatch = cityStateZip.match(/^([^,]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/i);
-    if (cszMatch) {
-      city = cszMatch[1].trim();
-      state = cszMatch[2].toUpperCase();
-      zip = cszMatch[3];
-      addressKey = `${state}-${zip.substring(0, 5)}`;
+    // Parse city, state zip using shared parseAddress for consistent addressKey format
+    const addrData = parseAddress(shippingAddress);
+    if (addrData) {
+      city = addrData.city;
+      state = addrData.state;
+      zip = addrData.zip;
+      addressKey = addrData.addressKey;
     }
   }
 
@@ -3629,26 +3631,17 @@ function parseBestBuyEmail(parsed, accountEmail) {
     }
   }
 
-  // Tracking extraction
+  // Tracking extraction — use shared function for URL-based + carrier-context detection
   let tracking = null, carrier = null, trackingUrl = null;
-  match = content.match(/(UPS|FedEx|USPS|OnTrac|DHL)\s*[:\s#]*([A-Z0-9]{10,22})/i);
-  if (match) {
-    carrier = match[1];
-    tracking = match[2];
+  tracking = extractTrackingNumber(content);
+  if (tracking) {
+    carrier = detectCarrier(tracking, content);
     trackingUrl = getTrackingUrl(carrier, tracking);
   }
-  // Also try 1Z pattern for UPS
-  if (!tracking) {
-    match = content.match(/(1Z[A-Z0-9]{16})/i);
-    if (match) {
-      tracking = match[1];
-      carrier = 'UPS';
-      trackingUrl = getTrackingUrl(carrier, tracking);
-    }
-  }
 
-  // Order date from email date (local timezone)
-  const orderDate = toLocalDateString(parsed.date);
+  // Order date — only use email date for confirmed/cancelled (ship date ≠ order date)
+  const emailDate = toLocalDateString(parsed.date);
+  const orderDate = (status === 'confirmed' || status === 'cancelled') ? emailDate : null;
 
   debugLog(`[BESTBUY] SUCCESS - Order ${orderId}, Status: ${status}, Item: ${item?.substring(0, 40) || 'none'}`);
 
@@ -3682,7 +3675,7 @@ function parseCostcoEmail(parsed, accountEmail) {
   const html = parsed.html || '';
   const text = parsed.text || '';
   const subject = parsed.subject || '';
-  const content = html || text;
+  const content = (text || '') + ' ' + (html || '');
 
   debugLog(`[COSTCO] Parsing email: subject="${subject.substring(0, 60)}" html=${html.length} text=${text.length}`);
 
@@ -3697,16 +3690,16 @@ function parseCostcoEmail(parsed, accountEmail) {
 
   // Order ID extraction - Costco uses 10-digit order numbers in subject
   let orderId = null;
-  let match = subject.match(/Order\s*Number\s*(\d{10,})/i);
+  let match = subject.match(/Order\s*Number\s*(\d{10,14})/i);
   if (match) orderId = match[1];
 
   // Fallback: try body patterns
   if (!orderId) {
-    match = content.match(/orderId[=:]\s*(\d{10,})/i);
+    match = content.match(/orderId[=:]\s*(\d{10,14})/i);
     if (match) orderId = match[1];
   }
   if (!orderId) {
-    match = content.match(/Order\s*(?:#|Number)?[:\s]*(\d{10,})/i);
+    match = content.match(/Order\s*(?:#|Number)?[:\s]*(\d{10,14})/i);
     if (match) orderId = match[1];
   }
 
@@ -3776,12 +3769,20 @@ function parseCostcoEmail(parsed, accountEmail) {
   match = content.match(/Qty[:\s]*(\d+)/i);
   if (match) quantity = parseInt(match[1], 10);
 
-  // Price extraction - look for dollar amount
+  // Price extraction — context-aware: look for "Total" labels first, then fallback
   let amount = 0;
-  // Look for price near the item (Costco format: $123.99)
-  match = content.match(/\$\s*([\d,]+\.?\d{0,2})/);
-  if (match) {
-    amount = parseFloat(match[1].replace(/,/g, ''));
+  const costcoPricePatterns = [
+    /Order\s*Total[:\s]*\$\s*([\d,]+\.?\d{0,2})/i,
+    /Total\s*Charged[:\s]*\$\s*([\d,]+\.?\d{0,2})/i,
+    /(?:^|[\s>])Total[:\s]*\$\s*([\d,]+\.?\d{0,2})/im,
+    /\$\s*([\d,]+\.?\d{0,2})/,  // Fallback: first dollar amount
+  ];
+  for (const pattern of costcoPricePatterns) {
+    match = content.match(pattern);
+    if (match) {
+      const val = parseFloat(match[1].replace(/,/g, ''));
+      if (!isNaN(val) && val > 0 && val < 50000) { amount = val; break; }
+    }
   }
 
   // Image extraction - Costco uses bfasset.costco-static.com
@@ -3815,26 +3816,17 @@ function parseCostcoEmail(parsed, accountEmail) {
     }
   }
 
-  // Tracking extraction
+  // Tracking extraction — use shared function for URL-based + carrier-context detection
   let tracking = null, carrier = null, trackingUrl = null;
-  match = content.match(/(UPS|FedEx|USPS|OnTrac|DHL)\s*[:\s#]*([A-Z0-9]{10,22})/i);
-  if (match) {
-    carrier = match[1];
-    tracking = match[2];
+  tracking = extractTrackingNumber(content);
+  if (tracking) {
+    carrier = detectCarrier(tracking, content);
     trackingUrl = getTrackingUrl(carrier, tracking);
   }
-  // Also try 1Z pattern for UPS
-  if (!tracking) {
-    match = content.match(/(1Z[A-Z0-9]{16})/i);
-    if (match) {
-      tracking = match[1];
-      carrier = 'UPS';
-      trackingUrl = getTrackingUrl(carrier, tracking);
-    }
-  }
 
-  // Order date from email date (local timezone)
-  const orderDate = toLocalDateString(parsed.date);
+  // Order date — only use email date for confirmed/cancelled (ship date ≠ order date)
+  const emailDate = toLocalDateString(parsed.date);
+  const orderDate = (status === 'confirmed' || status === 'cancelled') ? emailDate : null;
 
   debugLog(`[COSTCO] SUCCESS - Order ${orderId}, Status: ${status}, Item: ${item?.substring(0, 40) || 'none'}`);
 
@@ -3865,14 +3857,44 @@ function parseCostcoEmail(parsed, accountEmail) {
   };
 }
 
+// Extract the original recipient email — NOT the forwarding address.
+// Priority: X-ICLOUD-HME header > parsed.to > fallback to IMAP account email
+function extractOriginalRecipient(parsed, fallbackEmail) {
+  // 1. iCloud Hide My Email header (most reliable for HME)
+  const headers = parsed.headers;
+  if (headers) {
+    const hme = headers.get('x-icloud-hme');
+    if (hme) {
+      const hmeStr = typeof hme === 'string' ? hme : (hme.text || String(hme));
+      // Format: p=91.boiling_tapas@icloud.com; d=; f=jdrogers@skribbles.com; r=to; s=info@em.pokemon.com
+      const pMatch = hmeStr.match(/p=([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      if (pMatch) return pMatch[1];
+    }
+  }
+  // 2. parsed.to — the To: header (original recipient for non-forwarded emails)
+  if (parsed.to) {
+    if (typeof parsed.to.text === 'string') {
+      const em = parsed.to.text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      if (em && em[1].toLowerCase() !== fallbackEmail.toLowerCase()) return em[1];
+      if (em) return em[1];
+    } else if (parsed.to.value && parsed.to.value[0]) {
+      return parsed.to.value[0].address;
+    }
+  }
+  // 3. Fallback to IMAP account email
+  return fallbackEmail;
+}
+
 function parseRetailerEmail(parsed, email, retailer) {
+  // Extract original recipient once — all parsers use this instead of account email
+  const originalRecipient = extractOriginalRecipient(parsed, email);
   switch (retailer) {
-    case 'walmart': return parseWalmartEmail(parsed, email);
-    case 'target': return parseTargetEmail(parsed, email);
-    case 'pokecenter': return parsePokemonCenterEmail(parsed, email);
-    case 'samsclub': return parseSamsClubEmail(parsed, email);
-    case 'costco': return parseCostcoEmail(parsed, email);
-    case 'bestbuy': return parseBestBuyEmail(parsed, email);
+    case 'walmart': return parseWalmartEmail(parsed, originalRecipient);
+    case 'target': return parseTargetEmail(parsed, originalRecipient);
+    case 'pokecenter': return parsePokemonCenterEmail(parsed, originalRecipient);
+    case 'samsclub': return parseSamsClubEmail(parsed, originalRecipient);
+    case 'costco': return parseCostcoEmail(parsed, originalRecipient);
+    case 'bestbuy': return parseBestBuyEmail(parsed, originalRecipient);
     default: return null;
   }
 }
@@ -3928,7 +3950,7 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
   let lastProgressTime = 0;
   const sendProgress = (message, current, total) => {
     const now = Date.now();
-    if (now - lastProgressTime > 100 || current === 0 || current === total) {
+    if (now - lastProgressTime > 250 || current === 0 || current === total) {
       lastProgressTime = now;
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('sync-progress', { accountId, message, current, total });
@@ -5166,8 +5188,9 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
                           confirmedCount: confirmedOrderIds.size
                         });
                       }
-                      // Save incrementally every 100 orders - ensures orders aren't lost if sync fails
-                      if (allOrders.length % 100 === 0) {
+                      // Save incrementally every 500 orders - ensures orders aren't lost if sync fails
+                      // (was 100 — too frequent; each save serializes entire orders array to disk, blocking main thread)
+                      if (allOrders.length % 500 === 0) {
                         saveOrdersIncrementally();
                       }
                     }

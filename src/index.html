@@ -9124,7 +9124,7 @@ function renderDashboard() {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - dashboardPeriod);
     all = all.filter(o => {
-      if (!o.date) return true; // Include dateless orders in all periods
+      if (!o.date) return false; // Exclude dateless orders from period-filtered views
       const orderDate = new Date(o.date);
       return orderDate >= cutoffDate;
     });
@@ -9506,20 +9506,18 @@ function getDeliveryData() {
     const shipDate = order.shipDate ? new Date(order.shipDate) : (order.date ? new Date(order.date) : null);
     
     // Check for alerts (stale shipments - shipped 7+ days ago with no delivery)
+    // Use shallow copies to avoid mutating cached order objects
     if (shipDate) {
       const daysSinceShip = Math.floor((today - shipDate) / (1000 * 60 * 60 * 24));
       if (daysSinceShip >= 7) {
-        order.alertType = 'stale';
-        order.alertDays = daysSinceShip;
-        deliveries.alerts.push(order);
+        deliveries.alerts.push({ ...order, alertType: 'stale', alertDays: daysSinceShip });
       }
     }
-    
+
     // Check for delayed (past ETA)
     if (eta && eta < today) {
-      order.alertType = 'delayed';
-      if (!deliveries.alerts.includes(order)) {
-        deliveries.alerts.push(order);
+      if (!deliveries.alerts.find(a => a.orderId === order.orderId && a.retailer === order.retailer)) {
+        deliveries.alerts.push({ ...order, alertType: 'delayed' });
       }
     }
     
@@ -10295,7 +10293,8 @@ function renderCalendar() {
   const seenTracking = new Set();
   allOrders.forEach(order => {
     // Deduplicate by tracking number (multicart shipments share one tracking)
-    if (order.tracking) {
+    // Only dedup on real tracking numbers, not placeholders
+    if (order.tracking && order.tracking !== 'N/A') {
       if (seenTracking.has(order.tracking)) return;
       seenTracking.add(order.tracking);
     }
@@ -10781,7 +10780,7 @@ function renderStickRateChart(orders, previousOrders) {
       }
       const s = dailyStats.get(o.date);
       s.total++;
-      if (o.finalStatus !== 'cancelled') s.confirmed++;
+      if (o.finalStatus !== 'cancelled' && o.finalStatus !== 'declined') s.confirmed++;
     }
   });
 
@@ -10826,7 +10825,7 @@ function renderStickRateChart(orders, previousOrders) {
         if (!prevDailyStats.has(o.date)) prevDailyStats.set(o.date, { confirmed: 0, total: 0 });
         const s = prevDailyStats.get(o.date);
         s.total++;
-        if (o.finalStatus !== 'cancelled') s.confirmed++;
+        if (o.finalStatus !== 'cancelled' && o.finalStatus !== 'declined') s.confirmed++;
       }
     });
     const prevSorted = Array.from(prevDailyStats.keys()).sort().slice(-maxPoints);
@@ -11976,7 +11975,7 @@ function deferredRenderDashboard() {
       if (deliveryMainTab === 'calendar') renderCalendar();
     }
     dashboardRenderTimeout = null;
-  }, 100);
+  }, 300);
 }
 
 async function syncAllAccounts() {
@@ -12002,13 +12001,7 @@ async function syncAllAccounts() {
 
         if (result.success) {
           showAccountProgress(acc.id, 100, 100, `✓ ${result.orders}`);
-          // Reload and update this row immediately
-          accounts = await window.api.getAccounts();
-          orders = await window.api.getOrders(); invalidateOrdersCache();
-          console.log(`[SYNC] Loaded ${orders.length} orders after ${acc.email} sync`);
-          updateAccountRow(acc.id);
-          // Use debounced render - don't render immediately for each account
-          deferredRenderDashboard();
+          // Don't reload orders or re-render per-account — final refresh after Promise.all handles it.
           setTimeout(() => hideAccountProgress(acc.id), 1500);
         } else {
           showAccountProgress(acc.id, 0, 0, '✗ Error');
@@ -12021,9 +12014,11 @@ async function syncAllAccounts() {
   // Wait for all to complete
   await Promise.all(promises);
 
-  // Final refresh of all views after all syncs complete
+  // Final refresh of all views after all syncs complete (single re-render, not per-account)
+  accounts = await window.api.getAccounts();
   orders = await window.api.getOrders(); invalidateOrdersCache();
   console.log(`[SYNC] Final load: ${orders.length} orders total`);
+  renderAccounts();
   refreshAllViews();
   if (['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy'].includes(currentPage)) {
     renderRetailerPage(currentPage);
@@ -12076,11 +12071,8 @@ async function syncRecentAll() {
         if (result.success) {
           debugLog.info('sync', `Recent sync completed for ${acc.email}: ${result.orders} orders`);
           showAccountProgress(acc.id, 100, 100, `✓ ${result.orders}`);
-          accounts = await window.api.getAccounts();
-          orders = await window.api.getOrders(); invalidateOrdersCache();
-          console.log(`[SYNC] Loaded ${orders.length} orders after ${acc.email} sync`);
-          updateAccountRow(acc.id);
-          deferredRenderDashboard();
+          // Don't reload orders or re-render per-account — final refresh after Promise.all handles it.
+          // This avoids N full re-renders during multi-account sync.
           setTimeout(() => hideAccountProgress(acc.id), 1500);
         } else {
           showAccountProgress(acc.id, 0, 0, '✗ Error');
@@ -12092,9 +12084,11 @@ async function syncRecentAll() {
 
   await Promise.all(promises);
 
-  // Final refresh of all views after all syncs complete
+  // Final refresh of all views after all syncs complete (single re-render, not per-account)
+  accounts = await window.api.getAccounts();
   orders = await window.api.getOrders(); invalidateOrdersCache();
   console.log(`[SYNC] Final load: ${orders.length} orders total`);
+  renderAccounts();
   refreshAllViews();
   if (['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy'].includes(currentPage)) {
     renderRetailerPage(currentPage);
@@ -16697,7 +16691,7 @@ async function flexToDiscord() {
   }
 }
 
-function exportData() { const data = { accounts: accounts.map(a => ({email: a.email})), orders }; const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `solus-export-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); toast('Data exported'); }
+function exportData() { const data = { accounts: accounts.map(a => ({email: a.email})), orders }; const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); const a = document.createElement('a'); const url = URL.createObjectURL(blob); a.href = url; a.download = `solus-export-${localDateStr()}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); toast('Data exported'); }
 
 function getExportDateRange() {
   const fromEl = $('exportDateFrom');
@@ -16714,7 +16708,7 @@ function filterOrdersByDateRange(orderList) {
 
   return orderList.filter(o => {
     if (!o.date) return false;
-    const orderDate = new Date(o.date).toISOString().slice(0, 10);
+    const orderDate = localDateStr(new Date(o.date + 'T00:00:00'));
     if (from && orderDate < from) return false;
     if (to && orderDate > to) return false;
     return true;
@@ -16856,7 +16850,7 @@ function exportCSV() {
       trackingUrl: (o.trackingUrl || '').replace(/"/g, '""'),
       email: (o.email || '').replace(/"/g, '""'),
       status: (o.finalStatus || o.status || '').replace(/"/g, '""'),
-      address: (o.shippingAddress || '').replace(/"/g, '""'),
+      address: (o.shippingAddress || (o.addressLine1 ? [o.addressLine1, o.city, o.state, o.zip].filter(Boolean).join(', ') : '') || '').replace(/"/g, '""'),
       eta: etaStr,
     };
 
@@ -16868,11 +16862,13 @@ function exportCSV() {
   const BOM = '\uFEFF';
   const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `solus-orders-${new Date().toISOString().slice(0,10)}.csv`;
+  const csvUrl = URL.createObjectURL(blob);
+  a.href = csvUrl;
+  a.download = `solus-orders-${localDateStr()}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  URL.revokeObjectURL(csvUrl);
   toast(`Exported ${filteredOrders.length} orders to CSV`);
 }
 
@@ -22527,7 +22523,7 @@ async function saveWebhookForm() {
       loadAcoDiagnostics();
       // Refresh channel dropdowns too
       loadAcoChannels();
-      showToast(id ? 'Webhook updated' : 'Webhook saved', 'success');
+      toast(id ? 'Webhook updated' : 'Webhook saved', 'success');
     } else {
       if (errEl) { errEl.textContent = (result && result.error) || 'Failed to save'; errEl.style.display = 'inline'; }
     }
@@ -22546,12 +22542,12 @@ async function deleteSavedWebhook(id) {
       await loadSavedWebhooks();
       loadAcoChannels();
       loadAcoDiagnostics();
-      showToast('Webhook deleted', 'success');
+      toast('Webhook deleted', 'success');
     } else {
-      showToast((result && result.error) || 'Failed to delete', 'error');
+      toast((result && result.error) || 'Failed to delete', 'error');
     }
   } catch (e) {
-    showToast('Error: ' + e.message, 'error');
+    toast('Error: ' + e.message, 'error');
   }
 }
 

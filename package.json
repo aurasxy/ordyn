@@ -1,6 +1,6 @@
 {
   "name": "ordyn",
-  "version": "2.3.7",
+  "version": "2.3.10",
   "description": "SOLUS - Order Analytics for Walmart, Target, Pokemon Center & more",
   "main": "src-protected/main.js",
   "scripts": {
@@ -12,7 +12,7 @@
     "build:linux": "electron-builder --linux",
     "build:protected": "node build-obfuscated.js && electron-builder",
     "build:protected:win": "node build-obfuscated.js && set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --x64",
-    "publish:win": "node build-obfuscated.js && set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --x64 --publish always",
+    "publish:win": "node build-obfuscated.js && set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win --x64 --publish always & node build-obfuscated.js --restore",
     "publish:mac": "node build-obfuscated.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --publish always",
     "obfuscate": "node build-obfuscated.js",
     "restore": "node build-obfuscated.js --restore",
@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "electron": "^28.1.0",
+    "electron": "^28.3.3",
     "electron-builder": "^24.9.1",
     "javascript-obfuscator": "^4.1.0",
     "playwright": "^1.58.2"

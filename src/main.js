@@ -277,7 +277,21 @@ const store = new Store({
     },
     discordWebhookUrl: '',
     skuOverrides: {},
-    dataMode: 'imap'
+    dataMode: 'imap',
+    shippingWebhooks: {
+      enabled: false,
+      webhookUrl: '',
+      includeSensitive: false,
+      retailers: {
+        walmart: true,
+        target: true,
+        pokecenter: true,
+        bestbuy: true,
+        costco: true,
+        samsclub: true
+      },
+      lastSentAt: null
+    }
   }
 });
 
@@ -799,6 +813,33 @@ if (!store.get('declinesMigrated', false)) {
   store.set('declinesMigrated', true);
 }
 
+// Migration v2: Fix over-broad decline reclassification — only payment failures should be 'declined'
+// Retailer-initiated cancels (OOS, policy review, etc.) were incorrectly classified as declines
+if (!store.get('declineReclassifiedV2', false)) {
+  const allOrders = store.get('orders', []);
+  let corrected = 0;
+  const isPaymentDecline = (reason) => {
+    const r = (reason || '').toLowerCase();
+    return /(?:payment|card|transaction)\s*(?:was\s*)?(?:declined|failed|rejected|denied|not\s*authorized)/i.test(r)
+      || /(?:unable|could\s*not|couldn'?t)\s*(?:to\s*)?(?:process|authorize|verify)\s*(?:your\s*)?payment/i.test(r)
+      || /(?:insufficient\s*funds|expired\s*card|invalid\s*card|billing\s*(?:issue|problem|error))/i.test(r)
+      || /(?:payment\s*method|card\s*on\s*file)\s*(?:was\s*)?(?:declined|rejected|invalid)/i.test(r);
+  };
+  for (const o of allOrders) {
+    if (o.source === 'discord' && o.status === 'declined' && o.cancelReason) {
+      if (!isPaymentDecline(o.cancelReason)) {
+        o.status = 'cancelled';
+        corrected++;
+      }
+    }
+  }
+  if (corrected > 0) {
+    console.log(`[MIGRATION] Corrected ${corrected} Discord orders from declined → cancelled (not payment failures)`);
+    store.set('orders', allOrders);
+  }
+  store.set('declineReclassifiedV2', true);
+}
+
 // ==================== LICENSE SYSTEM ====================
 // Uses Supabase backend for license validation with offline grace period
 
@@ -1153,6 +1194,8 @@ function saveOrdersBatch(newOrders) {
     const existingIdx = orderIndex.has(lookupKey) ? orderIndex.get(lookupKey) : -1;
     if (existingIdx >= 0) {
       const existing = orders[existingIdx];
+      // Snapshot previous status for shipping webhook detection
+      const previousStatus = existing.status;
       // Normalize the stored orderId to prevent future mismatches
       existing.orderId = nid;
       // Merge: upgrade status, keep confirmed data, add shipping fields
@@ -1195,6 +1238,10 @@ function saveOrdersBatch(newOrders) {
       if (order.accountId && !existing.accountId) existing.accountId = order.accountId;
       if (order.profileName && !existing.profileName) existing.profileName = order.profileName;
       if (order.acoBotType && !existing.acoBotType) existing.acoBotType = order.acoBotType;
+      // Detect shipped status transition for webhook notification
+      if (existing.status === 'shipped' && previousStatus !== 'shipped' && previousStatus !== 'delivered') {
+        queueShippingWebhook(existing, previousStatus);
+      }
       orders[existingIdx] = existing;
     } else {
       const newIdx = orders.length;
@@ -1205,7 +1252,133 @@ function saveOrdersBatch(newOrders) {
   }
 
   store.set('orders', orders);
+
+  // Fire shipping webhooks for status transitions detected during this batch
+  if (_shippingWebhookQueue.length > 0) {
+    const queued = [..._shippingWebhookQueue];
+    _shippingWebhookQueue.length = 0;
+    processShippingWebhookQueue(queued);
+  }
+
   return added;
+}
+
+// ==================== SHIPPING WEBHOOK SYSTEM ====================
+const _shippingWebhookQueue = [];
+
+function queueShippingWebhook(order, previousStatus) {
+  const settings = store.get('shippingWebhooks', {});
+  if (!settings.enabled || !settings.webhookUrl) return;
+
+  // Only IMAP-sourced orders
+  const source = order.source || 'email';
+  if (source !== 'email') return;
+
+  // Only shipped transitions
+  if (order.status !== 'shipped') return;
+  if (previousStatus === 'shipped' || previousStatus === 'delivered') return;
+
+  // Check retailer toggle
+  const retailerKey = (order.retailer || '').toLowerCase().replace(/\s+/g, '');
+  if (settings.retailers && settings.retailers[retailerKey] === false) return;
+
+  _shippingWebhookQueue.push({ ...order, _previousStatus: previousStatus });
+}
+
+async function processShippingWebhookQueue(queue) {
+  if (!queue || queue.length === 0) return;
+
+  const settings = store.get('shippingWebhooks', {});
+  if (!settings.enabled || !isValidWebhookUrl(settings.webhookUrl)) return;
+
+  // First-sync guard: if too many shipping webhooks at once, skip (likely initial sync)
+  if (queue.length > 20) {
+    console.log(`[SHIPPING-WEBHOOK] Skipping ${queue.length} webhooks (likely initial sync)`);
+    return;
+  }
+
+  console.log(`[SHIPPING-WEBHOOK] Processing ${queue.length} shipping notification(s)`);
+
+  for (let i = 0; i < queue.length; i++) {
+    const order = queue[i];
+    try {
+      const payload = buildShippingWebhookPayload(order, settings);
+      const result = await sendWebhookJson(settings.webhookUrl, payload);
+      if (result.success) {
+        console.log(`[SHIPPING-WEBHOOK] Sent for ${order.retailer} #${order.orderId}`);
+        store.set('shippingWebhooks.lastSentAt', new Date().toISOString());
+      } else {
+        console.error(`[SHIPPING-WEBHOOK] Failed for ${order.retailer} #${order.orderId}:`, result.error || result.statusCode);
+      }
+    } catch (err) {
+      console.error(`[SHIPPING-WEBHOOK] Error sending for ${order.orderId}:`, err.message);
+    }
+
+    // 500ms delay between sends to avoid Discord rate limits
+    if (i < queue.length - 1) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+}
+
+function buildShippingWebhookPayload(order, settings) {
+  const retailerNames = {
+    walmart: 'Walmart',
+    target: 'Target',
+    pokecenter: 'Pokemon Center',
+    bestbuy: 'Best Buy',
+    costco: 'Costco',
+    samsclub: "Sam's Club"
+  };
+
+  const retailerDisplay = retailerNames[order.retailer] || order.retailer || 'Unknown';
+  const fields = [
+    { name: 'Retailer', value: retailerDisplay, inline: true },
+    { name: 'Order #', value: `#${order.orderId || 'N/A'}`, inline: true }
+  ];
+
+  if (order.item) {
+    fields.push({ name: 'Item', value: order.item.length > 256 ? order.item.substring(0, 253) + '...' : order.item, inline: false });
+  }
+
+  if (order.quantity && order.quantity > 1) {
+    fields.push({ name: 'Quantity', value: String(order.quantity), inline: true });
+  }
+
+  // Tracking info
+  if (order.trackingUrl) {
+    const trackLabel = order.tracking ? order.tracking : 'Track Package';
+    fields.push({ name: 'Tracking', value: `[${trackLabel}](${order.trackingUrl})`, inline: false });
+  } else if (order.tracking) {
+    fields.push({ name: 'Tracking #', value: order.tracking, inline: false });
+  }
+
+  // Sensitive fields (with spoiler tags)
+  if (settings.includeSensitive) {
+    if (order.email) {
+      fields.push({ name: 'Email', value: `||${order.email}||`, inline: true });
+    }
+    if (order.amount && order.amount > 0) {
+      fields.push({ name: 'Amount', value: `||$${order.amount.toFixed(2)}||`, inline: true });
+    }
+    if (order.shippingAddress) {
+      fields.push({ name: 'Address', value: `||${order.shippingAddress}||`, inline: false });
+    }
+  }
+
+  const embed = {
+    title: '\uD83D\uDCE6 Order Shipped',
+    color: 0x57F287,
+    fields,
+    timestamp: new Date().toISOString(),
+    footer: { text: 'SOLUS Shipping Alert' }
+  };
+
+  if (order.imageUrl) {
+    embed.thumbnail = { url: order.imageUrl };
+  }
+
+  return { embeds: [embed] };
 }
 
 function markOrderDelivered(retailer, orderId) {
@@ -1364,7 +1537,8 @@ function detectCarrier(trackingNumber, emailContent = '') {
   if (/^TBA\d+$/i.test(tn)) return 'Amazon';
 
   // For ambiguous formats (12-15 digits), REQUIRE content hints
-  const isFedExContent = content.includes('fedex') || content.includes('fed ex');
+  // Narvar tracking URLs (used by Pokemon Center, etc.) are FedEx shipments
+  const isFedExContent = content.includes('fedex') || content.includes('fed ex') || content.includes('narvar.com');
   const isUPSContent = content.includes('ups.com') || content.includes('ups tracking');
   const isUSPSContent = content.includes('usps') || content.includes('postal');
 
@@ -1418,8 +1592,9 @@ function getTrackingUrl(carrier, trackingNumber) {
 function extractTrackingNumber(content) {
   if (!content) return null;
 
-  // Phase 0: Extract tracking from carrier URLs (highest confidence — the URL IS the tracking)
+  // Phase 0: Extract tracking from carrier/tracking URLs (highest confidence — the URL IS the tracking)
   const urlPatterns = [
+    /narvar\.com[^"']*tracking_numbers=([A-Z0-9]{10,30})/i,        // Narvar tracking URL (Pokemon Center ships FedEx via Narvar wrapper)
     /fedextrack[^"']*trknbr=(\d{12,15})/i,                         // FedEx tracking URL
     /fedex\.com[^"']*tracknumbers=(\d{12,15})/i,                   // FedEx alt URL
     /tools\.usps\.com[^"']*tLabels=(\d{20,22})/i,                  // USPS tracking URL
@@ -1960,7 +2135,7 @@ function parseWalmartEmail(parsed, accountEmail) {
   let itemName = null;
   let productImages = [];
   let quantity = 1;
-  let amount = 0;
+  let amount = null;
 
   // Always extract images — shipped/delivered emails have reliable /seo/ product images.
   // Item name from product links + amount/quantity only from confirmed/cancelled (most accurate).
@@ -1997,7 +2172,7 @@ function parseWalmartEmail(parsed, accountEmail) {
     }
 
     // Strategy 2: HTML class="order-total-price" (pickup/ship format)
-    if (amount === 0) {
+    if (!amount) {
       const otpMatch = html.match(/order-total-price[^>]*>\s*\$?\s*([\d,]+\.?\d*)/i);
       if (otpMatch) {
         const val = parseFloat(otpMatch[1].replace(/,/g, ''));
@@ -2006,7 +2181,7 @@ function parseWalmartEmail(parsed, accountEmail) {
     }
 
     // Strategy 3: Text-based "Order total" with $ on same or nearby line
-    if (amount === 0) {
+    if (!amount) {
       const totalPatterns = [
         /order\s*total[:\s]*\$\s*([\d,]+\.?\d*)/i,
         /estimated\s*total[:\s]*\$\s*([\d,]+\.?\d*)/i,
@@ -2021,7 +2196,7 @@ function parseWalmartEmail(parsed, accountEmail) {
     }
 
     // Strategy 4: "Order total" label with amount further away (e.g., "Order total\n...\n$X.XX")
-    if (amount === 0) {
+    if (!amount) {
       const otIdx = content.toLowerCase().indexOf('order total');
       if (otIdx >= 0) {
         // Grab up to 300 chars after "Order total" and find the first $ not preceded by "saved"
@@ -2038,7 +2213,7 @@ function parseWalmartEmail(parsed, accountEmail) {
     }
 
     // Strategy 5: totalChargedClass (delivery order variant)
-    if (amount === 0) {
+    if (!amount) {
       const tccMatch = html.match(/totalChargedClass[^>]*>\s*(?:<[^>]*>)*\s*\$?\s*([\d,]+\.?\d*)/i);
       if (tccMatch) {
         const val = parseFloat(tccMatch[1].replace(/,/g, ''));
@@ -2047,7 +2222,7 @@ function parseWalmartEmail(parsed, accountEmail) {
     }
 
     // Strategy 6: Fallback — collect all dollar amounts but exclude "saved", "was", "before sale" contexts
-    if (amount === 0) {
+    if (!amount) {
       const amounts = [];
       const amtContextRegex = /(.{0,30})\$\s*([\d,]+\.?\d*)/g;
       let amtMatch;
@@ -2063,6 +2238,16 @@ function parseWalmartEmail(parsed, accountEmail) {
     // Shipped/delivered: extract item name from /seo/ image URL only (reliable, no promo links)
     if (productImages.length > 0) {
       itemName = extractNameFromImageUrl(productImages[0]);
+    }
+  }
+
+  // Fallback: try to extract price from shipped/delivered emails so orders aren't saved at $0
+  if (amount === null && (status === 'shipped' || status === 'delivered')) {
+    const totalMatch = content.match(/(?:order\s+total|total\s+charged|amount\s+charged)[:\s]*\$?([\d,]+\.?\d*)/i)
+      || content.match(/(?:total|charged)[:\s]*\$\s*([\d,]+\.?\d*)/i);
+    if (totalMatch) {
+      const val = parseFloat(totalMatch[1].replace(/,/g, ''));
+      if (!isNaN(val) && val > 0 && val < 50000) amount = val;
     }
   }
 
@@ -2120,10 +2305,10 @@ function parseWalmartEmail(parsed, accountEmail) {
     }
   }
 
-  console.log(`[WALMART] Order ${orderId}: ${status}, amount=$${amount}, item="${itemName || 'UNKNOWN'}", qty=${quantity}, date=${orderDate || 'null'}, tracking=${tracking || 'none'}`);
-  
+  console.log(`[WALMART] Order ${orderId}: ${status}, amount=$${amount || 0}, item="${itemName || 'UNKNOWN'}", qty=${quantity}, date=${orderDate || 'null'}, tracking=${tracking || 'none'}`);
+
   return {
-    orderId, email, item: itemName || null, amount, date: orderDate,
+    orderId, email, item: itemName || null, amount: amount || 0, date: orderDate,
     imageUrl: productImages[0] || null, productImages, status, retailer: 'walmart',
     quantity, subject: subject.substring(0, 100),
     tracking, carrier, trackingUrl, eta,
@@ -4299,10 +4484,15 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           { subject: 'has shipped', retailer: null },
         ];
 
-        // Filter to target retailer's patterns only (for resync-drop)
-        const searches = retailerFilter
-          ? allSearches.filter(s => s.retailer === retailerFilter || s.retailer === null)
-          : allSearches;
+        // Filter to target retailer's patterns only (for resync-drop or site-specific scan)
+        let searches;
+        if (Array.isArray(retailerFilter)) {
+          searches = allSearches.filter(s => retailerFilter.includes(s.retailer) || s.retailer === null);
+        } else if (retailerFilter) {
+          searches = allSearches.filter(s => s.retailer === retailerFilter || s.retailer === null);
+        } else {
+          searches = allSearches;
+        }
 
         let allResultIds = [];
         let searchIndex = 0;
@@ -9066,14 +9256,14 @@ ipcMain.handle('clear-target-drop-images', (_, dropDate) => clearTargetDropImage
 ipcMain.handle('get-orders', (_, retailer) => getOrders(retailer));
 ipcMain.handle('mark-order-delivered', (_, retailer, orderId) => markOrderDelivered(retailer, orderId));
 ipcMain.handle('delete-order', (_, retailer, orderId) => deleteOrder(retailer, orderId));
-ipcMain.handle('sync-account', async (_, id, dateFrom, dateTo) => {
+ipcMain.handle('sync-account', async (_, id, dateFrom, dateTo, retailerFilter) => {
   if (testModeNetworkGuard('IMAP sync-account')) return { success: false, error: 'Network blocked in test mode' };
   await requireValidLicense();
   const currentMode = store.get('dataMode', 'imap');
   if (currentMode !== 'imap') {
     throw new Error('IMAP sync is disabled in Discord mode. Switch to IMAP mode in Settings > General.');
   }
-  return queueSync(id, dateFrom, dateTo);
+  return queueSync(id, dateFrom, dateTo, retailerFilter || null);
 });
 
 ipcMain.handle('resync-drop', async (_, retailer, date) => {
@@ -9088,8 +9278,10 @@ ipcMain.handle('resync-drop', async (_, retailer, date) => {
     return { success: false, error: 'No accounts configured' };
   }
 
-  // Delete existing email orders for this retailer+date
-  const deleteResult = deleteOrdersByRetailerAndDate(retailer, date);
+  // Don't delete orders before re-fetching — if the confirmation email was archived
+  // (e.g., iCloud INBOX-only search), only shipped/delivered emails are found, and
+  // Walmart ship emails have date:null + amount:$0, making orders invisible.
+  // Instead, let saveOrdersBatch merge new data into existing orders.
 
   // Sync all accounts for just this one day, filtered to target retailer
   let totalOrders = 0;
@@ -9113,13 +9305,99 @@ ipcMain.handle('resync-drop', async (_, retailer, date) => {
 
   return {
     success: true,
-    deleted: deleteResult.removed,
+    deleted: 0,
     ordersFound: totalOrders,
     accountsChecked: accounts.length,
     accountsSucceeded: successCount,
     errors: errors.length > 0 ? errors : undefined
   };
 });
+
+// Deep Sync: re-fetch emails over a wide date range to re-parse with updated parsers.
+// Relies on merge logic to fill in gaps without overwriting existing good data.
+ipcMain.handle('deep-sync', async (_, daysBack) => {
+  if (testModeNetworkGuard('IMAP deep-sync')) return { success: false, error: 'Network blocked in test mode' };
+  try { await requireValidLicense(); } catch (e) { return { success: false, error: e.message }; }
+  const currentMode = store.get('dataMode', 'imap');
+  if (currentMode !== 'imap') {
+    return { success: false, error: 'Deep Sync requires IMAP mode. Switch to IMAP mode in Settings > General.' };
+  }
+  const accounts = store.get('accounts', []);
+  if (accounts.length === 0) {
+    return { success: false, error: 'No accounts configured. Add an email account first.' };
+  }
+
+  const days = Math.min(Math.max(parseInt(daysBack) || 90, 7), 365);
+  const fromDate = new Date();
+  fromDate.setDate(fromDate.getDate() - days);
+  const fromDateStr = localDateStr(fromDate);
+
+  const futureDate = new Date();
+  futureDate.setDate(futureDate.getDate() + 2);
+  const toDateStr = localDateStr(futureDate);
+
+  const ordersBefore = store.get('orders', []).length;
+  let totalOrders = 0;
+  let successCount = 0;
+  const errors = [];
+
+  // Send initial progress
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('deep-sync-progress', {
+      phase: 'start',
+      message: `Deep Sync: scanning ${days} days across ${accounts.length} account(s)...`,
+      current: 0,
+      total: accounts.length
+    });
+  }
+
+  for (let i = 0; i < accounts.length; i++) {
+    const account = accounts[i];
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('deep-sync-progress', {
+        phase: 'syncing',
+        message: `Syncing ${account.email} (${i + 1}/${accounts.length})...`,
+        current: i,
+        total: accounts.length
+      });
+    }
+
+    try {
+      const result = await queueSync(account.id, fromDateStr, toDateStr);
+      if (result && result.success !== false) {
+        successCount++;
+        totalOrders += result.orders || 0;
+      }
+    } catch (err) {
+      if (!err.message.includes('already')) {
+        errors.push(`${account.email}: ${err.message}`);
+      }
+    }
+  }
+
+  const ordersAfter = store.get('orders', []).length;
+  const newOrders = ordersAfter - ordersBefore;
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('deep-sync-progress', {
+      phase: 'done',
+      message: `Deep Sync complete`,
+      current: accounts.length,
+      total: accounts.length
+    });
+  }
+
+  return {
+    success: true,
+    daysScanned: days,
+    accountsChecked: accounts.length,
+    accountsSucceeded: successCount,
+    emailsProcessed: totalOrders,
+    newOrdersAdded: newOrders,
+    errors: errors.length > 0 ? errors : undefined
+  };
+});
+
 ipcMain.handle('stop-sync', (_, accountId) => {
   // Check if it's an active sync
   const activeSync = activeSyncs.get(accountId);
@@ -9677,6 +9955,68 @@ ipcMain.handle('test-discord-webhook', async (_, urlParam) => {
       req.write(payload);
       req.end();
     });
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// ==================== SHIPPING WEBHOOK SETTINGS ====================
+ipcMain.handle('get-shipping-webhook-settings', async () => {
+  return store.get('shippingWebhooks', {
+    enabled: false,
+    webhookUrl: '',
+    includeSensitive: false,
+    retailers: { walmart: true, target: true, pokecenter: true, bestbuy: true, costco: true, samsclub: true },
+    lastSentAt: null
+  });
+});
+
+ipcMain.handle('save-shipping-webhook-settings', async (_, settings) => {
+  try {
+    const current = store.get('shippingWebhooks', {});
+    const updated = {
+      ...current,
+      enabled: !!settings.enabled,
+      webhookUrl: settings.webhookUrl || '',
+      includeSensitive: !!settings.includeSensitive,
+      retailers: settings.retailers || current.retailers || {}
+    };
+    // Validate webhook URL if enabled
+    if (updated.enabled && updated.webhookUrl && !isValidWebhookUrl(updated.webhookUrl)) {
+      return { success: false, error: 'Invalid Discord webhook URL' };
+    }
+    store.set('shippingWebhooks', updated);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('test-shipping-webhook', async () => {
+  if (testModeNetworkGuard('test-shipping-webhook')) return { success: false, error: 'Network blocked in test mode' };
+  const settings = store.get('shippingWebhooks', {});
+  if (!settings.webhookUrl || !isValidWebhookUrl(settings.webhookUrl)) {
+    return { success: false, error: 'No valid webhook URL configured' };
+  }
+  try {
+    const testPayload = buildShippingWebhookPayload({
+      retailer: 'target',
+      orderId: '123-456-7890',
+      item: 'Pokemon TCG Prismatic Evolutions Booster Bundle',
+      quantity: 2,
+      tracking: '1Z999AA10123456784',
+      trackingUrl: 'https://www.ups.com/track?tracknum=1Z999AA10123456784',
+      carrier: 'UPS',
+      email: 'user@example.com',
+      amount: 49.99,
+      imageUrl: null,
+      source: 'email',
+      status: 'shipped'
+    }, settings);
+    // Add a note that this is a test
+    testPayload.embeds[0].footer = { text: 'SOLUS Shipping Alert - Test Message' };
+    const result = await sendWebhookJson(settings.webhookUrl, testPayload);
+    return result;
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -10278,14 +10618,19 @@ ipcMain.handle('sync-discord-orders', async () => {
       const shouldMap = !skipMappingBots.has(botType);
 
       // Detect payment declines: bot sends status='cancelled' with decline_reason for failed attempts
-      // These are NOT real cancellations — they're failed checkout attempts (payment rejected)
+      // Only reclassify as 'declined' when reason matches actual payment failure patterns
+      // Retailer-initiated cancels (OOS, policy, etc.) stay as 'cancelled'
       let effectiveStatus = row.status;
       if (row.status === 'cancelled' && row.decline_reason) {
         const reasonLower = (row.decline_reason || '').toLowerCase();
-        const isManualCancel = /quantity\s*limit|manual|customer\s*request|self.?cancel/i.test(reasonLower);
-        if (!isManualCancel) {
+        const isPaymentDecline = /(?:payment|card|transaction)\s*(?:was\s*)?(?:declined|failed|rejected|denied|not\s*authorized)/i.test(reasonLower)
+          || /(?:unable|could\s*not|couldn'?t)\s*(?:to\s*)?(?:process|authorize|verify)\s*(?:your\s*)?payment/i.test(reasonLower)
+          || /(?:insufficient\s*funds|expired\s*card|invalid\s*card|billing\s*(?:issue|problem|error))/i.test(reasonLower)
+          || /(?:payment\s*method|card\s*on\s*file)\s*(?:was\s*)?(?:declined|rejected|invalid)/i.test(reasonLower);
+        if (isPaymentDecline) {
           effectiveStatus = 'declined';
         }
+        // Everything else (OOS, policy, retailer cancel, etc.) stays 'cancelled'
       }
 
       if (isMulticart) {
@@ -10670,6 +11015,45 @@ ipcMain.handle('save-profile-mapping', async (_, profileName, discordUserId, dis
     return result;
   } catch (error) {
     console.error('[ACO PANEL] save-profile-mapping error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('save-profile-mappings-batch', async (_, profiles, discordUserId, discordUsername) => {
+  try {
+    const licenseKey = getDiscordAcoLicenseKey();
+    if (!licenseKey) return { success: false, error: 'No active license' };
+    if (!Array.isArray(profiles) || profiles.length === 0) return { success: false, error: 'No profiles provided' };
+    if (!discordUserId || !/^\d{17,20}$/.test(discordUserId)) return { success: false, error: 'Invalid Discord user ID (must be 17-20 digits)' };
+
+    const saved = [];
+    const failed = [];
+    const errors = [];
+
+    for (let i = 0; i < profiles.length; i++) {
+      const profileName = (profiles[i] || '').trim();
+      if (!profileName) { failed.push(profileName); errors.push({ profile: profileName, error: 'Empty profile name' }); continue; }
+      try {
+        const result = await callDiscordAcoApi('save-profile-mapping', { licenseKey, profileName, discordUserId, discordUsername: discordUsername || null });
+        if (result && result.success) {
+          saved.push(profileName);
+        } else {
+          failed.push(profileName);
+          errors.push({ profile: profileName, error: (result && result.error) || 'Unknown error' });
+        }
+      } catch (err) {
+        failed.push(profileName);
+        errors.push({ profile: profileName, error: err.message });
+      }
+      // Small delay between API calls to avoid rate limiting
+      if (i < profiles.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+      }
+    }
+
+    return { success: failed.length === 0, saved, failed, errors, totalSaved: saved.length, totalFailed: failed.length };
+  } catch (error) {
+    console.error('[ACO PANEL] save-profile-mappings-batch error:', error);
     return { success: false, error: error.message };
   }
 });
@@ -11224,6 +11608,486 @@ function startAutoResumeTimer() {
     }
   }, 60000); // Check every minute
 }
+// ==================== PROFILE GROUPS CRUD ====================
+
+ipcMain.handle('get-profile-groups', async () => {
+  try {
+    const groups = store.get('profileGroups', []);
+    return { success: true, groups };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('create-profile-group', async (_, { name, color }) => {
+  try {
+    if (!name || !name.trim()) return { success: false, error: 'Group name is required' };
+    const groups = store.get('profileGroups', []);
+    const trimmedName = name.trim();
+    if (groups.some(g => g.name.toLowerCase() === trimmedName.toLowerCase())) {
+      return { success: false, error: 'A group with that name already exists' };
+    }
+    const newGroup = {
+      id: uuidv4(),
+      name: trimmedName,
+      color: color || '#57F287',
+      createdAt: new Date().toISOString()
+    };
+    groups.push(newGroup);
+    store.set('profileGroups', groups);
+    return { success: true, group: newGroup };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('update-profile-group', async (_, { id, name, color }) => {
+  try {
+    if (!id) return { success: false, error: 'Group ID is required' };
+    const groups = store.get('profileGroups', []);
+    const idx = groups.findIndex(g => g.id === id);
+    if (idx === -1) return { success: false, error: 'Group not found' };
+    const trimmedName = name ? name.trim() : groups[idx].name;
+    if (name && groups.some((g, i) => i !== idx && g.name.toLowerCase() === trimmedName.toLowerCase())) {
+      return { success: false, error: 'A group with that name already exists' };
+    }
+    const oldName = groups[idx].name;
+    if (name) groups[idx].name = trimmedName;
+    if (color) groups[idx].color = color;
+    store.set('profileGroups', groups);
+
+    // If name changed, update profiles assigned to the old group name
+    if (name && trimmedName !== oldName) {
+      const aycdData = store.get('aycdProfiles', null);
+      if (aycdData && aycdData.profiles) {
+        let changed = false;
+        for (const p of aycdData.profiles) {
+          if (p.group === oldName && p.customGroup) {
+            p.group = trimmedName;
+            changed = true;
+          }
+        }
+        if (changed) store.set('aycdProfiles', aycdData);
+      }
+    }
+
+    return { success: true, group: groups[idx] };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('delete-profile-group', async (_, { id }) => {
+  try {
+    if (!id) return { success: false, error: 'Group ID is required' };
+    const groups = store.get('profileGroups', []);
+    const idx = groups.findIndex(g => g.id === id);
+    if (idx === -1) return { success: false, error: 'Group not found' };
+    const deletedName = groups[idx].name;
+    groups.splice(idx, 1);
+    store.set('profileGroups', groups);
+
+    // Reset profiles in deleted group back to auto-derived group
+    const aycdData = store.get('aycdProfiles', null);
+    if (aycdData && aycdData.profiles) {
+      let changed = false;
+      for (const p of aycdData.profiles) {
+        if (p.group === deletedName && p.customGroup) {
+          const trimmed = (p.name || '').trim();
+          const match = trimmed.match(/^(.+?)\s+\d+$/);
+          p.group = match ? match[1].trim() : trimmed;
+          delete p.customGroup;
+          changed = true;
+        }
+      }
+      if (changed) store.set('aycdProfiles', aycdData);
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('reassign-profile-group', async (_, { profileName, groupName }) => {
+  try {
+    if (!profileName) return { success: false, error: 'Profile name is required' };
+    const aycdData = store.get('aycdProfiles', null);
+    if (!aycdData || !aycdData.profiles) return { success: false, error: 'No profiles imported' };
+
+    const profile = aycdData.profiles.find(p => p.name === profileName);
+    if (!profile) return { success: false, error: 'Profile not found' };
+
+    if (groupName === null || groupName === undefined || groupName === '') {
+      // Reset to auto-derived
+      const trimmed = (profile.name || '').trim();
+      const match = trimmed.match(/^(.+?)\s+\d+$/);
+      profile.group = match ? match[1].trim() : trimmed;
+      delete profile.customGroup;
+    } else {
+      profile.group = groupName;
+      profile.customGroup = true;
+    }
+
+    store.set('aycdProfiles', aycdData);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// ==================== AYCD PROFILE IMPORT & PERFORMANCE ====================
+
+ipcMain.handle('import-aycd-profiles', async (_, opts) => {
+  try {
+    const groupName = opts && opts.groupName ? opts.groupName : null;
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import AYCD Profiles',
+      filters: [{ name: 'JSON Files', extensions: ['json'] }],
+      properties: ['openFile']
+    });
+    if (result.canceled || !result.filePaths.length) {
+      return { success: false, error: 'cancelled' };
+    }
+    const filePath = result.filePaths[0];
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const fileHash = crypto.createHash('sha256').update(raw).digest('hex');
+
+    // Check for duplicate import (only block if same file AND same group)
+    const existingCheck = store.get('aycdProfiles', null);
+    if (existingCheck && existingCheck.fileHash === fileHash && !groupName) {
+      // Same file with auto-detect group — likely accidental re-import
+      return { success: false, error: 'This file has already been imported. Clear the existing import first, or import into a specific group.' };
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      return { success: false, error: 'Invalid JSON file' };
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return { success: false, error: 'File must contain a non-empty JSON array of profiles' };
+    }
+
+    // Derive group from profile name: "BRMA 1" -> "BRMA", "WMT Prime 3" -> "WMT Prime"
+    function deriveGroup(name) {
+      if (!name) return 'Unknown';
+      const trimmed = name.trim();
+      const match = trimmed.match(/^(.+?)\s+\d+$/);
+      return match ? match[1].trim() : trimmed;
+    }
+
+    // If a custom group name was specified, auto-create the group if it doesn't exist
+    if (groupName) {
+      const profileGroups = store.get('profileGroups', []);
+      if (!profileGroups.some(g => g.name.toLowerCase() === groupName.toLowerCase())) {
+        profileGroups.push({
+          id: uuidv4(),
+          name: groupName,
+          color: '#57F287',
+          createdAt: new Date().toISOString()
+        });
+        store.set('profileGroups', profileGroups);
+      }
+    }
+
+    // Sanitize: strip all PII except what's explicitly allowed
+    const sanitized = parsed.map(p => {
+      const zip = (p.billingAddress && p.billingAddress.postCode) || '';
+      const maskedZip = zip.length >= 2 ? 'X'.repeat(zip.length - 2) + zip.slice(-2) : zip;
+      const email = (p.billingAddress && p.billingAddress.email) || '';
+      const emailDomain = email.includes('@') ? email.split('@')[1].toLowerCase() : '';
+      const cardNum = (p.paymentDetails && p.paymentDetails.cardNumber) || '';
+      const bin = cardNum.length >= 6 ? cardNum.slice(0, 6) : '';
+      const lastFour = cardNum.length >= 4 ? cardNum.slice(-4) : '';
+      const profileObj = {
+        name: (p.name || '').trim(),
+        group: groupName || deriveGroup(p.name),
+        email,
+        emailDomain,
+        city: (p.billingAddress && p.billingAddress.city) || '',
+        state: (p.billingAddress && p.billingAddress.state) || '',
+        zip: maskedZip,
+        country: (p.billingAddress && p.billingAddress.country) || '',
+        cardType: (p.paymentDetails && p.paymentDetails.cardType) || '',
+        bin,
+        lastFour,
+        sameBillingShipping: !!(p.sameBillingAndShippingAddress),
+        shippingState: (p.shippingAddress && p.shippingAddress.state) || '',
+        shippingCity: (p.shippingAddress && p.shippingAddress.city) || ''
+      };
+      if (groupName) profileObj.customGroup = true;
+      return profileObj;
+    });
+
+    const groups = [...new Set(sanitized.map(p => p.group))];
+    const emails = [...new Set(sanitized.map(p => p.email).filter(Boolean))];
+
+    // Merge with existing profiles instead of replacing
+    const existingData = store.get('aycdProfiles', null);
+    const existingProfiles = existingData && existingData.profiles ? existingData.profiles : [];
+
+    // Deduplicate by profile name — new import wins for duplicates
+    const existingByName = new Map(existingProfiles.map(p => [p.name.toLowerCase(), p]));
+    for (const p of sanitized) {
+      existingByName.set(p.name.toLowerCase(), p);
+    }
+    const mergedProfiles = [...existingByName.values()];
+
+    const storeData = {
+      importedAt: new Date().toISOString(),
+      fileHash,
+      profiles: mergedProfiles
+    };
+    store.set('aycdProfiles', storeData);
+
+    return {
+      success: true,
+      total: sanitized.length,
+      groups: groups.length,
+      groupNames: groups,
+      emails: emails.length
+    };
+  } catch (error) {
+    console.error('import-aycd-profiles error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-aycd-profiles', async () => {
+  try {
+    const data = store.get('aycdProfiles', null);
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('clear-aycd-profiles', async () => {
+  try {
+    store.delete('aycdProfiles');
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-profile-performance', async () => {
+  try {
+    const aycdData = store.get('aycdProfiles', null);
+    const profiles = aycdData ? aycdData.profiles : [];
+    // Get all discord orders regardless of data mode
+    const allOrders = store.get('orders', []).filter(o => o.source === 'discord');
+
+    // Build profileName -> orders map
+    const profileOrderMap = new Map();
+    for (const order of allOrders) {
+      if (!order.profileName) continue;
+      if (!profileOrderMap.has(order.profileName)) profileOrderMap.set(order.profileName, []);
+      profileOrderMap.get(order.profileName).push(order);
+    }
+
+    const profilePerf = [];
+    const matchedProfileNames = new Set();
+
+    for (const profile of profiles) {
+      const orders = profileOrderMap.get(profile.name) || [];
+      matchedProfileNames.add(profile.name);
+
+      const confirmed = orders.filter(o => o.status === 'confirmed' || o.status === 'shipped' || o.status === 'delivered');
+      const cancelled = orders.filter(o => o.status === 'cancelled' || o.status === 'declined');
+      const totalQty = orders.reduce((sum, o) => sum + (o.quantity || 1), 0);
+      const totalAmount = orders.reduce((sum, o) => sum + (parseFloat(o.amount) || 0), 0);
+
+      // Per-retailer breakdown
+      const retailerMap = {};
+      for (const o of orders) {
+        if (!retailerMap[o.retailer]) retailerMap[o.retailer] = { total: 0, confirmed: 0, amount: 0 };
+        retailerMap[o.retailer].total++;
+        if (['confirmed', 'shipped', 'delivered'].includes(o.status)) retailerMap[o.retailer].confirmed++;
+        retailerMap[o.retailer].amount += parseFloat(o.amount) || 0;
+      }
+
+      // Per-item breakdown
+      const itemMap = {};
+      for (const o of orders) {
+        const itemName = o.item || 'Unknown';
+        if (!itemMap[itemName]) itemMap[itemName] = { count: 0, confirmed: 0, amount: 0 };
+        itemMap[itemName].count++;
+        if (['confirmed', 'shipped', 'delivered'].includes(o.status)) itemMap[itemName].confirmed++;
+        itemMap[itemName].amount += parseFloat(o.amount) || 0;
+      }
+
+      const dates = orders.map(o => o.date).filter(Boolean).sort();
+      const stickRate = orders.length > 0 ? Math.round((confirmed.length / orders.length) * 100) : 0;
+
+      let topRetailer = '', topRetailerCount = 0;
+      for (const [r, data] of Object.entries(retailerMap)) {
+        if (data.total > topRetailerCount) { topRetailerCount = data.total; topRetailer = r; }
+      }
+
+      let topItem = '', topItemCount = 0;
+      for (const [item, data] of Object.entries(itemMap)) {
+        if (data.count > topItemCount) { topItemCount = data.count; topItem = item; }
+      }
+
+      profilePerf.push({
+        name: profile.name,
+        group: profile.group,
+        email: profile.email,
+        emailDomain: profile.emailDomain || '',
+        city: profile.city,
+        state: profile.state,
+        cardType: profile.cardType,
+        bin: profile.bin || '',
+        lastFour: profile.lastFour || '',
+        sameBillingShipping: !!profile.sameBillingShipping,
+        shippingState: profile.shippingState || '',
+        shippingCity: profile.shippingCity || '',
+        totalOrders: orders.length,
+        confirmedCount: confirmed.length,
+        cancelledCount: cancelled.length,
+        stickRate,
+        totalQty,
+        totalAmount,
+        topRetailer,
+        topItem,
+        retailers: retailerMap,
+        items: itemMap,
+        firstOrder: dates[0] || null,
+        lastOrder: dates[dates.length - 1] || null
+      });
+    }
+
+    // Discord orders with profileName not in AYCD profiles
+    const unmatchedOrders = [];
+    for (const [pName, orders] of profileOrderMap) {
+      if (!matchedProfileNames.has(pName)) {
+        const confirmed = orders.filter(o => ['confirmed', 'shipped', 'delivered'].includes(o.status));
+        unmatchedOrders.push({
+          name: pName,
+          group: null,
+          totalOrders: orders.length,
+          confirmedCount: confirmed.length,
+          stickRate: orders.length > 0 ? Math.round((confirmed.length / orders.length) * 100) : 0
+        });
+      }
+    }
+
+    // Group summaries
+    const profileGroups = store.get('profileGroups', []);
+    const groupColorMap = {};
+    for (const pg of profileGroups) {
+      groupColorMap[pg.name.toLowerCase()] = { color: pg.color, id: pg.id };
+    }
+
+    const groupMap = {};
+    for (const p of profilePerf) {
+      if (!groupMap[p.group]) groupMap[p.group] = { name: p.group, profileCount: 0, totalOrders: 0, confirmedCount: 0, topRetailerMap: {}, totalAmount: 0 };
+      const g = groupMap[p.group];
+      g.profileCount++;
+      g.totalOrders += p.totalOrders;
+      g.confirmedCount += p.confirmedCount;
+      g.totalAmount += p.totalAmount;
+      if (p.topRetailer) {
+        g.topRetailerMap[p.topRetailer] = (g.topRetailerMap[p.topRetailer] || 0) + p.totalOrders;
+      }
+    }
+    const groups = Object.values(groupMap).map(g => {
+      let top = '', topCount = 0;
+      for (const [r, c] of Object.entries(g.topRetailerMap)) {
+        if (c > topCount) { topCount = c; top = r; }
+      }
+      const pgInfo = groupColorMap[g.name.toLowerCase()];
+      return {
+        name: g.name,
+        profileCount: g.profileCount,
+        totalOrders: g.totalOrders,
+        confirmedCount: g.confirmedCount,
+        stickRate: g.totalOrders > 0 ? Math.round((g.confirmedCount / g.totalOrders) * 100) : 0,
+        topRetailer: top,
+        totalAmount: g.totalAmount,
+        color: pgInfo ? pgInfo.color : null,
+        groupId: pgInfo ? pgInfo.id : null
+      };
+    });
+
+    // Aggregate analytics: BIN, email domain, state, city, billing=shipping
+    const binStats = {};
+    const domainStats = {};
+    const stateStats = {};
+    const cityStats = {};
+    let sameBillingTotal = 0, sameBillingConfirmed = 0, diffBillingTotal = 0, diffBillingConfirmed = 0;
+    for (const p of profilePerf) {
+      if (p.totalOrders === 0) continue;
+      // BIN
+      if (p.bin) {
+        if (!binStats[p.bin]) binStats[p.bin] = { total: 0, confirmed: 0, cardType: p.cardType };
+        binStats[p.bin].total += p.totalOrders;
+        binStats[p.bin].confirmed += p.confirmedCount;
+      }
+      // Email domain
+      if (p.emailDomain) {
+        if (!domainStats[p.emailDomain]) domainStats[p.emailDomain] = { total: 0, confirmed: 0 };
+        domainStats[p.emailDomain].total += p.totalOrders;
+        domainStats[p.emailDomain].confirmed += p.confirmedCount;
+      }
+      // State
+      if (p.state) {
+        if (!stateStats[p.state]) stateStats[p.state] = { total: 0, confirmed: 0 };
+        stateStats[p.state].total += p.totalOrders;
+        stateStats[p.state].confirmed += p.confirmedCount;
+      }
+      // City
+      const cityKey = [p.city, p.state].filter(Boolean).join(', ');
+      if (cityKey) {
+        if (!cityStats[cityKey]) cityStats[cityKey] = { total: 0, confirmed: 0 };
+        cityStats[cityKey].total += p.totalOrders;
+        cityStats[cityKey].confirmed += p.confirmedCount;
+      }
+      // Billing = Shipping correlation
+      if (p.sameBillingShipping) {
+        sameBillingTotal += p.totalOrders;
+        sameBillingConfirmed += p.confirmedCount;
+      } else {
+        diffBillingTotal += p.totalOrders;
+        diffBillingConfirmed += p.confirmedCount;
+      }
+    }
+
+    const buildRanked = (map, minOrders = 3) => Object.entries(map)
+      .filter(([, v]) => v.total >= minOrders)
+      .map(([key, v]) => ({ key, total: v.total, confirmed: v.confirmed, stickRate: v.total > 0 ? Math.round((v.confirmed / v.total) * 100) : 0, cardType: v.cardType || undefined }))
+      .sort((a, b) => b.stickRate - a.stickRate || b.total - a.total);
+
+    const analytics = {
+      topBins: buildRanked(binStats, 3),
+      topDomains: buildRanked(domainStats, 3),
+      topStates: buildRanked(stateStats, 3),
+      topCities: buildRanked(cityStats, 3),
+      billingShipping: {
+        same: { total: sameBillingTotal, confirmed: sameBillingConfirmed, stickRate: sameBillingTotal > 0 ? Math.round((sameBillingConfirmed / sameBillingTotal) * 100) : 0 },
+        different: { total: diffBillingTotal, confirmed: diffBillingConfirmed, stickRate: diffBillingTotal > 0 ? Math.round((diffBillingConfirmed / diffBillingTotal) * 100) : 0 }
+      }
+    };
+
+    return {
+      success: true,
+      profiles: profilePerf,
+      groups,
+      analytics,
+      unmatched: unmatchedOrders,
+      importedAt: aycdData ? aycdData.importedAt : null,
+      totalProfiles: profiles.length
+    };
+  } catch (error) {
+    console.error('get-profile-performance error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (app.isReady() && BrowserWindow.getAllWindows().length === 0) createWindow(); });
 app.on('before-quit', () => {

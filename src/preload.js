@@ -33,7 +33,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Sync
   resyncDrop: (retailer, date) => ipcRenderer.invoke('resync-drop', retailer, date),
-  syncAccount: (accountId, dateFrom, dateTo) => ipcRenderer.invoke('sync-account', accountId, dateFrom, dateTo),
+  syncAccount: (accountId, dateFrom, dateTo, retailerFilter) => ipcRenderer.invoke('sync-account', accountId, dateFrom, dateTo, retailerFilter),
   stopSync: (accountId) => ipcRenderer.invoke('stop-sync', accountId),
   getSyncSettings: () => ipcRenderer.invoke('get-sync-settings'),
   updateSyncSettings: (settings) => ipcRenderer.invoke('update-sync-settings', settings),
@@ -118,6 +118,13 @@ contextBridge.exposeInMainWorld('api', {
   applyTargetImage: (itemName, imageUrl, guestId, dropDate) => ipcRenderer.invoke('apply-target-image', itemName, imageUrl, guestId, dropDate),
   spreadTargetImages: () => ipcRenderer.invoke('spread-target-images'),
   clearTargetDropImages: (dropDate) => ipcRenderer.invoke('clear-target-drop-images', dropDate),
+
+  // Deep Sync (re-fetch with updated parsers)
+  deepSync: (daysBack) => ipcRenderer.invoke('deep-sync', daysBack),
+  onDeepSyncProgress: (callback) => {
+    ipcRenderer.removeAllListeners('deep-sync-progress');
+    ipcRenderer.on('deep-sync-progress', (_, data) => callback(data));
+  },
 
   // Debug/Settings
   getDataPath: () => ipcRenderer.invoke('get-data-path'),
@@ -219,6 +226,11 @@ contextBridge.exposeInMainWorld('api', {
   saveChannelWebhook: (data) => ipcRenderer.invoke('save-channel-webhook', data),
   migrateWebhook: () => ipcRenderer.invoke('migrate-webhook'),
 
+  // Shipping Webhooks
+  getShippingWebhookSettings: () => ipcRenderer.invoke('get-shipping-webhook-settings'),
+  saveShippingWebhookSettings: (settings) => ipcRenderer.invoke('save-shipping-webhook-settings', settings),
+  testShippingWebhook: () => ipcRenderer.invoke('test-shipping-webhook'),
+
   // Discord ACO Sync
   getDiscordAcoSettings: () => ipcRenderer.invoke('get-discord-aco-settings'),
   saveDiscordAcoSettings: (settings) => ipcRenderer.invoke('save-discord-aco-settings', settings),
@@ -238,6 +250,7 @@ contextBridge.exposeInMainWorld('api', {
   // ACO Profile Mappings
   getProfileMappings: () => ipcRenderer.invoke('get-profile-mappings'),
   saveProfileMapping: (profileName, discordUserId, discordUsername) => ipcRenderer.invoke('save-profile-mapping', profileName, discordUserId, discordUsername),
+  saveProfileMappingsBatch: (profiles, discordUserId, discordUsername) => ipcRenderer.invoke('save-profile-mappings-batch', profiles, discordUserId, discordUsername),
   deleteProfileMapping: (profileName) => ipcRenderer.invoke('delete-profile-mapping', profileName),
   setAutoForwardEnabled: (enabled) => ipcRenderer.invoke('set-auto-forward-enabled', enabled),
   setForwardDeclinedEnabled: (enabled) => ipcRenderer.invoke('set-forward-declined-enabled', enabled),
@@ -316,6 +329,19 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.removeAllListeners('tcg-auto-linked');
     ipcRenderer.on('tcg-auto-linked', (_, data) => callback(data));
   },
+
+  // Profile Groups CRUD
+  getProfileGroups: () => ipcRenderer.invoke('get-profile-groups'),
+  createProfileGroup: (data) => ipcRenderer.invoke('create-profile-group', data),
+  updateProfileGroup: (data) => ipcRenderer.invoke('update-profile-group', data),
+  deleteProfileGroup: (data) => ipcRenderer.invoke('delete-profile-group', data),
+  reassignProfileGroup: (data) => ipcRenderer.invoke('reassign-profile-group', data),
+
+  // AYCD Profile Import & Performance
+  importAycdProfiles: (opts) => ipcRenderer.invoke('import-aycd-profiles', opts),
+  getAycdProfiles: () => ipcRenderer.invoke('get-aycd-profiles'),
+  clearAycdProfiles: () => ipcRenderer.invoke('clear-aycd-profiles'),
+  getProfilePerformance: () => ipcRenderer.invoke('get-profile-performance'),
 });
 
 console.log('API exposed to window');

@@ -509,6 +509,26 @@
     .card-title { font-size: var(--text-md); font-weight: 600; }
     .card-body { padding: var(--space-5); }
     .retailers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); margin-bottom: 28px; }
+    .recent-orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+    .recent-order-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; transition: all var(--duration-base) var(--ease-out); }
+    .recent-order-card:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+    .recent-order-img { width: 40px; height: 40px; border-radius: var(--radius-sm); object-fit: cover; background: var(--bg-tertiary); flex-shrink: 0; }
+    .recent-order-info { flex: 1; min-width: 0; }
+    .recent-order-item { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
+    .recent-order-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; align-items: center; margin-top: 2px; }
+    .recent-order-status { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
+    .recent-order-status.confirmed { background: rgba(45,212,191,0.15); color: var(--green); }
+    .recent-order-status.shipped { background: rgba(251,191,36,0.15); color: var(--yellow); }
+    .recent-order-status.delivered { background: rgba(45,212,191,0.15); color: var(--cyan); }
+    .recent-order-status.cancelled { background: rgba(248,113,113,0.15); color: var(--red); }
+    .recent-order-status.declined { background: rgba(248,113,113,0.15); color: var(--red); }
+    .recent-orders-list { display: flex; flex-direction: column; gap: 0; }
+    .recent-orders-list .recent-order-card { border-radius: 0; margin: 0; border-bottom: 1px solid var(--border); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+    .recent-orders-list .recent-order-card:first-child { border-top: 1px solid var(--border); border-radius: var(--radius-md) var(--radius-md) 0 0; }
+    .recent-orders-list .recent-order-card:last-child { border-radius: 0 0 var(--radius-md) var(--radius-md); }
+    .recent-orders-list .recent-order-card:only-child { border-radius: var(--radius-md); }
+    .recent-orders-list .recent-order-card:hover { transform: none; border-color: var(--accent); }
+    .recent-orders-list .recent-order-card .recent-order-amount { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
     .retailer-card { background: var(--bg-secondary); border: 2px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6); cursor: pointer; transition: all var(--duration-base) var(--ease-out); box-shadow: var(--shadow-sm); }
     .retailer-card:hover { border-color: var(--border-hover); transform: translateY(-2px); box-shadow: var(--shadow-md); }
     .retailer-card.walmart:hover { border-color: var(--walmart); background: rgba(0,113,220,0.05); box-shadow: 0 0 0 1px var(--walmart), var(--shadow-md); }
@@ -583,6 +603,13 @@
     .sync-panel-header { font-size: var(--text-sm); text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: var(--space-4); font-weight: 600; }
     .sync-options { display: flex; gap: var(--space-4); align-items: flex-end; flex-wrap: wrap; }
     .sync-options .form-group { margin-bottom: 0; flex: 1; min-width: 150px; }
+    .retailer-filter-row { display: flex; align-items: center; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+    .retailer-filter-label { font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-right: 4px; white-space: nowrap; }
+    .retailer-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-muted); transition: all var(--duration-base) var(--ease-out); user-select: none; }
+    .retailer-chip:hover { border-color: var(--border-hover); color: var(--text-secondary); }
+    .retailer-chip.active { background: var(--blue-dim, rgba(59,130,246,0.15)); border-color: var(--blue); color: var(--blue); }
+    .retailer-chip .chip-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.5; transition: opacity var(--duration-base); }
+    .retailer-chip.active .chip-dot { opacity: 1; }
     .drops-container { border-radius: var(--radius-md); background: var(--bg-secondary); border: 1px solid var(--border); padding: var(--space-3); }
     /* drops-container scrollbar width set globally above */
     .drops-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-3); }
@@ -1727,6 +1754,12 @@
     .settings-input-row .form-input { flex: 1; }
     .settings-status { margin-top: var(--space-2); font-size: var(--text-sm); }
     .settings-tab-heading { font-size: var(--text-xl); margin-bottom: var(--space-4); }
+
+    /* Shipping Webhook Retailers */
+    .shipping-webhook-retailers { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+    .shipping-webhook-retailer-toggle { display: flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--text-secondary); cursor: pointer; user-select: none; }
+    .shipping-webhook-retailer-toggle input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+    .shipping-webhook-last-sent { font-size: var(--text-sm); color: var(--text-muted); padding: var(--space-2) var(--space-3); background: var(--bg-tertiary); border-radius: var(--radius-sm); border: 1px solid var(--border); }
 
     /* ========== PHASE 2: SEARCH BAR ========== */
     .search-container {
@@ -4612,6 +4645,84 @@
     .adv-filter-row input, .adv-filter-row select { background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text-primary); font-size: var(--text-sm); }
     .advanced-filter-toggle.has-filters { color: var(--accent); font-weight: 600; }
 
+    /* Profile Performance Styles */
+    .pp-th { padding: 10px 14px; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; white-space: nowrap; transition: color 0.15s; }
+    .pp-th:hover { color: var(--accent); }
+    .pp-th.sorted { color: var(--accent); }
+    .pp-th .pp-sort-arrow { font-size: 10px; opacity: 0.4; margin-left: 2px; }
+    .pp-th.sorted .pp-sort-arrow { opacity: 1; }
+    .pp-row { border-bottom: 1px solid var(--border); transition: background 0.15s; cursor: pointer; }
+    .pp-row:hover { background: var(--bg-tertiary); }
+    .pp-row td { padding: 10px 14px; vertical-align: middle; }
+    .pp-row-expanded { background: var(--bg-secondary); border-bottom: 1px solid var(--border); }
+    .pp-row-expanded td { padding: 12px 14px 16px; }
+    .pp-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .pp-detail-section { background: var(--bg-card); border-radius: var(--radius-md); padding: 12px; border: 1px solid var(--border); }
+    .pp-detail-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 8px; }
+    .pp-detail-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+    .pp-detail-row span:first-child { color: var(--text-secondary); }
+    .pp-detail-row span:last-child { color: var(--text-primary); font-weight: 500; }
+    .pp-group-card { background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur)); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: 16px 20px; transition: border-color 0.2s, transform 0.15s; cursor: pointer; }
+    .pp-group-card:hover { border-color: var(--glass-border-strong); transform: translateY(-1px); }
+    .pp-group-card-name { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+    .pp-group-card-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .pp-group-stat { font-size: 12px; color: var(--text-secondary); }
+    .pp-group-stat span { color: var(--text-primary); font-weight: 600; }
+    .pp-tier-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .pp-tier-diamond { background: rgba(185,242,255,0.15); color: #B9F2FF; }
+    .pp-tier-perfect { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+    .pp-tier-good { background: rgba(0,168,107,0.15); color: #00A86B; }
+    .pp-tier-okay { background: rgba(249,115,22,0.15); color: #F97316; }
+    .pp-tier-at-risk { background: rgba(239,68,68,0.15); color: #EF4444; }
+    .pp-email-masked { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-muted); }
+    .pp-stick-bar { display: inline-block; width: 48px; height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
+    .pp-stick-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    .pp-unmatched-chip { display: inline-block; padding: 4px 10px; margin: 3px; border-radius: var(--radius-sm); background: var(--bg-tertiary); border: 1px solid var(--border); font-size: 12px; color: var(--text-secondary); }
+    .pp-toggle-bar { display: flex; align-items: center; gap: 6px; padding: 10px 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+    .pp-toggle-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-right: 4px; white-space: nowrap; }
+    .pp-toggle-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; transition: all 0.15s ease; user-select: none; }
+    .pp-toggle-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .pp-toggle-chip.active { background: var(--accent); border-color: var(--accent); color: white; }
+    .pp-insights-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .pp-insight-card { background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur)); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); overflow: hidden; transition: border-color 0.2s; }
+    .pp-insight-card:hover { border-color: var(--glass-border-strong); }
+    .pp-insight-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; cursor: pointer; user-select: none; }
+    .pp-insight-header-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+    .pp-insight-header-toggle { font-size: 10px; color: var(--text-muted); transition: transform 0.2s; }
+    .pp-insight-header-toggle.collapsed { transform: rotate(-90deg); }
+    .pp-insight-body { padding: 0 16px 12px; }
+    .pp-insight-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 12px; border-bottom: 1px solid var(--border); }
+    .pp-insight-row:last-child { border-bottom: none; }
+    .pp-insight-row .pp-insight-key { color: var(--text-secondary); font-weight: 500; }
+    .pp-insight-row .pp-insight-val { color: var(--text-primary); font-weight: 600; }
+    .pp-insight-row .pp-insight-meta { color: var(--text-muted); font-size: 11px; margin-left: 6px; }
+    .pp-billing-compare { display: flex; gap: 16px; padding: 4px 0; }
+    .pp-billing-box { flex: 1; text-align: center; padding: 8px; border-radius: var(--radius-md); background: var(--bg-tertiary); }
+    .pp-billing-box-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+    .pp-billing-box-val { font-size: 18px; font-weight: 700; }
+
+    /* Profile Group Modal Styles */
+    .pg-group-option { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-md); border: 2px solid var(--border); cursor: pointer; transition: border-color 0.2s, background 0.15s; margin-bottom: 8px; }
+    .pg-group-option:hover { background: var(--bg-tertiary); }
+    .pg-group-option.selected { border-color: var(--accent); background: rgba(99,102,241,0.08); }
+    .pg-group-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+    .pg-group-label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .pg-group-count { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+    .pg-new-group-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+    .pg-color-picker { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .pg-color-swatch { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s, transform 0.15s; }
+    .pg-color-swatch:hover { transform: scale(1.15); }
+    .pg-color-swatch.selected { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--bg-secondary); }
+    .pg-manage-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 6px; background: var(--bg-card); }
+    .pg-manage-row .pg-group-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pg-manage-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .pg-manage-actions button { padding: 4px 8px; font-size: 11px; }
+    .pg-group-card-color-bar { width: 4px; border-radius: 2px; position: absolute; left: 0; top: 8px; bottom: 8px; }
+    .pp-group-card { position: relative; padding-left: 24px; }
+    .pp-group-card.active { border-color: var(--accent); background: rgba(99,102,241,0.06); }
+    .pp-group-reassign { padding: 4px 10px; font-size: 12px; border-radius: var(--radius-sm); background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; }
+    .pp-group-reassign:hover { border-color: var(--accent); color: var(--accent); }
+
     /* Discord Page Styles */
     .discord-warning { padding: var(--space-3) var(--space-4); background: var(--yellow-dim); border: 1px solid rgba(251,191,36,0.3); border-radius: var(--radius-md); margin-bottom: var(--space-5); }
     .discord-warning-inner { display: flex; align-items: center; gap: 10px; }
@@ -4683,6 +4794,7 @@
           <a class="nav-item" data-page="deliveries"><span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span><span class="nav-label">Deliveries</span><span class="nav-badge" id="navDeliveriesCount">0</span></a>
           <a class="nav-item" data-page="analytics"><span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span><span class="nav-label">Analytics</span></a>
           <a class="nav-item" data-page="accountstats"><span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span><span class="nav-label">Account Stats</span></a>
+          <a class="nav-item" data-page="profileperf" id="navProfilePerf"><span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="nav-label">Profile Perf</span></a>
           <a class="nav-item" data-page="accounts"><span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span><span class="nav-label">IMAP</span></a>
           <a class="nav-item" data-page="discord"><span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></span><span class="nav-label">Discord</span></a>
           <a class="nav-item" data-page="aco-panel" id="navAcoPanel" style="display:none"><span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><span class="nav-label">ACO Panel</span></a>
@@ -4753,6 +4865,14 @@
             <div class="empty-state-title">No orders yet</div>
             <div class="empty-state-text">Add an email account and sync to start tracking orders.</div>
             <button class="btn btn-primary" onclick="navigateTo('accounts')">Add Account</button>
+          </div>
+          <div class="section" id="recentOrdersSection" style="display:none;"><div class="section-header" style="display:flex;justify-content:space-between;align-items:center;"><div class="section-title">Recent Orders</div>
+              <div style="display:flex;gap:4px;">
+                <button class="tab-item active" id="recentViewGrid" onclick="setRecentOrdersView('grid')" title="Grid view" style="padding:4px 8px;font-size:12px;">▦</button>
+                <button class="tab-item" id="recentViewList" onclick="setRecentOrdersView('list')" title="List view" style="padding:4px 8px;font-size:12px;">☰</button>
+              </div>
+            </div>
+            <div id="recentOrdersList" class="recent-orders-grid"></div>
           </div>
           <div class="section" data-widget="stats"><div class="section-header"><div class="section-title">Overall Statistics</div></div>
             <div class="stats-grid">
@@ -5066,7 +5186,7 @@
               <div class="section-header">
                 <div class="section-title" id="accountStatsPerformanceTitle">Account Performance</div>
                 <div style="display:flex;gap:10px;align-items:center;">
-                  <input type="text" id="accountStatsSearch" class="account-stats-search" placeholder="Search accounts..." oninput="debouncedAccountStatsSearch()" style="width:250px;margin:0;" aria-label="Search accounts by email or address" role="searchbox">
+                  <input type="text" id="accountStatsSearch" class="account-stats-search" placeholder="Search accounts or products..." oninput="debouncedAccountStatsSearch()" style="width:250px;margin:0;" aria-label="Search accounts by email, address, or product name" role="searchbox">
                   <div class="view-toggle">
                     <button class="view-toggle-btn" id="accountStatsViewGrid" onclick="setAccountStatsView('grid')" title="Grid View">▦</button>
                     <button class="view-toggle-btn active" id="accountStatsViewList" onclick="setAccountStatsView('list')" title="List View">☰</button>
@@ -5084,6 +5204,7 @@
                     <option value="score">Score (High to Low)</option>
                     <option value="orders">Order Count (High to Low)</option>
                     <option value="spent">Total Spent (High to Low)</option>
+                    <option value="recent">Most Recent Order</option>
                     <option value="account">Account/Address (A-Z)</option>
                     <option value="address">Group by Ship Address</option>
                   </select>
@@ -5274,6 +5395,90 @@
         </div>
       </div>
 
+      <!-- Profile Performance Page -->
+      <div id="page-profileperf" class="page">
+        <div class="page-header"><h1><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px;margin-right:8px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Profile Performance</h1></div>
+        <div class="page-body">
+
+          <!-- Import Header -->
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:16px 20px;">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="importAycdProfiles()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import AYCD Profiles</button>
+                <span id="ppImportStatus" style="font-size:13px;color:var(--text-secondary);">No profiles imported</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <input type="text" id="ppSearchInput" class="form-input" placeholder="Search profiles..." style="width:220px;height:34px;font-size:13px;" oninput="debouncedProfilePerfSearch()">
+                <button class="btn btn-secondary btn-sm" id="ppManageGroupsBtn" onclick="showManageGroupsModal()" style="display:none;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Manage Groups</button>
+                <button class="btn btn-secondary btn-sm" id="ppClearImportBtn" onclick="clearAycdProfilesConfirm()" style="display:none;">Clear Import</button>
+                <button class="btn btn-secondary btn-sm" onclick="exportProfilePerformance()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>CSV</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Group Summary Cards -->
+          <div id="ppGroupCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:16px;"></div>
+
+          <!-- Analytics Insights -->
+          <div id="ppInsightsSection" style="display:none;margin-bottom:16px;">
+            <div id="ppInsightsGrid" class="pp-insights-grid"></div>
+          </div>
+
+          <!-- Profile Table -->
+          <div class="card">
+            <div class="pp-toggle-bar" id="ppToggleBar">
+              <span class="pp-toggle-label">Show:</span>
+              <span class="pp-toggle-chip active" data-toggle="address" onclick="togglePpFilter('address')">Address</span>
+              <span class="pp-toggle-chip active" data-toggle="card" onclick="togglePpFilter('card')">Card Info</span>
+              <span class="pp-toggle-chip active" data-toggle="email" onclick="togglePpFilter('email')">Email</span>
+              <span class="pp-toggle-chip" data-toggle="billing" onclick="togglePpFilter('billing')">Billing = Shipping</span>
+            </div>
+            <div class="card-body" style="padding:0;overflow-x:auto;">
+              <table id="ppTable" style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead id="ppTableHead">
+                  <tr style="border-bottom:1px solid var(--border);background:var(--bg-tertiary);">
+                    <th class="pp-th" data-sort="name" onclick="sortProfilePerf('name')">Profile <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th" data-sort="group" onclick="sortProfilePerf('group')">Group <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th pp-col-email" data-sort="email" onclick="sortProfilePerf('email')">Email <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th pp-col-card" data-sort="cardType" onclick="sortProfilePerf('cardType')">Card <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th pp-col-card" data-sort="bin" onclick="sortProfilePerf('bin')">BIN <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th pp-col-card" data-sort="lastFour" onclick="sortProfilePerf('lastFour')">Last 4 <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th pp-col-address" data-sort="state" onclick="sortProfilePerf('state')">State <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th pp-col-address" data-sort="city" onclick="sortProfilePerf('city')">City <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th pp-col-billing" data-sort="sameBillingShipping" onclick="sortProfilePerf('sameBillingShipping')">B=S <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th" data-sort="orders" onclick="sortProfilePerf('orders')">Orders <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th" data-sort="confirmed" onclick="sortProfilePerf('confirmed')">Confirmed <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th" data-sort="stickRate" onclick="sortProfilePerf('stickRate')">Stick Rate <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th" data-sort="topItem" onclick="sortProfilePerf('topItem')">Top Item <span class="pp-sort-arrow"></span></th>
+                    <th class="pp-th" data-sort="tier" onclick="sortProfilePerf('tier')">Tier <span class="pp-sort-arrow"></span></th>
+                  </tr>
+                </thead>
+                <tbody id="ppTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Unmatched Profiles -->
+          <div id="ppUnmatchedSection" style="display:none;margin-top:16px;">
+            <div class="card">
+              <div class="card-header"><div class="card-title" style="font-size:14px;color:var(--text-secondary);">Unmatched Discord Profiles</div></div>
+              <div class="card-body" style="padding:12px 16px;">
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">These profile names appear in Discord orders but don't match any imported AYCD profiles.</div>
+                <div id="ppUnmatchedList"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="ppEmptyState" style="display:none;text-align:center;padding:60px 20px;">
+            <div style="font-size:48px;margin-bottom:16px;opacity:0.3;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <div style="font-size:16px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">No Profile Data</div>
+            <div style="font-size:13px;color:var(--text-muted);max-width:400px;margin:0 auto;">Import your AYCD profiles to see performance analytics. You'll need Discord order data synced via the ACO panel for matching.</div>
+          </div>
+
+        </div>
+      </div>
+
       <div id="page-accounts" class="page">
         <div class="page-header"><h1><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px;margin-right:8px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>IMAP</h1></div>
         <div class="page-body">
@@ -5281,7 +5486,7 @@
             <div class="card-body">
               <div class="account-list" id="accountList"></div>
               <div class="empty" id="accountsEmpty"><div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div><div class="empty-title">No accounts added</div><div class="empty-text">Add a Gmail account to start syncing orders</div></div>
-              <div class="sync-panel" id="syncPanel" style="display:none;"><div class="sync-panel-header">Sync Options</div><div class="sync-options"><div class="form-group"><label class="form-label">From Date</label><input type="date" class="form-input" id="syncDateFrom"></div><div class="form-group"><label class="form-label">To Date</label><input type="date" class="form-input" id="syncDateTo"></div><button class="btn btn-success" id="syncRecentBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Sync Recent</button><button class="btn btn-primary" id="syncAllBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Sync All</button><button class="btn btn-secondary" onclick="relinkEmailImages()" title="Re-match product names to local SKU images"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Refresh Images</button><button class="btn btn-secondary" onclick="refreshAllData()" title="Deduplicate and merge order entries without resyncing"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Refresh Data</button></div></div>
+              <div class="sync-panel" id="syncPanel" style="display:none;"><div class="sync-panel-header">Sync Options</div><div class="sync-options"><div class="form-group"><label class="form-label">From Date</label><input type="date" class="form-input" id="syncDateFrom"></div><div class="form-group"><label class="form-label">To Date</label><input type="date" class="form-input" id="syncDateTo"></div><button class="btn btn-success" id="syncRecentBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Sync Recent</button><button class="btn btn-primary" id="syncAllBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Sync All</button><button class="btn btn-secondary" onclick="relinkEmailImages()" title="Re-match product names to local SKU images"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Refresh Images</button><button class="btn btn-secondary" onclick="refreshAllData()" title="Deduplicate and merge order entries without resyncing"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Refresh Data</button><button class="btn btn-secondary" id="deepSyncBtn" onclick="startDeepSync()" title="Re-fetch all emails over a wide date range to pick up data missed by older parsers. Never deletes existing data."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m0 0a9 9 0 0 1 9-9m-9 9a9 9 0 0 0 9 9"/></svg>Deep Sync</button></div><div class="retailer-filter-row" id="retailerFilterRow"><span class="retailer-filter-label">Sites:</span><span class="retailer-chip active" data-retailer="walmart" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Walmart</span><span class="retailer-chip active" data-retailer="target" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Target</span><span class="retailer-chip active" data-retailer="pokecenter" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Pokemon Center</span><span class="retailer-chip active" data-retailer="bestbuy" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Best Buy</span><span class="retailer-chip active" data-retailer="costco" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Costco</span><span class="retailer-chip active" data-retailer="samsclub" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Sam's Club</span></div></div>
             </div>
           </div>
           <input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none;">
@@ -5552,6 +5757,7 @@
                 <option value="Best Buy">Best Buy</option>
               </select>
               <button class="btn btn-primary btn-sm" onclick="showAddMappingForm()" style="font-size:11px;padding:5px 14px">+ Link Profile</button>
+              <button class="btn btn-sm" onclick="showAddProfilesModal()" style="font-size:11px;padding:5px 14px;border-color:var(--accent);color:var(--accent)">+ Add Profiles</button>
               <button class="btn btn-sm" onclick="showAcoExportModal()" style="font-size:11px;padding:5px 14px">Export</button>
               <button class="btn btn-sm" onclick="toggleAcoAdvancedFilters()" id="acoAdvFilterToggle" style="font-size:11px;padding:5px 10px;color:var(--text-secondary)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
@@ -5951,6 +6157,7 @@
             <button class="settings-tab tab-item" data-tab="data" onclick="showSettingsTab('data')">Data</button>
             <button class="settings-tab tab-item" data-tab="jig" onclick="showSettingsTab('jig')">Address Grouping</button>
             <button class="settings-tab tab-item" data-tab="reports" onclick="showSettingsTab('reports')">Reports</button>
+            <button class="settings-tab tab-item" data-tab="webhooks" onclick="showSettingsTab('webhooks')">Webhooks</button>
           </div>
 
           <!-- GENERAL TAB -->
@@ -6272,6 +6479,65 @@
                 <p class="settings-panel-desc">Create reusable report configurations.</p>
                 <div id="reportTemplatesList"></div>
                 <button class="btn btn-secondary btn-sm" onclick="createReportTemplate()" style="margin-top:var(--space-2);">+ New Template</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- WEBHOOKS TAB -->
+          <div id="settings-tab-webhooks" class="settings-tab-content">
+            <h2 class="settings-tab-heading">Shipping Webhooks</h2>
+            <div class="card settings-card-mb">
+              <div class="card-header"><div class="card-title">Shipping Notifications</div></div>
+              <div class="card-body">
+                <p class="settings-panel-desc">Get a Discord notification when IMAP sync detects a new shipping email for an existing order.</p>
+
+                <!-- Enable Toggle -->
+                <div class="settings-toggle-row">
+                  <div class="settings-toggle-info">
+                    <div class="settings-toggle-title">Enable Shipping Webhooks</div>
+                    <div class="settings-toggle-desc">Send a Discord embed when an order status changes to shipped</div>
+                  </div>
+                  <div class="toggle-switch" id="shippingWebhookToggle" onclick="toggleShippingWebhook()"></div>
+                </div>
+
+                <!-- Webhook URL -->
+                <div id="shippingWebhookSettings" style="margin-top:var(--space-4);">
+                  <label class="form-label">Discord Webhook URL</label>
+                  <div class="settings-input-row">
+                    <input type="text" id="shippingWebhookUrlInput" class="form-input" placeholder="https://discord.com/api/webhooks/...">
+                    <button class="btn btn-primary btn-sm" onclick="saveShippingWebhookSettings()">Save</button>
+                    <button class="btn btn-secondary btn-sm" onclick="testShippingWebhook()">Test</button>
+                  </div>
+                  <div id="shippingWebhookStatus" class="settings-status"></div>
+
+                  <!-- Sensitive Info Toggle -->
+                  <div class="settings-toggle-row settings-toggle-row--spaced">
+                    <div class="settings-toggle-info">
+                      <div class="settings-toggle-title">Include Sensitive Details</div>
+                      <div class="settings-toggle-desc">Email, amount, and address will use Discord spoiler tags (||hidden||) so you click to reveal</div>
+                    </div>
+                    <div class="toggle-switch" id="shippingWebhookSensitiveToggle" onclick="toggleShippingWebhookSensitive()"></div>
+                  </div>
+
+                  <!-- Retailer Toggles -->
+                  <div style="margin-top:var(--space-4);">
+                    <label class="form-label">Retailers</label>
+                    <p class="settings-panel-desc" style="margin-bottom:var(--space-2);">Choose which retailers trigger shipping notifications.</p>
+                    <div class="shipping-webhook-retailers">
+                      <label class="shipping-webhook-retailer-toggle"><input type="checkbox" id="swRetailerWalmart" onchange="saveShippingWebhookRetailers()" checked> Walmart</label>
+                      <label class="shipping-webhook-retailer-toggle"><input type="checkbox" id="swRetailerTarget" onchange="saveShippingWebhookRetailers()" checked> Target</label>
+                      <label class="shipping-webhook-retailer-toggle"><input type="checkbox" id="swRetailerPokecenter" onchange="saveShippingWebhookRetailers()" checked> Pokemon Center</label>
+                      <label class="shipping-webhook-retailer-toggle"><input type="checkbox" id="swRetailerBestbuy" onchange="saveShippingWebhookRetailers()" checked> Best Buy</label>
+                      <label class="shipping-webhook-retailer-toggle"><input type="checkbox" id="swRetailerCostco" onchange="saveShippingWebhookRetailers()" checked> Costco</label>
+                      <label class="shipping-webhook-retailer-toggle"><input type="checkbox" id="swRetailerSamsclub" onchange="saveShippingWebhookRetailers()" checked> Sam's Club</label>
+                    </div>
+                  </div>
+
+                  <!-- Status -->
+                  <div class="shipping-webhook-last-sent" id="shippingWebhookLastSent" style="margin-top:var(--space-4);">
+                    No webhooks sent yet
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -7012,6 +7278,7 @@
           <div id="invDetailSet" class="inv-detail-set">Set Name</div>
           <div id="invDetailPrice" class="inv-detail-price">$0.00</div>
           <div id="invDetailChange" class="inv-detail-change">-</div>
+          <a id="invDetailTcgLink" href="#" target="_blank" style="color:var(--accent);text-decoration:none;font-size:12px;font-weight:500;display:none;">View on TCGPlayer ↗</a>
         </div>
       </div>
       <div class="inv-detail-stats">
@@ -7789,26 +8056,51 @@ function exportSelectedCSV() {
 
   if (selectedOrders.length === 0) return;
 
-  // Same format as main CSV export: Date, Retailer, Order ID, Item, Qty, Amount, Per Unit, Tracking #, Carrier
-  const headers = ['Date', 'Retailer', 'Order ID', 'Item', 'Qty', 'Amount', 'Per Unit', 'Tracking #', 'Carrier'];
+  // Use same column toggle system as main exportCSV()
+  const cols = getExportColumns();
+  const activeCols = EXPORT_COLUMN_META.filter(c => cols[c.key]);
+
+  if (activeCols.length === 0) {
+    toast('No columns selected for export. Enable columns in Settings > Data.', 'error');
+    return;
+  }
+
+  const headers = activeCols.map(c => c.header);
   const rows = selectedOrders.map(o => {
-    // Fix timezone issue: parse date as local, not UTC
     let date = '';
     if (o.date) {
       const [year, month, day] = o.date.split('-').map(Number);
       date = new Date(year, month - 1, day).toLocaleDateString();
     }
-    const retailer = o.retailer || '';
-    const orderId = o.orderId || '';
-    const item = (o.item || '').replace(/"/g, '""');
     const qty = o.quantity || o.qty || 1;
     const amount = o.amount ? parseFloat(o.amount) : 0;
     const perUnit = qty > 0 && amount > 0 ? (amount / qty).toFixed(2) : '';
     const amountStr = amount > 0 ? `$${amount.toFixed(2)}` : '';
     const perUnitStr = perUnit ? `$${perUnit}` : '';
-    const tracking = (o.tracking || '').replace(/"/g, '""');
-    const carrier = (o.carrier || '').replace(/"/g, '""');
-    return `"${date}","${retailer}","${orderId}","${item}",${qty},"${amountStr}","${perUnitStr}","${tracking}","${carrier}"`;
+    let etaStr = '';
+    if (o.eta) {
+      const [ey, em, ed] = o.eta.split('-').map(Number);
+      etaStr = new Date(ey, em - 1, ed).toLocaleDateString();
+    }
+
+    const valueMap = {
+      date,
+      retailer: o.retailer || '',
+      orderId: o.orderId || '',
+      item: (o.item || '').replace(/"/g, '""'),
+      qty: String(qty),
+      amount: amountStr,
+      perUnit: perUnitStr,
+      tracking: (o.tracking || '').replace(/"/g, '""'),
+      carrier: (o.carrier || '').replace(/"/g, '""'),
+      trackingUrl: (o.trackingUrl || '').replace(/"/g, '""'),
+      email: (o.email || '').replace(/"/g, '""'),
+      status: (o.finalStatus || o.status || '').replace(/"/g, '""'),
+      address: (o.shippingAddress || (o.addressLine1 ? [o.addressLine1, o.city, o.state, o.zip].filter(Boolean).join(', ') : '') || '').replace(/"/g, '""'),
+      eta: etaStr,
+    };
+
+    return activeCols.map(c => `"${valueMap[c.key]}"`).join(',');
   });
 
   const csv = [headers.join(','), ...rows].join('\n');
@@ -8756,7 +9048,7 @@ async function performAutoSync() {
     showAccountProgress(acc.id, 0, 0, 'Auto-syncing...');
 
     try {
-      const result = await window.api.syncAccount(acc.id, fromDate, today);
+      const result = await window.api.syncAccount(acc.id, fromDate, today, getRetailerFilter());
       syncingAccounts.delete(acc.id);
       
       if (result.success) {
@@ -8984,6 +9276,11 @@ function showPage(page) {
     toast('Deliveries page is disabled in Discord mode', 'info');
     return;
   }
+  // Block Profile Performance in IMAP mode
+  if (page === 'profileperf' && currentDataMode === 'imap') {
+    toast('Profile Performance is only available in Discord mode', 'info');
+    return;
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   $(`page-${page}`).classList.add('active');
@@ -8997,6 +9294,7 @@ function showPage(page) {
     renderAnalytics();
   }
   if (page === 'accountstats') renderAccountStats();
+  if (page === 'profileperf') renderProfilePerf();
   if (page === 'deliveries') requestAnimationFrame(() => renderDeliveryHub());
   if (page === 'inventory') renderInventory();
   if (page === 'tcgtracker') renderTCGTracker();
@@ -9156,6 +9454,9 @@ function renderDashboard() {
   // Update quick stats bar
   updateQuickStats();
 
+  // Render recent orders feed
+  renderRecentOrders(all);
+
   // Render dashboard alerts (uses source-filtered orders)
   renderDashboardAlerts(applySourceFilter(computeOrderStatuses()));
 
@@ -9212,6 +9513,73 @@ function renderDashboard() {
       }
     });
   }
+}
+
+let recentOrdersView = 'grid';
+let _recentOrdersCache = [];
+
+function setRecentOrdersView(view) {
+  recentOrdersView = view;
+  $('recentViewGrid').classList.toggle('active', view === 'grid');
+  $('recentViewList').classList.toggle('active', view === 'list');
+  if (_recentOrdersCache.length > 0) renderRecentOrdersFromCache();
+}
+
+function renderRecentOrders(allOrders) {
+  const section = $('recentOrdersSection');
+  const container = $('recentOrdersList');
+  if (!section || !container) return;
+
+  // Get 6 most recent orders by date, excluding declined
+  _recentOrdersCache = allOrders
+    .filter(o => o.date && o.finalStatus !== 'declined')
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 6);
+
+  if (_recentOrdersCache.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = '';
+  renderRecentOrdersFromCache();
+}
+
+function renderRecentOrdersFromCache() {
+  const container = $('recentOrdersList');
+  if (!container) return;
+  const recent = _recentOrdersCache;
+  const isGrid = recentOrdersView === 'grid';
+
+  container.className = isGrid ? 'recent-orders-grid' : 'recent-orders-list';
+
+  const retailerColors = { walmart: 'var(--walmart)', target: 'var(--target)', pokecenter: 'var(--pokecenter)', samsclub: 'var(--samsclub)', costco: 'var(--costco)', bestbuy: 'var(--bestbuy)' };
+  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+
+  container.innerHTML = recent.map(o => {
+    const status = o.finalStatus || o.status || 'confirmed';
+    const retailerColor = retailerColors[o.retailer] || 'var(--accent)';
+    const retailerName = retailerNames[o.retailer] || o.retailer;
+    const itemName = o.item || 'Order #' + (o.orderId || '').slice(-6);
+    const dateStr = o.date ? new Date(o.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    const amount = o.amount ? `$${Number(o.amount).toFixed(2)}` : '';
+    const imgSrc = o.imageUrl || `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='6' fill='%23222'/><text x='20' y='24' text-anchor='middle' font-size='16' fill='%23666'>📦</text></svg>`;
+
+    return `<div class="recent-order-card" onclick="showPage('${o.retailer}')">
+      <div style="width:4px;height:36px;border-radius:2px;background:${retailerColor};flex-shrink:0;"></div>
+      <img class="recent-order-img" src="${escapeHtml(imgSrc)}" onerror="this.onerror=null;this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect width=%2240%22 height=%2240%22 rx=%226%22 fill=%22%23222%22/><text x=%2220%22 y=%2224%22 text-anchor=%22middle%22 font-size=%2216%22 fill=%22%23666%22>📦</text></svg>'">
+      <div class="recent-order-info">
+        <div class="recent-order-item">${escapeHtml(itemName)}</div>
+        <div class="recent-order-meta">
+          <span style="color:${retailerColor};font-weight:600;">${retailerName}</span>
+          <span>${dateStr}</span>
+          ${isGrid ? (amount ? `<span>${amount}</span>` : '') : ''}
+        </div>
+      </div>
+      ${!isGrid && amount ? `<div class="recent-order-amount">${amount}</div>` : ''}
+      <div class="recent-order-status ${status}">${status}</div>
+    </div>`;
+  }).join('');
 }
 
 function setDashboardPeriod(period) {
@@ -9289,6 +9657,9 @@ function applyDataModeUI() {
   // Show/hide ACO Panel nav item (Discord mode only)
   const acoPanelNav = document.getElementById('navAcoPanel');
   if (acoPanelNav) acoPanelNav.style.display = currentDataMode === 'discord' ? '' : 'none';
+  // Show/hide Profile Performance nav item (Discord mode only)
+  const profilePerfNav = document.getElementById('navProfilePerf');
+  if (profilePerfNav) profilePerfNav.style.display = currentDataMode === 'discord' ? '' : 'none';
   // Hide Deliveries in Discord mode (no tracking data)
   const deliveriesNav = document.querySelector('[data-page="deliveries"]');
   if (deliveriesNav) deliveriesNav.style.display = currentDataMode === 'discord' ? 'none' : '';
@@ -9318,6 +9689,7 @@ function setSourceFilter(source) {
   else if (page === 'analytics') renderAnalytics();
   else if (page === 'deliveries') renderDeliveryHub();
   else if (page === 'accountstats') renderAccountStats();
+  else if (page === 'profileperf') renderProfilePerf();
 }
 
 // Helper to apply global source filter to an order list
@@ -11884,9 +12256,10 @@ async function syncAccount(id) {
   const toDate = $('syncDateTo').value || localDateStr(futureDate);
   const fromDate = $('syncDateFrom').value;
 
-  debugLog.info('SYNC', `Date range: ${fromDate} to ${toDate}`);
+  const retailerFilter = getRetailerFilter();
+  debugLog.info('SYNC', `Date range: ${fromDate} to ${toDate}`, { retailerFilter });
 
-  const result = await window.api.syncAccount(id, fromDate, toDate);
+  const result = await window.api.syncAccount(id, fromDate, toDate, retailerFilter);
 
   // Capture detailed debug log from main process
   if (result.debugLog && Array.isArray(result.debugLog)) {
@@ -11994,8 +12367,9 @@ async function syncAllAccounts() {
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + 2);
   const toDate = $('syncDateTo').value || localDateStr(futureDate);
+  const retailerFilter = getRetailerFilter();
   const promises = accounts.map(acc => {
-    return window.api.syncAccount(acc.id, $('syncDateFrom').value, toDate)
+    return window.api.syncAccount(acc.id, $('syncDateFrom').value, toDate, retailerFilter)
       .then(async result => {
         syncingAccounts.delete(acc.id);
 
@@ -12030,9 +12404,47 @@ async function syncAllAccounts() {
   toast('All accounts synced!');
 }
 
+// --- Retailer Filter Chips ---
+const ALL_RETAILERS = ['walmart', 'target', 'pokecenter', 'bestbuy', 'costco', 'samsclub'];
+
+function toggleRetailerChip(el) {
+  el.classList.toggle('active');
+  saveRetailerFilter();
+}
+
+function getRetailerFilter() {
+  const chips = document.querySelectorAll('#retailerFilterRow .retailer-chip');
+  const active = [];
+  chips.forEach(c => { if (c.classList.contains('active')) active.push(c.dataset.retailer); });
+  // If all are active, return null (no filter = scan everything)
+  if (active.length === ALL_RETAILERS.length || active.length === 0) return null;
+  return active;
+}
+
+function saveRetailerFilter() {
+  const chips = document.querySelectorAll('#retailerFilterRow .retailer-chip');
+  const state = {};
+  chips.forEach(c => { state[c.dataset.retailer] = c.classList.contains('active'); });
+  localStorage.setItem('retailerFilterState', JSON.stringify(state));
+}
+
+function loadRetailerFilter() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('retailerFilterState'));
+    if (!saved) return;
+    const chips = document.querySelectorAll('#retailerFilterRow .retailer-chip');
+    chips.forEach(c => {
+      const key = c.dataset.retailer;
+      if (key in saved) {
+        c.classList.toggle('active', saved[key]);
+      }
+    });
+  } catch (e) { /* ignore */ }
+}
+
 async function syncRecentAll() {
   if (syncingAccounts.size > 0) return;
-  
+
   // Mark all as syncing
   accounts.forEach(acc => {
     syncingAccounts.add(acc.id);
@@ -12043,6 +12455,9 @@ async function syncRecentAll() {
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + 2);
   const toDate = $('syncDateTo').value || localDateStr(futureDate);
+
+  // Get retailer filter from UI chips
+  const retailerFilter = getRetailerFilter();
 
   // Start all syncs concurrently, using each account's lastSynced date
   const promises = accounts.map(acc => {
@@ -12055,8 +12470,8 @@ async function syncRecentAll() {
       weekAgo.setDate(weekAgo.getDate() - 7);
       fromDate = localDateStr(weekAgo);
     }
-    
-    return window.api.syncAccount(acc.id, fromDate, toDate)
+
+    return window.api.syncAccount(acc.id, fromDate, toDate, retailerFilter)
       .then(async result => {
         syncingAccounts.delete(acc.id);
 
@@ -12203,7 +12618,7 @@ function getItemStats(list, allOrders = null) {
   // Aggregate stats from the filtered list only
   list.forEach(o => {
     const orderImg = o.imageUrl || null;
-    const isCancelled = o.finalStatus === 'cancelled';
+    const isCancelled = o.finalStatus === 'cancelled' || o.finalStatus === 'declined';
 
     // Check if order has multicart items array
     if (o.items && o.items.length > 0) {
@@ -13528,6 +13943,14 @@ function sortAccountStats(data, sortBy) {
     case 'spent':
       sorted.sort((a, b) => b.totalSpent - a.totalSpent);
       break;
+    case 'recent':
+      sorted.sort((a, b) => {
+        const dateA = a.lastOrderDate || '';
+        const dateB = b.lastOrderDate || '';
+        if (dateB !== dateA) return dateB.localeCompare(dateA);
+        return b.totalOrders - a.totalOrders;
+      });
+      break;
     case 'score': {
       const scoreOrders = computeOrderStatuses();
       const scoreCache = new Map();
@@ -13965,7 +14388,7 @@ function aggregateAccountData(orders, retailer) {
     // Average order value should be based on confirmed orders (orders that actually stuck)
     acc.avgOrderValue = acc.confirmed > 0 ? acc.totalSpent / acc.confirmed : 0;
     // Manual cancels and non-penalizing cancels (out of stock, quantity limits) don't count against stick rate
-    const effectiveTotal = acc.totalOrders - (acc.manualCancels || 0);
+    const effectiveTotal = acc.totalOrders - (acc.manualCancels || 0) - (acc.declined || 0);
     acc.stickRate = effectiveTotal > 0 ? (acc.confirmed / effectiveTotal) * 100 : 0;
     acc.declineRate = acc.totalOrders > 0 ? (acc.declined / acc.totalOrders) * 100 : 0;
     acc.cancelRate = acc.totalOrders > 0 ? (acc.cancelled / acc.totalOrders) * 100 : 0;
@@ -14053,7 +14476,7 @@ function aggregateProfileData(orders, retailer) {
 
   return Array.from(profileMap.values()).map(acc => {
     acc.avgOrderValue = acc.confirmed > 0 ? acc.totalSpent / acc.confirmed : 0;
-    const effectiveTotal = acc.totalOrders - (acc.manualCancels || 0);
+    const effectiveTotal = acc.totalOrders - (acc.manualCancels || 0) - (acc.declined || 0);
     acc.stickRate = effectiveTotal > 0 ? (acc.confirmed / effectiveTotal) * 100 : 0;
     acc.declineRate = acc.totalOrders > 0 ? (acc.declined / acc.totalOrders) * 100 : 0;
     acc.cancelRate = acc.totalOrders > 0 ? (acc.cancelled / acc.totalOrders) * 100 : 0;
@@ -14968,16 +15391,27 @@ async function renderAccountStats() {
   if (searchTerm) {
     aggregatedData = aggregatedData.filter(item => {
       if (item.type === 'discordProfile') {
-        return item.profileName.toLowerCase().includes(searchTerm);
+        const nameMatch = item.profileName.toLowerCase().includes(searchTerm);
+        const productMatch = item.orders && item.orders.some(o =>
+          (o.item || '').toLowerCase().includes(searchTerm)
+        );
+        return nameMatch || productMatch;
       } else if (item.type === 'account') {
-        return item.email.toLowerCase().includes(searchTerm);
+        const emailMatch = item.email.toLowerCase().includes(searchTerm);
+        const productMatch = item.orders && item.orders.some(o =>
+          (o.item || '').toLowerCase().includes(searchTerm)
+        );
+        return emailMatch || productMatch;
       } else if (item.type === 'profile') {
         const addressMatch = item.baseAddress.toLowerCase().includes(searchTerm);
         const emailMatch = Array.from(item.emails).some(email =>
           email.toLowerCase().includes(searchTerm)
         );
         const nicknameMatch = addressGroupNames[item.baseAddress] && addressGroupNames[item.baseAddress].toLowerCase().includes(searchTerm);
-        return addressMatch || emailMatch || nicknameMatch;
+        const productMatch = item.variants && Array.from(item.variants.values()).some(v =>
+          v.orders && v.orders.some(o => (o.item || '').toLowerCase().includes(searchTerm))
+        );
+        return addressMatch || emailMatch || nicknameMatch || productMatch;
       }
       return false;
     });
@@ -15739,7 +16173,7 @@ function showFlexModal(retailer, dropDate) {
   const itemAggregation = new Map(); // key: item name, value: {name, qty, orders, spent, image, sku}
 
   drop.orders.forEach(o => {
-    const isCancelled = o.finalStatus === 'cancelled';
+    const isCancelled = o.finalStatus === 'cancelled' || o.finalStatus === 'declined';
 
     // Check if order has multicart items array
     if (o.items && o.items.length > 0) {
@@ -16750,12 +17184,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const EXPORT_COLUMNS_KEY = 'solus-export-columns';
 const EXPORT_COLUMN_DEFAULTS = {
-  date: true, retailer: true, orderId: true, item: true, qty: true, amount: true, perUnit: true,
-  tracking: false, carrier: false, trackingUrl: false, email: false, status: false, address: false, eta: false
+  date: true, email: true, retailer: true, orderId: true, item: true, qty: true, amount: true, perUnit: true,
+  tracking: false, carrier: false, trackingUrl: false, status: false, address: false, eta: false
 };
 
 const EXPORT_COLUMN_META = [
   { key: 'date',        header: 'Date' },
+  { key: 'email',       header: 'Email' },
   { key: 'retailer',    header: 'Retailer' },
   { key: 'orderId',     header: 'Order ID' },
   { key: 'item',        header: 'Item' },
@@ -16765,7 +17200,6 @@ const EXPORT_COLUMN_META = [
   { key: 'tracking',    header: 'Tracking #' },
   { key: 'carrier',     header: 'Carrier' },
   { key: 'trackingUrl', header: 'Tracking URL' },
-  { key: 'email',       header: 'Email' },
   { key: 'status',      header: 'Status' },
   { key: 'address',     header: 'Shipping Address' },
   { key: 'eta',         header: 'ETA' },
@@ -17199,6 +17633,76 @@ async function refreshAllData() {
     } else {
       toast('Data refreshed — no duplicates found');
     }
+  }
+}
+
+// Deep Sync: re-fetch emails over a wide date range to re-parse with updated parsers
+let _deepSyncInProgress = false;
+async function startDeepSync() {
+  if (_deepSyncInProgress) {
+    toast('Deep Sync is already running', 'warning');
+    return;
+  }
+  if (syncingAccounts.size > 0) {
+    toast('Wait for current sync to finish first', 'warning');
+    return;
+  }
+
+  // Prompt for days back with a simple confirm
+  const daysBack = prompt(
+    'Deep Sync re-fetches all emails to pick up data from improved parsers.\n' +
+    'Existing data is never deleted — only missing fields get filled in.\n\n' +
+    'How many days back to scan? (7-365, default 90)',
+    '90'
+  );
+  if (daysBack === null) return; // cancelled
+
+  const days = Math.min(Math.max(parseInt(daysBack) || 90, 7), 365);
+
+  _deepSyncInProgress = true;
+  const btn = $('deepSyncBtn');
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Deep Syncing...';
+
+  // Listen for progress updates
+  window.api.onDeepSyncProgress((data) => {
+    if (data.phase === 'syncing') {
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>${data.current + 1}/${data.total} accounts...`;
+    }
+  });
+
+  try {
+    const result = await window.api.deepSync(days);
+    if (result.success) {
+      // Reload all data and refresh views
+      accounts = await window.api.getAccounts();
+      orders = await window.api.getOrders(); invalidateOrdersCache();
+      renderAccounts();
+      refreshAllViews();
+      if (['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy'].includes(currentPage)) {
+        renderRetailerPage(currentPage);
+      }
+
+      let msg = `Deep Sync complete: scanned ${result.daysScanned} days, ${result.accountsSucceeded}/${result.accountsChecked} accounts`;
+      if (result.newOrdersAdded > 0) {
+        msg += `, ${result.newOrdersAdded} new orders found`;
+      }
+      if (result.errors && result.errors.length > 0) {
+        msg += ` (${result.errors.length} error${result.errors.length > 1 ? 's' : ''})`;
+        console.warn('[Deep Sync] Errors:', result.errors);
+      }
+      toast(msg, result.errors ? 'warning' : 'success');
+    } else {
+      toast(result.error || 'Deep Sync failed', 'error');
+    }
+  } catch (err) {
+    console.error('[Deep Sync] Error:', err);
+    toast('Deep Sync failed: ' + (err.message || 'Unknown error'), 'error');
+  } finally {
+    _deepSyncInProgress = false;
+    btn.disabled = false;
+    btn.innerHTML = originalText;
   }
 }
 
@@ -18334,7 +18838,15 @@ function showInvDetail(id) {
   $('invDetailName').textContent = item.name || 'Unknown';
   $('invDetailSet').textContent = item.setName || '';
   $('invDetailPrice').textContent = `$${item.marketPrice?.toFixed(2) || '-'}`;
-  if ($('invDetailTcgLink')) $('invDetailTcgLink').href = item.tcgplayerUrl || '#';
+  if ($('invDetailTcgLink')) {
+    if (item.tcgplayerUrl && item.tcgplayerUrl.trim()) {
+      $('invDetailTcgLink').href = item.tcgplayerUrl;
+      $('invDetailTcgLink').style.display = '';
+    } else {
+      $('invDetailTcgLink').href = '#';
+      $('invDetailTcgLink').style.display = 'none';
+    }
+  }
   
   // Calculate values
   const marketValue = (item.marketPrice || 0) * item.quantity;
@@ -19745,6 +20257,115 @@ function showSettingsTab(tab) {
     loadDiscordWebhookSetting();
     renderReportTemplates();
   }
+  // Load shipping webhook settings when webhooks tab is shown
+  if (tab === 'webhooks') {
+    loadShippingWebhookSettings();
+  }
+}
+
+// ==================== SHIPPING WEBHOOKS ====================
+let _shippingWebhookSettings = null;
+
+async function loadShippingWebhookSettings() {
+  try {
+    const settings = await window.api.getShippingWebhookSettings();
+    _shippingWebhookSettings = settings;
+
+    // Enable toggle
+    const toggle = $('shippingWebhookToggle');
+    if (toggle) toggle.classList.toggle('active', !!settings.enabled);
+
+    // Webhook URL
+    const urlInput = $('shippingWebhookUrlInput');
+    if (urlInput) urlInput.value = settings.webhookUrl || '';
+
+    // Sensitive toggle
+    const sensitiveToggle = $('shippingWebhookSensitiveToggle');
+    if (sensitiveToggle) sensitiveToggle.classList.toggle('active', !!settings.includeSensitive);
+
+    // Retailer checkboxes
+    const retailers = settings.retailers || {};
+    const retailerMap = { walmart: 'swRetailerWalmart', target: 'swRetailerTarget', pokecenter: 'swRetailerPokecenter', bestbuy: 'swRetailerBestbuy', costco: 'swRetailerCostco', samsclub: 'swRetailerSamsclub' };
+    for (const [key, elId] of Object.entries(retailerMap)) {
+      const el = $(elId);
+      if (el) el.checked = retailers[key] !== false;
+    }
+
+    // Last sent
+    const lastSentEl = $('shippingWebhookLastSent');
+    if (lastSentEl) {
+      if (settings.lastSentAt) {
+        const d = new Date(settings.lastSentAt);
+        lastSentEl.textContent = `Last webhook sent: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+      } else {
+        lastSentEl.textContent = 'No webhooks sent yet';
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load shipping webhook settings:', err);
+  }
+}
+
+async function toggleShippingWebhook() {
+  const toggle = $('shippingWebhookToggle');
+  const isActive = toggle.classList.contains('active');
+  toggle.classList.toggle('active', !isActive);
+  await saveShippingWebhookSettings();
+}
+
+async function toggleShippingWebhookSensitive() {
+  const toggle = $('shippingWebhookSensitiveToggle');
+  const isActive = toggle.classList.contains('active');
+  toggle.classList.toggle('active', !isActive);
+  await saveShippingWebhookSettings();
+}
+
+async function saveShippingWebhookSettings() {
+  const enabled = $('shippingWebhookToggle')?.classList.contains('active') || false;
+  const webhookUrl = $('shippingWebhookUrlInput')?.value?.trim() || '';
+  const includeSensitive = $('shippingWebhookSensitiveToggle')?.classList.contains('active') || false;
+  const retailers = {
+    walmart: $('swRetailerWalmart')?.checked !== false,
+    target: $('swRetailerTarget')?.checked !== false,
+    pokecenter: $('swRetailerPokecenter')?.checked !== false,
+    bestbuy: $('swRetailerBestbuy')?.checked !== false,
+    costco: $('swRetailerCostco')?.checked !== false,
+    samsclub: $('swRetailerSamsclub')?.checked !== false
+  };
+
+  const result = await window.api.saveShippingWebhookSettings({ enabled, webhookUrl, includeSensitive, retailers });
+  if (result.success) {
+    toast('Shipping webhook settings saved', 'success');
+  } else {
+    toast(result.error || 'Failed to save settings', 'error');
+    // Reload to revert UI
+    await loadShippingWebhookSettings();
+  }
+}
+
+async function saveShippingWebhookRetailers() {
+  await saveShippingWebhookSettings();
+}
+
+async function testShippingWebhook() {
+  const statusEl = $('shippingWebhookStatus');
+  if (statusEl) {
+    statusEl.textContent = 'Sending test...';
+    statusEl.style.color = 'var(--text-muted)';
+  }
+  try {
+    const result = await window.api.testShippingWebhook();
+    if (result.success) {
+      if (statusEl) { statusEl.textContent = 'Test sent successfully!'; statusEl.style.color = 'var(--success)'; }
+      toast('Test shipping webhook sent!', 'success');
+    } else {
+      if (statusEl) { statusEl.textContent = result.error || 'Test failed'; statusEl.style.color = 'var(--error)'; }
+      toast(result.error || 'Test failed', 'error');
+    }
+  } catch (err) {
+    if (statusEl) { statusEl.textContent = err.message; statusEl.style.color = 'var(--error)'; }
+    toast('Test failed: ' + err.message, 'error');
+  }
 }
 
 async function clearLiveTrackingCacheUI() {
@@ -20505,6 +21126,17 @@ function showInvDetailV2(itemId) {
     $('invDetailChange').style.color = change.percent >= 0 ? 'var(--green)' : 'var(--red)';
   } else {
     $('invDetailChange').textContent = '';
+  }
+
+  // TCGPlayer link
+  if ($('invDetailTcgLink')) {
+    if (item.tcgplayerUrl && item.tcgplayerUrl.trim()) {
+      $('invDetailTcgLink').href = item.tcgplayerUrl;
+      $('invDetailTcgLink').style.display = '';
+    } else {
+      $('invDetailTcgLink').href = '#';
+      $('invDetailTcgLink').style.display = 'none';
+    }
   }
 
   // Linked orders
@@ -22956,13 +23588,33 @@ function renderAcoUsers() {
 
   let html = '';
 
+  // Collect all visible profile names for "Select All Visible"
+  const allVisibleProfileNames = [];
+  for (const u of userList) {
+    for (const p of u.profiles) allVisibleProfileNames.push(p.name);
+  }
+  for (const p of filteredUnmapped) allVisibleProfileNames.push(p.name);
+
+  if (allVisibleProfileNames.length > 1) {
+    const allVisChecked = allVisibleProfileNames.length > 0 && allVisibleProfileNames.every(n => _acoBulkSelection.has(n));
+    html += `<div style="padding:6px 16px;display:flex;align-items:center;justify-content:flex-end;border-bottom:1px solid var(--border-color);background:var(--bg-secondary)">
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:10px;font-weight:500;color:var(--text-secondary)">
+        <input type="checkbox" ${allVisChecked ? 'checked' : ''} onchange="toggleAcoBulkSelectAll(this.checked, ${JSON.stringify(allVisibleProfileNames).replace(/"/g, '&quot;')})" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">
+        Select All Visible (${allVisibleProfileNames.length})
+      </label>
+    </div>`;
+  }
+
   // Mapped users (grouped)
   for (const u of userList) {
     const safeId = escapeHtml(u.discordUserId);
     const profileSummary = u.profiles.map(p => {
+      const safePName = escapeHtml(p.name).replace(/'/g, '&#39;');
+      const isChecked = _acoBulkSelection.has(p.name);
       const sites = Object.keys(p.sites);
       const siteStr = sites.length > 0 ? sites.join(', ') : '';
       return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:11px;color:var(--text-secondary)">
+        <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="event.stopPropagation();toggleAcoBulkSelect('${safePName}', this.checked)" onclick="event.stopPropagation()" style="accent-color:var(--accent);width:13px;height:13px;cursor:pointer;flex-shrink:0">
         <span style="color:var(--text-primary);font-weight:500">${escapeHtml(p.name)}</span>
         <span style="color:var(--text-tertiary)">&middot;</span>
         <span>${p.total} orders</span>
@@ -23538,31 +24190,70 @@ function toggleAcoBulkSelectAll(checked, profileNames) {
 function showBulkLinkModal() {
   if (_acoBulkSelection.size === 0) return;
   const count = _acoBulkSelection.size;
+  // Check if any selected profiles are already mapped (for reassignment messaging)
+  const mappedNames = new Set(acoMappingsCache.map(m => m.profile_name));
+  const reassignCount = [..._acoBulkSelection].filter(n => mappedNames.has(n)).length;
+  const reassignNote = reassignCount > 0
+    ? `<div style="font-size:11px;color:#EAB308;margin-bottom:12px;padding:6px 10px;border-radius:var(--radius-sm);background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2)">${reassignCount} profile${reassignCount === 1 ? ' is' : 's are'} already mapped and will be reassigned.</div>`
+    : '';
+
+  // Build known Discord users for autocomplete datalist
+  const knownUsers = {};
+  for (const m of acoMappingsCache) {
+    if (m.discord_user_id && m.discord_username) knownUsers[m.discord_user_id] = m.discord_username;
+  }
+  const datalistOptions = Object.entries(knownUsers).map(([id, name]) => `<option value="${escapeHtml(id)}" label="@${escapeHtml(name)}">`).join('');
+
   const overlay = document.createElement('div');
   overlay.id = 'acoBulkLinkOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center';
   overlay.innerHTML = `
-    <div style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:24px;width:380px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
+    <div style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:24px;width:420px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
       <div style="font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:4px">Bulk Link Profiles</div>
-      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">Link ${count} selected profile${count === 1 ? '' : 's'} to a Discord user.</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Link ${count} selected profile${count === 1 ? '' : 's'} to a Discord user.</div>
+      ${reassignNote}
+      <div style="margin-bottom:10px;max-height:100px;overflow-y:auto;padding:6px 10px;border-radius:var(--radius-sm);background:var(--bg-tertiary);border:1px solid var(--border-color)">
+        <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:4px">Selected profiles:</div>
+        ${[..._acoBulkSelection].map(n => `<span style="display:inline-block;font-size:11px;padding:1px 8px;margin:2px 4px 2px 0;border-radius:10px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color)">${escapeHtml(n)}</span>`).join('')}
+      </div>
+      <datalist id="acoBulkUserDatalist">${datalistOptions}</datalist>
       <div style="margin-bottom:12px">
         <label style="font-size:11px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Discord User ID <span style="color:var(--red)">*</span></label>
-        <input id="acoBulkDiscordId" type="text" placeholder="e.g. 123456789012345678" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text-primary);box-sizing:border-box">
+        <input id="acoBulkDiscordId" type="text" list="acoBulkUserDatalist" placeholder="e.g. 123456789012345678" autocomplete="off" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text-primary);box-sizing:border-box" oninput="autofillBulkUsername()">
       </div>
       <div style="margin-bottom:16px">
         <label style="font-size:11px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Discord Username <span style="font-size:10px;color:var(--text-tertiary)">(optional)</span></label>
         <input id="acoBulkDiscordUsername" type="text" placeholder="e.g. username" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text-primary);box-sizing:border-box">
       </div>
       <div id="acoBulkLinkError" style="display:none;font-size:11px;color:var(--red);margin-bottom:8px"></div>
-      <div style="display:flex;justify-content:flex-end;gap:8px">
+      <div id="acoBulkLinkProgress" style="display:none;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span id="acoBulkProgressText" style="font-size:11px;color:var(--text-secondary)">Linking...</span>
+          <span id="acoBulkProgressCount" style="font-size:11px;color:var(--text-tertiary)">0 / ${count}</span>
+        </div>
+        <div style="width:100%;height:4px;border-radius:2px;background:var(--bg-tertiary);overflow:hidden">
+          <div id="acoBulkProgressBar" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.2s"></div>
+        </div>
+      </div>
+      <div id="acoBulkLinkActions" style="display:flex;justify-content:flex-end;gap:8px">
         <button class="btn btn-sm" onclick="closeBulkLinkModal()" style="font-size:12px;padding:6px 14px">Cancel</button>
-        <button class="btn btn-sm btn-primary" onclick="bulkLinkProfiles()" style="font-size:12px;padding:6px 14px">Link ${count} Profile${count === 1 ? '' : 's'}</button>
+        <button id="acoBulkLinkBtn" class="btn btn-sm btn-primary" onclick="bulkLinkProfiles()" style="font-size:12px;padding:6px 14px">Link ${count} Profile${count === 1 ? '' : 's'}</button>
       </div>
     </div>
   `;
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeBulkLinkModal(); });
   document.body.appendChild(overlay);
   setTimeout(() => document.getElementById('acoBulkDiscordId')?.focus(), 50);
+}
+
+function autofillBulkUsername() {
+  const idInput = document.getElementById('acoBulkDiscordId');
+  const usernameInput = document.getElementById('acoBulkDiscordUsername');
+  if (!idInput || !usernameInput) return;
+  const id = idInput.value.trim();
+  // Auto-fill username from known mappings
+  const match = acoMappingsCache.find(m => m.discord_user_id === id && m.discord_username);
+  if (match) usernameInput.value = match.discord_username;
 }
 
 function closeBulkLinkModal() {
@@ -23581,11 +24272,28 @@ async function bulkLinkProfiles() {
   }
 
   const profiles = [..._acoBulkSelection];
-  closeBulkLinkModal();
-  toast(`Linking ${profiles.length} profile${profiles.length === 1 ? '' : 's'}...`, 'info');
+  const total = profiles.length;
 
+  // Show progress, disable button
+  const progressEl = document.getElementById('acoBulkLinkProgress');
+  const btnEl = document.getElementById('acoBulkLinkBtn');
+  const progressText = document.getElementById('acoBulkProgressText');
+  const progressCount = document.getElementById('acoBulkProgressCount');
+  const progressBar = document.getElementById('acoBulkProgressBar');
+  if (progressEl) progressEl.style.display = '';
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'Linking...'; }
+  if (errorEl) errorEl.style.display = 'none';
+
+  // Use batch API
   let successCount = 0, failCount = 0;
-  for (const profileName of profiles) {
+
+  // Update progress via polling-style: use individual calls so we can show per-item progress
+  for (let i = 0; i < profiles.length; i++) {
+    const profileName = profiles[i];
+    if (progressText) progressText.textContent = `Linking "${profileName}"...`;
+    if (progressCount) progressCount.textContent = `${i} / ${total}`;
+    if (progressBar) progressBar.style.width = `${Math.round((i / total) * 100)}%`;
+
     try {
       const result = await window.api.saveProfileMapping(profileName, discordId, discordUsername || undefined);
       if (result && result.success) successCount++;
@@ -23595,15 +24303,180 @@ async function bulkLinkProfiles() {
     }
   }
 
+  // Final progress
+  if (progressText) progressText.textContent = 'Done!';
+  if (progressCount) progressCount.textContent = `${total} / ${total}`;
+  if (progressBar) progressBar.style.width = '100%';
+
   _acoBulkSelection.clear();
   await loadAcoMappings();
   renderAcoUsers();
 
+  // Close modal and show results
+  closeBulkLinkModal();
   if (failCount === 0) {
     toast(`Linked ${successCount} profile${successCount === 1 ? '' : 's'} to ${discordUsername || discordId}`, 'success');
   } else {
     toast(`Linked ${successCount}, failed ${failCount} profile${failCount === 1 ? '' : 's'}`, 'error');
   }
+}
+
+// ==================== ADD PROFILES MODAL ====================
+function showAddProfilesModal() {
+  // Build known Discord users for autocomplete datalist
+  const knownUsers = {};
+  for (const m of acoMappingsCache) {
+    if (m.discord_user_id && m.discord_username) knownUsers[m.discord_user_id] = m.discord_username;
+  }
+  const datalistOptions = Object.entries(knownUsers).map(([id, name]) => `<option value="${escapeHtml(id)}" label="@${escapeHtml(name)}">`).join('');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'acoAddProfilesOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:24px;width:460px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
+      <div style="font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:4px">Add Profiles</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">Paste profile names below (one per line) and link them to a Discord user. These can be new profiles that SOLUS has never seen before.</div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Profile Names <span style="color:var(--red)">*</span></label>
+        <textarea id="acoAddProfilesTextarea" rows="6" placeholder="ProfileName1&#10;ProfileName2&#10;ProfileName3" style="width:100%;padding:8px 10px;font-size:12px;font-family:monospace;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text-primary);box-sizing:border-box;resize:vertical;line-height:1.5"></textarea>
+        <div style="font-size:10px;color:var(--text-tertiary);margin-top:3px">One profile name per line. Empty lines and duplicates will be ignored.</div>
+      </div>
+
+      <datalist id="acoAddProfilesUserDatalist">${datalistOptions}</datalist>
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Discord User ID <span style="color:var(--red)">*</span></label>
+        <input id="acoAddProfilesDiscordId" type="text" list="acoAddProfilesUserDatalist" placeholder="e.g. 123456789012345678" autocomplete="off" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text-primary);box-sizing:border-box" oninput="autofillAddProfilesUsername()">
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:11px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px">Discord Username <span style="font-size:10px;color:var(--text-tertiary)">(optional)</span></label>
+        <input id="acoAddProfilesDiscordUsername" type="text" placeholder="e.g. username" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text-primary);box-sizing:border-box">
+      </div>
+
+      <div id="acoAddProfilesError" style="display:none;font-size:11px;color:var(--red);margin-bottom:8px"></div>
+      <div id="acoAddProfilesProgress" style="display:none;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span id="acoAddProfilesProgressText" style="font-size:11px;color:var(--text-secondary)">Linking...</span>
+          <span id="acoAddProfilesProgressCount" style="font-size:11px;color:var(--text-tertiary)">0 / 0</span>
+        </div>
+        <div style="width:100%;height:4px;border-radius:2px;background:var(--bg-tertiary);overflow:hidden">
+          <div id="acoAddProfilesProgressBar" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.2s"></div>
+        </div>
+      </div>
+      <div id="acoAddProfilesResult" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:var(--radius-sm);font-size:12px"></div>
+
+      <div id="acoAddProfilesActions" style="display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn btn-sm" onclick="closeAddProfilesModal()" style="font-size:12px;padding:6px 14px">Cancel</button>
+        <button id="acoAddProfilesBtn" class="btn btn-sm btn-primary" onclick="submitAddProfiles()" style="font-size:12px;padding:6px 14px">Link All</button>
+      </div>
+    </div>
+  `;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAddProfilesModal(); });
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('acoAddProfilesTextarea')?.focus(), 50);
+}
+
+function autofillAddProfilesUsername() {
+  const idInput = document.getElementById('acoAddProfilesDiscordId');
+  const usernameInput = document.getElementById('acoAddProfilesDiscordUsername');
+  if (!idInput || !usernameInput) return;
+  const id = idInput.value.trim();
+  const match = acoMappingsCache.find(m => m.discord_user_id === id && m.discord_username);
+  if (match) usernameInput.value = match.discord_username;
+}
+
+function closeAddProfilesModal() {
+  const overlay = document.getElementById('acoAddProfilesOverlay');
+  if (overlay) overlay.remove();
+}
+
+function _parseProfileNames(text) {
+  return [...new Set(
+    text.split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0)
+  )];
+}
+
+async function submitAddProfiles() {
+  const textarea = document.getElementById('acoAddProfilesTextarea');
+  const discordIdInput = document.getElementById('acoAddProfilesDiscordId');
+  const discordUsernameInput = document.getElementById('acoAddProfilesDiscordUsername');
+  const errorEl = document.getElementById('acoAddProfilesError');
+  const progressEl = document.getElementById('acoAddProfilesProgress');
+  const progressText = document.getElementById('acoAddProfilesProgressText');
+  const progressCount = document.getElementById('acoAddProfilesProgressCount');
+  const progressBar = document.getElementById('acoAddProfilesProgressBar');
+  const resultEl = document.getElementById('acoAddProfilesResult');
+  const btnEl = document.getElementById('acoAddProfilesBtn');
+
+  const rawText = textarea?.value || '';
+  const profiles = _parseProfileNames(rawText);
+  const discordId = (discordIdInput?.value || '').trim();
+  const discordUsername = (discordUsernameInput?.value || '').trim();
+
+  // Validation
+  if (profiles.length === 0) {
+    if (errorEl) { errorEl.textContent = 'Please enter at least one profile name.'; errorEl.style.display = ''; }
+    return;
+  }
+  if (!discordId || !/^\d{17,20}$/.test(discordId)) {
+    if (errorEl) { errorEl.textContent = 'Please enter a valid Discord User ID (17-20 digits).'; errorEl.style.display = ''; }
+    return;
+  }
+
+  // Hide error, show progress
+  if (errorEl) errorEl.style.display = 'none';
+  if (resultEl) resultEl.style.display = 'none';
+  if (progressEl) progressEl.style.display = '';
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'Linking...'; }
+  if (textarea) textarea.disabled = true;
+  if (discordIdInput) discordIdInput.disabled = true;
+  if (discordUsernameInput) discordUsernameInput.disabled = true;
+
+  const total = profiles.length;
+  let successCount = 0, failCount = 0;
+  const failedNames = [];
+
+  for (let i = 0; i < profiles.length; i++) {
+    const profileName = profiles[i];
+    if (progressText) progressText.textContent = `Linking "${profileName}"...`;
+    if (progressCount) progressCount.textContent = `${i} / ${total}`;
+    if (progressBar) progressBar.style.width = `${Math.round((i / total) * 100)}%`;
+
+    try {
+      const result = await window.api.saveProfileMapping(profileName, discordId, discordUsername || undefined);
+      if (result && result.success) successCount++;
+      else { failCount++; failedNames.push(profileName); }
+    } catch {
+      failCount++;
+      failedNames.push(profileName);
+    }
+  }
+
+  // Final progress
+  if (progressText) progressText.textContent = 'Done!';
+  if (progressCount) progressCount.textContent = `${total} / ${total}`;
+  if (progressBar) progressBar.style.width = '100%';
+
+  // Show results
+  if (resultEl) {
+    if (failCount === 0) {
+      resultEl.style.cssText = 'display:block;margin-bottom:10px;padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);color:var(--green)';
+      resultEl.textContent = `Successfully linked ${successCount} profile${successCount === 1 ? '' : 's'} to ${discordUsername || discordId}.`;
+    } else {
+      resultEl.style.cssText = 'display:block;margin-bottom:10px;padding:8px 12px;border-radius:var(--radius-sm);font-size:12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:var(--red)';
+      resultEl.innerHTML = `Linked ${successCount}, failed ${failCount}: ${failedNames.map(n => escapeHtml(n)).join(', ')}`;
+    }
+  }
+
+  // Refresh data
+  await loadAcoMappings();
+  renderAcoUsers();
+
+  // Update button to close
+  if (btnEl) { btnEl.disabled = false; btnEl.textContent = 'Done'; btnEl.onclick = closeAddProfilesModal; }
 }
 
 // ==================== ACO EXPORT ====================
@@ -24743,6 +25616,7 @@ $('saveFlexBtn').addEventListener('click', saveFlexAsPng);
 $('flexDiscordBtn').addEventListener('click', flexToDiscord);
 $('syncAllBtn').addEventListener('click', syncAllAccounts);
 $('syncRecentBtn').addEventListener('click', syncRecentAll);
+loadRetailerFilter();
 $('exportBtn2').addEventListener('click', exportData);
 $('disconnectBtn').addEventListener('click', disconnectLicense);
 $('clearDataBtn').addEventListener('click', clearAllData);
@@ -24751,6 +25625,759 @@ $('importCsvBtn').addEventListener('click', triggerCsvImport);
 $('csvFileInput').addEventListener('change', e => { if (e.target.files[0]) handleCsvImport(e.target.files[0]); e.target.value = ''; });
 
 $('accountList').addEventListener('click', e => { const item = e.target.closest('.account-item'); if (!item) return; const id = item.dataset.id; if (e.target.closest('.test-btn')) testAccountConnection(id); if (e.target.closest('.log-btn')) showSyncLogModal(id); if (e.target.closest('.resume-btn')) resumePausedSync(id); if (e.target.closest('.sync-btn')) syncAccount(id); if (e.target.closest('.sync-pause-btn')) pauseSync(id); if (e.target.closest('.sync-stop-btn')) stopSync(id); if (e.target.closest('.edit-btn')) editAccountPassword(id); if (e.target.closest('.delete-btn')) deleteAccount(id); });
+// ==================== PROFILE PERFORMANCE ====================
+let ppData = null; // Cached performance data
+let ppSortKey = 'stickRate';
+let ppSortDir = 'desc';
+let ppExpandedRow = null;
+let _ppSearchTimer = null;
+let ppToggles = { address: true, card: true, email: true, billing: false };
+try { const saved = JSON.parse(localStorage.getItem('ppFilterToggles')); if (saved) ppToggles = { ...ppToggles, ...saved }; } catch(e) {}
+
+function togglePpFilter(key) {
+  ppToggles[key] = !ppToggles[key];
+  localStorage.setItem('ppFilterToggles', JSON.stringify(ppToggles));
+  // Update chip visual
+  document.querySelectorAll('.pp-toggle-chip').forEach(chip => {
+    if (chip.dataset.toggle === key) chip.classList.toggle('active', ppToggles[key]);
+  });
+  applyPpColumnVisibility();
+  renderProfilePerfTable();
+}
+
+function applyPpColumnVisibility() {
+  document.querySelectorAll('.pp-col-address').forEach(el => el.style.display = ppToggles.address ? '' : 'none');
+  document.querySelectorAll('.pp-col-card').forEach(el => el.style.display = ppToggles.card ? '' : 'none');
+  document.querySelectorAll('.pp-col-email').forEach(el => el.style.display = ppToggles.email ? '' : 'none');
+  document.querySelectorAll('.pp-col-billing').forEach(el => el.style.display = ppToggles.billing ? '' : 'none');
+}
+
+function initPpToggles() {
+  document.querySelectorAll('.pp-toggle-chip').forEach(chip => {
+    chip.classList.toggle('active', !!ppToggles[chip.dataset.toggle]);
+  });
+  applyPpColumnVisibility();
+}
+
+function debouncedProfilePerfSearch() {
+  if (_ppSearchTimer) clearTimeout(_ppSearchTimer);
+  _ppSearchTimer = setTimeout(() => renderProfilePerfTable(), 250);
+}
+
+async function renderProfilePerf() {
+  try {
+    await refreshPpGroupCache();
+    const result = await window.api.getProfilePerformance();
+    if (!result.success) { toast(result.error || 'Failed to load profile data', 'error'); return; }
+    ppData = result;
+
+    // Update import status
+    const statusEl = document.getElementById('ppImportStatus');
+    const clearBtn = document.getElementById('ppClearImportBtn');
+    const manageBtn = document.getElementById('ppManageGroupsBtn');
+    const emptyState = document.getElementById('ppEmptyState');
+    const groupCards = document.getElementById('ppGroupCards');
+    const tableCard = document.getElementById('ppTable')?.closest('.card');
+
+    if (result.totalProfiles > 0) {
+      const groupCount = result.groups ? result.groups.length : 0;
+      statusEl.textContent = `${result.totalProfiles} profiles imported (${groupCount} group${groupCount !== 1 ? 's' : ''})`;
+      statusEl.style.color = 'var(--green)';
+      clearBtn.style.display = '';
+      if (manageBtn) manageBtn.style.display = '';
+    } else {
+      statusEl.textContent = 'No profiles imported';
+      statusEl.style.color = 'var(--text-secondary)';
+      clearBtn.style.display = 'none';
+      if (manageBtn) manageBtn.style.display = 'none';
+    }
+
+    const hasData = result.profiles.length > 0 || (result.unmatched && result.unmatched.length > 0);
+    if (emptyState) emptyState.style.display = hasData ? 'none' : '';
+    if (groupCards) groupCards.style.display = hasData ? '' : 'none';
+    if (tableCard) tableCard.style.display = hasData ? '' : 'none';
+
+    if (hasData) {
+      initPpToggles();
+      renderProfilePerfGroupCards();
+      renderProfilePerfInsights();
+      renderProfilePerfTable();
+      renderProfilePerfUnmatched();
+    }
+  } catch (err) {
+    console.error('renderProfilePerf error:', err);
+    toast('Failed to load profile performance', 'error');
+  }
+}
+
+function renderProfilePerfGroupCards() {
+  const container = document.getElementById('ppGroupCards');
+  if (!container || !ppData || !ppData.groups || ppData.groups.length === 0) {
+    if (container) container.innerHTML = '';
+    return;
+  }
+  const currentFilter = (document.getElementById('ppSearchInput')?.value || '').toLowerCase();
+  container.innerHTML = ppData.groups.map(g => {
+    const stickColor = g.stickRate >= 80 ? 'var(--green)' : g.stickRate >= 60 ? 'var(--yellow)' : 'var(--red)';
+    const retailerLabel = g.topRetailer ? g.topRetailer.charAt(0).toUpperCase() + g.topRetailer.slice(1) : 'N/A';
+    const colorBar = g.color ? `<div class="pg-group-card-color-bar" style="background:${g.color};"></div>` : '';
+    const isActive = currentFilter === g.name.toLowerCase();
+    return `<div class="pp-group-card${isActive ? ' active' : ''}" onclick="filterProfilePerfByGroup('${escapeHtml(g.name)}')" style="${g.color ? 'border-left:3px solid ' + g.color + ';' : ''}">
+      ${colorBar}
+      <div class="pp-group-card-name">${escapeHtml(g.name)}</div>
+      <div class="pp-group-card-stats">
+        <div class="pp-group-stat">Profiles: <span>${g.profileCount}</span></div>
+        <div class="pp-group-stat">Orders: <span>${g.totalOrders}</span></div>
+        <div class="pp-group-stat">Stick Rate: <span style="color:${stickColor}">${g.stickRate}%</span></div>
+        <div class="pp-group-stat">Top: <span>${escapeHtml(retailerLabel)}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterProfilePerfByGroup(groupName) {
+  const searchEl = document.getElementById('ppSearchInput');
+  if (searchEl) {
+    searchEl.value = searchEl.value === groupName ? '' : groupName;
+    renderProfilePerfGroupCards();
+    renderProfilePerfTable();
+  }
+}
+
+function maskEmail(email) {
+  if (!email) return '';
+  const parts = email.split('@');
+  if (parts.length !== 2) return email;
+  const local = parts[0];
+  if (local.length <= 2) return local[0] + '***@' + parts[1];
+  return local[0] + '****' + local[local.length - 1] + '@' + parts[1];
+}
+
+function ppGetTier(stickRate, totalOrders) {
+  if (stickRate >= 100 && (totalOrders || 0) >= 3) return 'diamond';
+  if (stickRate >= 80) return 'perfect';
+  if (stickRate >= 60) return 'good';
+  if (stickRate >= 40) return 'okay';
+  return 'at-risk';
+}
+
+function ppTierBadge(tier) {
+  const labels = { diamond: 'Diamond', perfect: 'Perfect', good: 'Good', okay: 'Okay', 'at-risk': 'At Risk' };
+  return `<span class="pp-tier-badge pp-tier-${tier}">${labels[tier] || tier}</span>`;
+}
+
+function ppStickBar(rate) {
+  const color = rate >= 80 ? 'var(--green)' : rate >= 60 ? 'var(--yellow)' : rate >= 40 ? 'var(--orange)' : 'var(--red)';
+  return `<span class="pp-stick-bar"><span class="pp-stick-fill" style="width:${rate}%;background:${color}"></span></span>${rate}%`;
+}
+
+let _ppCachedGroups = [];
+async function refreshPpGroupCache() {
+  try {
+    const res = await window.api.getProfileGroups();
+    _ppCachedGroups = res.success ? res.groups : [];
+  } catch (e) { _ppCachedGroups = []; }
+}
+
+function buildGroupOptions(currentGroup) {
+  // Build unique group names from existing profile groups + auto-derived groups from ppData
+  const allGroupNames = new Set();
+  for (const g of _ppCachedGroups) allGroupNames.add(g.name);
+  if (ppData && ppData.groups) {
+    for (const g of ppData.groups) allGroupNames.add(g.name);
+  }
+  let html = `<option value="__auto__">Auto-detect</option>`;
+  for (const name of allGroupNames) {
+    const selected = name === currentGroup ? ' selected' : '';
+    html += `<option value="${escapeHtml(name)}"${selected}>${escapeHtml(name)}</option>`;
+  }
+  return html;
+}
+
+function sortProfilePerf(key) {
+  if (ppSortKey === key) {
+    ppSortDir = ppSortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    ppSortKey = key;
+    const ascKeys = ['name', 'group', 'email', 'topItem', 'cardType', 'bin', 'lastFour', 'state', 'city'];
+    ppSortDir = ascKeys.includes(key) ? 'asc' : 'desc';
+  }
+  renderProfilePerfTable();
+}
+
+function ppColCount() {
+  // Base columns: profile, group, orders, confirmed, stick rate, top item, tier = 7
+  let count = 7;
+  if (ppToggles.email) count++;
+  if (ppToggles.card) count += 3; // card type, bin, last 4
+  if (ppToggles.address) count += 2; // state, city
+  if (ppToggles.billing) count++;
+  return count;
+}
+
+function renderProfilePerfTable() {
+  const tbody = document.getElementById('ppTableBody');
+  if (!tbody || !ppData) return;
+
+  applyPpColumnVisibility();
+
+  let profiles = [...ppData.profiles];
+
+  // Search filter
+  const search = (document.getElementById('ppSearchInput')?.value || '').toLowerCase();
+  if (search) {
+    profiles = profiles.filter(p =>
+      p.name.toLowerCase().includes(search) ||
+      p.group.toLowerCase().includes(search) ||
+      p.email.toLowerCase().includes(search) ||
+      (p.bin || '').includes(search) ||
+      (p.lastFour || '').includes(search) ||
+      (p.state || '').toLowerCase().includes(search) ||
+      (p.city || '').toLowerCase().includes(search)
+    );
+  }
+
+  // Sort
+  profiles.sort((a, b) => {
+    let va, vb;
+    switch (ppSortKey) {
+      case 'name': va = a.name.toLowerCase(); vb = b.name.toLowerCase(); break;
+      case 'group': va = a.group.toLowerCase(); vb = b.group.toLowerCase(); break;
+      case 'email': va = a.email.toLowerCase(); vb = b.email.toLowerCase(); break;
+      case 'cardType': va = (a.cardType || '').toLowerCase(); vb = (b.cardType || '').toLowerCase(); break;
+      case 'bin': va = a.bin || ''; vb = b.bin || ''; break;
+      case 'lastFour': va = a.lastFour || ''; vb = b.lastFour || ''; break;
+      case 'state': va = (a.state || '').toLowerCase(); vb = (b.state || '').toLowerCase(); break;
+      case 'city': va = (a.city || '').toLowerCase(); vb = (b.city || '').toLowerCase(); break;
+      case 'sameBillingShipping': va = a.sameBillingShipping ? 1 : 0; vb = b.sameBillingShipping ? 1 : 0; break;
+      case 'orders': va = a.totalOrders; vb = b.totalOrders; break;
+      case 'confirmed': va = a.confirmedCount; vb = b.confirmedCount; break;
+      case 'stickRate': va = a.stickRate; vb = b.stickRate; break;
+      case 'topItem': va = (a.topItem || '').toLowerCase(); vb = (b.topItem || '').toLowerCase(); break;
+      case 'tier': {
+        const order = { diamond: 5, perfect: 4, good: 3, okay: 2, 'at-risk': 1 };
+        va = order[ppGetTier(a.stickRate, a.totalOrders)] || 0;
+        vb = order[ppGetTier(b.stickRate, b.totalOrders)] || 0;
+        break;
+      }
+      default: va = a.stickRate; vb = b.stickRate;
+    }
+    if (typeof va === 'string') {
+      const cmp = va.localeCompare(vb);
+      return ppSortDir === 'asc' ? cmp : -cmp;
+    }
+    return ppSortDir === 'asc' ? va - vb : vb - va;
+  });
+
+  // Update sort arrows
+  document.querySelectorAll('.pp-th').forEach(th => {
+    const key = th.dataset.sort;
+    const arrow = th.querySelector('.pp-sort-arrow');
+    if (key === ppSortKey) {
+      th.classList.add('sorted');
+      if (arrow) arrow.textContent = ppSortDir === 'asc' ? '\u25B2' : '\u25BC';
+    } else {
+      th.classList.remove('sorted');
+      if (arrow) arrow.textContent = '';
+    }
+  });
+
+  const colspan = ppColCount();
+
+  if (profiles.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:32px;color:var(--text-muted);font-size:13px;">${search ? 'No profiles match your search' : 'No profile data available'}</td></tr>`;
+    return;
+  }
+
+  const showEmail = ppToggles.email;
+  const showCard = ppToggles.card;
+  const showAddr = ppToggles.address;
+  const showBilling = ppToggles.billing;
+
+  let html = '';
+  for (const p of profiles) {
+    const tier = ppGetTier(p.stickRate, p.totalOrders);
+    const isExpanded = ppExpandedRow === p.name;
+    html += `<tr class="pp-row${isExpanded ? ' active' : ''}" onclick="toggleProfilePerfRow('${escapeHtml(p.name).replace(/'/g, "\\'")}')">
+      <td style="font-weight:600;color:var(--text-primary);">${escapeHtml(p.name)}</td>
+      <td style="color:var(--text-secondary);">${escapeHtml(p.group)}</td>`;
+    if (showEmail) html += `<td class="pp-col-email"><span class="pp-email-masked">${escapeHtml(maskEmail(p.email))}</span></td>`;
+    if (showCard) {
+      html += `<td class="pp-col-card" style="color:var(--text-secondary);">${escapeHtml(p.cardType || 'N/A')}</td>`;
+      html += `<td class="pp-col-card" style="font-family:'Roboto Mono',monospace;font-size:12px;color:var(--text-muted);">${escapeHtml(p.bin || '-')}</td>`;
+      html += `<td class="pp-col-card" style="font-family:'Roboto Mono',monospace;font-size:12px;color:var(--text-muted);">${escapeHtml(p.lastFour || '-')}</td>`;
+    }
+    if (showAddr) {
+      html += `<td class="pp-col-address" style="color:var(--text-secondary);font-size:12px;">${escapeHtml(p.state || '-')}</td>`;
+      html += `<td class="pp-col-address" style="color:var(--text-secondary);font-size:12px;">${escapeHtml(p.city || '-')}</td>`;
+    }
+    if (showBilling) {
+      const icon = p.sameBillingShipping ? '<span style="color:var(--green);">Yes</span>' : '<span style="color:var(--orange);">No</span>';
+      html += `<td class="pp-col-billing">${icon}</td>`;
+    }
+    html += `<td style="font-weight:600;">${p.totalOrders}</td>
+      <td style="color:var(--green);font-weight:600;">${p.confirmedCount}</td>
+      <td>${ppStickBar(p.stickRate)}</td>
+      <td style="color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(p.topItem || '')}">${escapeHtml(p.topItem || 'N/A')}</td>
+      <td>${ppTierBadge(tier)}</td>
+    </tr>`;
+
+    if (isExpanded) {
+      html += `<tr class="pp-row-expanded"><td colspan="${colspan}">${buildProfilePerfDetail(p)}</td></tr>`;
+    }
+  }
+  tbody.innerHTML = html;
+}
+
+function toggleProfilePerfRow(profileName) {
+  ppExpandedRow = ppExpandedRow === profileName ? null : profileName;
+  renderProfilePerfTable();
+}
+
+function buildProfilePerfDetail(p) {
+  let retailerRows = '';
+  if (p.retailers && Object.keys(p.retailers).length > 0) {
+    for (const [r, data] of Object.entries(p.retailers)) {
+      const rStick = data.total > 0 ? Math.round((data.confirmed / data.total) * 100) : 0;
+      retailerRows += `<div class="pp-detail-row"><span>${r.charAt(0).toUpperCase() + r.slice(1)}</span><span>${data.confirmed}/${data.total} (${rStick}%) - $${data.amount.toFixed(2)}</span></div>`;
+    }
+  } else {
+    retailerRows = '<div class="pp-detail-row"><span style="color:var(--text-muted);">No orders yet</span><span></span></div>';
+  }
+
+  let itemRows = '';
+  if (p.items && Object.keys(p.items).length > 0) {
+    const sorted = Object.entries(p.items).sort((a, b) => b[1].count - a[1].count).slice(0, 8);
+    for (const [item, data] of sorted) {
+      itemRows += `<div class="pp-detail-row"><span style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(item)}">${escapeHtml(item)}</span><span>${data.confirmed}/${data.count} - $${data.amount.toFixed(2)}</span></div>`;
+    }
+  } else {
+    itemRows = '<div class="pp-detail-row"><span style="color:var(--text-muted);">No items yet</span><span></span></div>';
+  }
+
+  const dateRange = p.firstOrder && p.lastOrder
+    ? `${p.firstOrder} - ${p.lastOrder}`
+    : p.firstOrder || 'No orders';
+
+  // Shipping address differs?
+  const shippingDiffers = !p.sameBillingShipping && (p.shippingCity || p.shippingState);
+  const shippingLine = shippingDiffers ? `<div class="pp-detail-row"><span>Shipping</span><span>${escapeHtml([p.shippingCity, p.shippingState].filter(Boolean).join(', '))}</span></div>` : '';
+  const billingShipLabel = p.sameBillingShipping ? '<span style="color:var(--green);">Yes</span>' : '<span style="color:var(--orange);">No</span>';
+
+  return `<div class="pp-detail-grid">
+    <div class="pp-detail-section">
+      <div class="pp-detail-title">Retailer Breakdown</div>
+      ${retailerRows}
+    </div>
+    <div class="pp-detail-section">
+      <div class="pp-detail-title">Top Items</div>
+      ${itemRows}
+    </div>
+    <div class="pp-detail-section">
+      <div class="pp-detail-title">Profile Info</div>
+      <div class="pp-detail-row"><span>Group</span><span>${escapeHtml(p.group)} <select class="pp-group-reassign" onchange="reassignProfileGroup('${escapeHtml(p.name).replace(/'/g, "\\'")}', this.value)" onclick="event.stopPropagation();">${buildGroupOptions(p.group)}</select></span></div>
+      <div class="pp-detail-row"><span>Email</span><span>${escapeHtml(p.email || 'N/A')}</span></div>
+      <div class="pp-detail-row"><span>Email Domain</span><span>${escapeHtml(p.emailDomain || 'N/A')}</span></div>
+      <div class="pp-detail-row"><span>Location</span><span>${escapeHtml([p.city, p.state].filter(Boolean).join(', ') || 'N/A')}</span></div>
+      <div class="pp-detail-row"><span>Card Type</span><span>${escapeHtml(p.cardType || 'N/A')}</span></div>
+      <div class="pp-detail-row"><span>BIN (First 6)</span><span style="font-family:'Roboto Mono',monospace;">${escapeHtml(p.bin || 'N/A')}</span></div>
+      <div class="pp-detail-row"><span>Last 4</span><span style="font-family:'Roboto Mono',monospace;">${escapeHtml(p.lastFour || 'N/A')}</span></div>
+      <div class="pp-detail-row"><span>Billing = Shipping</span><span>${billingShipLabel}</span></div>
+      ${shippingLine}
+      <div class="pp-detail-row"><span>Total Qty</span><span>${p.totalQty}</span></div>
+      <div class="pp-detail-row"><span>Total Amount</span><span>$${p.totalAmount.toFixed(2)}</span></div>
+    </div>
+    <div class="pp-detail-section">
+      <div class="pp-detail-title">Timeline</div>
+      <div class="pp-detail-row"><span>Date Range</span><span>${dateRange}</span></div>
+      <div class="pp-detail-row"><span>Cancelled/Declined</span><span style="color:var(--red);">${p.cancelledCount}</span></div>
+    </div>
+  </div>`;
+}
+
+function renderProfilePerfUnmatched() {
+  const section = document.getElementById('ppUnmatchedSection');
+  const list = document.getElementById('ppUnmatchedList');
+  if (!section || !list || !ppData) return;
+
+  if (!ppData.unmatched || ppData.unmatched.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = '';
+  list.innerHTML = ppData.unmatched.map(u =>
+    `<span class="pp-unmatched-chip">${escapeHtml(u.name)} <span style="color:var(--text-muted);font-size:11px;">(${u.totalOrders} orders, ${u.stickRate}%)</span></span>`
+  ).join('');
+}
+
+let ppInsightCollapsed = {};
+try { const s = JSON.parse(localStorage.getItem('ppInsightCollapsed')); if (s) ppInsightCollapsed = s; } catch(e) {}
+
+function togglePpInsight(key) {
+  ppInsightCollapsed[key] = !ppInsightCollapsed[key];
+  localStorage.setItem('ppInsightCollapsed', JSON.stringify(ppInsightCollapsed));
+  renderProfilePerfInsights();
+}
+
+function ppInsightStickColor(rate) {
+  return rate >= 80 ? 'var(--green)' : rate >= 60 ? 'var(--yellow)' : rate >= 40 ? 'var(--orange)' : 'var(--red)';
+}
+
+function renderProfilePerfInsights() {
+  const section = document.getElementById('ppInsightsSection');
+  const grid = document.getElementById('ppInsightsGrid');
+  if (!section || !grid || !ppData || !ppData.analytics) { if (section) section.style.display = 'none'; return; }
+
+  const a = ppData.analytics;
+  const hasData = (a.topBins && a.topBins.length > 0) || (a.topDomains && a.topDomains.length > 0) || (a.topStates && a.topStates.length > 0);
+  if (!hasData && a.billingShipping.same.total === 0 && a.billingShipping.different.total === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+
+  function buildInsightCard(key, title, items, extraHtml) {
+    const collapsed = !!ppInsightCollapsed[key];
+    const toggleIcon = collapsed ? 'collapsed' : '';
+    let bodyHtml = '';
+    if (!collapsed) {
+      if (items && items.length > 0) {
+        bodyHtml = `<div class="pp-insight-body">${items.slice(0, 8).map(item =>
+          `<div class="pp-insight-row">
+            <span class="pp-insight-key">${escapeHtml(item.key)}${item.cardType ? `<span class="pp-insight-meta">${escapeHtml(item.cardType)}</span>` : ''}</span>
+            <span class="pp-insight-val" style="color:${ppInsightStickColor(item.stickRate)}">${item.stickRate}%<span class="pp-insight-meta">(${item.confirmed}/${item.total})</span></span>
+          </div>`
+        ).join('')}</div>`;
+      } else if (extraHtml) {
+        bodyHtml = `<div class="pp-insight-body">${extraHtml}</div>`;
+      } else {
+        bodyHtml = `<div class="pp-insight-body"><div style="font-size:12px;color:var(--text-muted);padding:4px 0;">Not enough data (min 3 orders)</div></div>`;
+      }
+    }
+    return `<div class="pp-insight-card">
+      <div class="pp-insight-header" onclick="togglePpInsight('${key}')">
+        <span class="pp-insight-header-title">${title}</span>
+        <span class="pp-insight-header-toggle ${toggleIcon}">\u25BC</span>
+      </div>
+      ${bodyHtml}
+    </div>`;
+  }
+
+  let cards = '';
+
+  // Top BINs
+  cards += buildInsightCard('bins', 'Top BINs by Stick Rate', a.topBins);
+
+  // Email Domains
+  cards += buildInsightCard('domains', 'Email Domains', a.topDomains);
+
+  // Best Regions (states)
+  cards += buildInsightCard('states', 'Best Regions (States)', a.topStates);
+
+  // Billing = Shipping correlation
+  const bs = a.billingShipping;
+  let bsHtml = '';
+  if (bs.same.total > 0 || bs.different.total > 0) {
+    bsHtml = `<div class="pp-billing-compare">
+      <div class="pp-billing-box">
+        <div class="pp-billing-box-label">Same Address</div>
+        <div class="pp-billing-box-val" style="color:${ppInsightStickColor(bs.same.stickRate)}">${bs.same.stickRate}%</div>
+        <div style="font-size:11px;color:var(--text-muted);">${bs.same.confirmed}/${bs.same.total} orders</div>
+      </div>
+      <div class="pp-billing-box">
+        <div class="pp-billing-box-label">Different Address</div>
+        <div class="pp-billing-box-val" style="color:${ppInsightStickColor(bs.different.stickRate)}">${bs.different.stickRate}%</div>
+        <div style="font-size:11px;color:var(--text-muted);">${bs.different.confirmed}/${bs.different.total} orders</div>
+      </div>
+    </div>`;
+  }
+  cards += buildInsightCard('billing', 'Billing vs Shipping Address', null, bsHtml);
+
+  // Top Cities (if we have them)
+  if (a.topCities && a.topCities.length > 0) {
+    cards += buildInsightCard('cities', 'Top Cities', a.topCities);
+  }
+
+  grid.innerHTML = cards;
+}
+
+// ==================== PROFILE GROUP MANAGEMENT ====================
+const PG_PRESET_COLORS = ['#57F287','#818cf8','#ED4245','#FEE75C','#EB459E','#3B82F6','#F97316','#06B6D4','#A855F7','#10B981'];
+let _pgSelectedImportGroup = '__auto__';
+let _pgSelectedColor = PG_PRESET_COLORS[0];
+let _pgManageSelectedColor = PG_PRESET_COLORS[0];
+
+function renderColorPicker(containerId, selectedColor, onClickFn) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = PG_PRESET_COLORS.map(c =>
+    `<div class="pg-color-swatch${c === selectedColor ? ' selected' : ''}" style="background:${c};" onclick="${onClickFn}('${c}')"></div>`
+  ).join('');
+}
+
+function selectPgNewColor(color) {
+  _pgSelectedColor = color;
+  renderColorPicker('pgNewGroupColorPicker', _pgSelectedColor, 'selectPgNewColor');
+}
+
+function selectPgManageColor(color) {
+  _pgManageSelectedColor = color;
+  renderColorPicker('pgManageColorPicker', _pgManageSelectedColor, 'selectPgManageColor');
+}
+
+function selectPgImportGroup(groupId) {
+  _pgSelectedImportGroup = groupId;
+  document.querySelectorAll('#ppGroupSelectModal .pg-group-option').forEach(el => {
+    el.classList.toggle('selected', el.dataset.groupId === groupId);
+  });
+  const newFields = document.getElementById('pgNewGroupFields');
+  if (newFields) {
+    newFields.style.display = groupId === '__new__' ? '' : 'none';
+    if (groupId === '__new__') {
+      setTimeout(() => document.getElementById('pgNewGroupName')?.focus(), 50);
+    }
+  }
+}
+
+async function showGroupSelectModal() {
+  _pgSelectedImportGroup = '__auto__';
+  _pgSelectedColor = PG_PRESET_COLORS[0];
+  const modal = document.getElementById('ppGroupSelectModal');
+  const listEl = document.getElementById('pgGroupSelectList');
+  if (!modal || !listEl) return;
+
+  // Load existing groups
+  try {
+    const res = await window.api.getProfileGroups();
+    const groups = res.success ? res.groups : [];
+    if (groups.length > 0) {
+      listEl.innerHTML = groups.map(g =>
+        `<div class="pg-group-option" onclick="selectPgImportGroup('${escapeHtml(g.name)}')" data-group-id="${escapeHtml(g.name)}">
+          <div class="pg-group-dot" style="background:${g.color || '#57F287'};"></div>
+          <div class="pg-group-label">${escapeHtml(g.name)}</div>
+        </div>`
+      ).join('');
+    } else {
+      listEl.innerHTML = '';
+    }
+  } catch (e) {
+    listEl.innerHTML = '';
+  }
+
+  renderColorPicker('pgNewGroupColorPicker', _pgSelectedColor, 'selectPgNewColor');
+  const nameInput = document.getElementById('pgNewGroupName');
+  if (nameInput) nameInput.value = '';
+  document.getElementById('pgNewGroupFields').style.display = 'none';
+
+  // Mark auto-detect as selected
+  document.querySelectorAll('#ppGroupSelectModal .pg-group-option').forEach(el => {
+    el.classList.toggle('selected', el.dataset.groupId === '__auto__');
+  });
+
+  modal.classList.add('show');
+}
+
+function closePpGroupSelectModal() {
+  document.getElementById('ppGroupSelectModal')?.classList.remove('show');
+}
+
+async function continuePgImport() {
+  let groupName = null;
+
+  if (_pgSelectedImportGroup === '__new__') {
+    const nameInput = document.getElementById('pgNewGroupName');
+    const newName = (nameInput?.value || '').trim();
+    if (!newName) { toast('Please enter a group name', 'info'); return; }
+    groupName = newName;
+    // Create group with selected color
+    try {
+      const createRes = await window.api.createProfileGroup({ name: newName, color: _pgSelectedColor });
+      if (!createRes.success && createRes.error !== 'A group with that name already exists') {
+        toast(createRes.error || 'Failed to create group', 'error');
+        return;
+      }
+    } catch (e) {
+      toast('Failed to create group', 'error');
+      return;
+    }
+  } else if (_pgSelectedImportGroup !== '__auto__') {
+    groupName = _pgSelectedImportGroup;
+  }
+
+  closePpGroupSelectModal();
+
+  try {
+    const result = await window.api.importAycdProfiles(groupName ? { groupName } : {});
+    if (!result.success) {
+      if (result.error === 'cancelled') return;
+      toast(result.error || 'Import failed', 'error');
+      return;
+    }
+    toast(`Imported ${result.total} profiles (${result.groups} group${result.groups !== 1 ? 's' : ''})`, 'success');
+    renderProfilePerf();
+  } catch (err) {
+    toast('Import failed: ' + err.message, 'error');
+  }
+}
+
+async function importAycdProfiles() {
+  await showGroupSelectModal();
+}
+
+async function clearAycdProfilesConfirm() {
+  if (!confirm('Clear all imported AYCD profiles? This cannot be undone.')) return;
+  try {
+    const result = await window.api.clearAycdProfiles();
+    if (result.success) {
+      toast('AYCD profiles cleared', 'success');
+      ppData = null;
+      renderProfilePerf();
+    } else {
+      toast(result.error || 'Failed to clear', 'error');
+    }
+  } catch (err) {
+    toast('Failed to clear: ' + err.message, 'error');
+  }
+}
+
+// ==================== MANAGE GROUPS MODAL ====================
+
+async function showManageGroupsModal() {
+  const modal = document.getElementById('ppManageGroupsModal');
+  if (!modal) return;
+  _pgManageSelectedColor = PG_PRESET_COLORS[0];
+  renderColorPicker('pgManageColorPicker', _pgManageSelectedColor, 'selectPgManageColor');
+  const nameInput = document.getElementById('pgManageNewName');
+  if (nameInput) nameInput.value = '';
+  await renderManageGroupList();
+  modal.classList.add('show');
+}
+
+function closeManageGroupsModal() {
+  document.getElementById('ppManageGroupsModal')?.classList.remove('show');
+}
+
+async function renderManageGroupList() {
+  const listEl = document.getElementById('pgManageGroupList');
+  const emptyEl = document.getElementById('pgManageEmpty');
+  if (!listEl) return;
+
+  try {
+    const res = await window.api.getProfileGroups();
+    const groups = res.success ? res.groups : [];
+
+    // Count profiles per group
+    const profileCounts = {};
+    if (ppData && ppData.profiles) {
+      for (const p of ppData.profiles) {
+        profileCounts[p.group] = (profileCounts[p.group] || 0) + 1;
+      }
+    }
+
+    if (groups.length === 0) {
+      listEl.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = '';
+      return;
+    }
+
+    if (emptyEl) emptyEl.style.display = 'none';
+    listEl.innerHTML = groups.map(g => {
+      const count = profileCounts[g.name] || 0;
+      return `<div class="pg-manage-row" data-group-id="${g.id}">
+        <div class="pg-group-dot" style="background:${g.color || '#57F287'};"></div>
+        <div class="pg-group-label">${escapeHtml(g.name)}</div>
+        <div class="pg-group-count">${count} profile${count !== 1 ? 's' : ''}</div>
+        <div class="pg-manage-actions">
+          <button class="btn btn-secondary btn-sm" onclick="editProfileGroup('${g.id}','${escapeHtml(g.name).replace(/'/g, "\\'")}','${g.color}')">Edit</button>
+          <button class="btn btn-secondary btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteProfileGroup('${g.id}','${escapeHtml(g.name).replace(/'/g, "\\'")}')">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="color:var(--red);font-size:13px;">Failed to load groups</div>';
+  }
+}
+
+async function createGroupFromManage() {
+  const nameInput = document.getElementById('pgManageNewName');
+  const name = (nameInput?.value || '').trim();
+  if (!name) { toast('Enter a group name', 'info'); return; }
+
+  try {
+    const res = await window.api.createProfileGroup({ name, color: _pgManageSelectedColor });
+    if (!res.success) { toast(res.error || 'Failed to create group', 'error'); return; }
+    toast(`Group "${name}" created`, 'success');
+    if (nameInput) nameInput.value = '';
+    _pgManageSelectedColor = PG_PRESET_COLORS[0];
+    renderColorPicker('pgManageColorPicker', _pgManageSelectedColor, 'selectPgManageColor');
+    await renderManageGroupList();
+    renderProfilePerf();
+  } catch (e) {
+    toast('Failed to create group', 'error');
+  }
+}
+
+async function editProfileGroup(id, currentName, currentColor) {
+  const newName = prompt('Rename group:', currentName);
+  if (newName === null) return;
+  const trimmed = newName.trim();
+  if (!trimmed) { toast('Group name cannot be empty', 'info'); return; }
+
+  try {
+    const res = await window.api.updateProfileGroup({ id, name: trimmed });
+    if (!res.success) { toast(res.error || 'Failed to update group', 'error'); return; }
+    toast(`Group renamed to "${trimmed}"`, 'success');
+    await renderManageGroupList();
+    renderProfilePerf();
+  } catch (e) {
+    toast('Failed to update group', 'error');
+  }
+}
+
+async function deleteProfileGroup(id, name) {
+  if (!confirm(`Delete group "${name}"? Profiles in this group will revert to auto-detected grouping.`)) return;
+  try {
+    const res = await window.api.deleteProfileGroup({ id });
+    if (!res.success) { toast(res.error || 'Failed to delete group', 'error'); return; }
+    toast(`Group "${name}" deleted`, 'success');
+    await renderManageGroupList();
+    renderProfilePerf();
+  } catch (e) {
+    toast('Failed to delete group', 'error');
+  }
+}
+
+async function reassignProfileGroup(profileName, newGroupName) {
+  try {
+    const res = await window.api.reassignProfileGroup({ profileName, groupName: newGroupName === '__auto__' ? '' : newGroupName });
+    if (!res.success) { toast(res.error || 'Failed to reassign', 'error'); return; }
+    toast(`Profile moved to "${newGroupName === '__auto__' ? 'auto-detect' : newGroupName}"`, 'success');
+    renderProfilePerf();
+  } catch (e) {
+    toast('Failed to reassign profile', 'error');
+  }
+}
+
+async function exportProfilePerformance() {
+  if (!ppData || !ppData.profiles || ppData.profiles.length === 0) {
+    toast('No profile data to export', 'info');
+    return;
+  }
+  const headers = ['Profile Name', 'Group', 'Email', 'Email Domain', 'Card Type', 'BIN', 'Last 4', 'State', 'City', 'Billing=Shipping', 'Orders', 'Confirmed', 'Cancelled', 'Stick Rate', 'Total Qty', 'Total Amount', 'Top Retailer', 'Top Item', 'Tier', 'First Order', 'Last Order'];
+  const rows = ppData.profiles.map(p => {
+    const tier = ppGetTier(p.stickRate, p.totalOrders);
+    return [p.name, p.group, maskEmail(p.email), p.emailDomain || '', p.cardType || '', p.bin || '', p.lastFour || '', p.state || '', p.city || '', p.sameBillingShipping ? 'Yes' : 'No', p.totalOrders, p.confirmedCount, p.cancelledCount, p.stickRate + '%', p.totalQty, '$' + p.totalAmount.toFixed(2), p.topRetailer || '', p.topItem || '', tier, p.firstOrder || '', p.lastOrder || ''];
+  });
+  const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
+  try {
+    await window.api.saveTextFile(csv, 'profile-performance.csv');
+    toast('Exported profile performance CSV', 'success');
+  } catch (err) {
+    toast('Export failed', 'error');
+  }
+}
+
 document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => showPage(n.dataset.page)));
 document.querySelectorAll('.retailer-card').forEach(c => c.addEventListener('click', () => showPage(c.dataset.retailer)));
 
@@ -25305,5 +26932,64 @@ init();
     </div>
   </div>
 </div>
+<!-- Group Selection Modal (shown on AYCD import) -->
+<div id="ppGroupSelectModal" class="modal-overlay" onclick="if(event.target===this) closePpGroupSelectModal()">
+  <div class="modal-content" style="max-width:480px;">
+    <div class="modal-header">
+      <h2>Select Group for Import</h2>
+      <button class="modal-close" onclick="closePpGroupSelectModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px;">
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Choose which group to assign these profiles to, or create a new group.</div>
+      <div id="pgGroupSelectList"></div>
+      <div class="pg-group-option" onclick="selectPgImportGroup('__auto__')" data-group-id="__auto__">
+        <div class="pg-group-dot" style="background:var(--text-muted);"></div>
+        <div class="pg-group-label">Auto-detect from name</div>
+        <div class="pg-group-count" style="font-style:italic;">e.g. "BRMA 1" -> BRMA</div>
+      </div>
+      <div class="pg-group-option" onclick="selectPgImportGroup('__new__')" data-group-id="__new__">
+        <div class="pg-group-dot" style="background:var(--accent);"></div>
+        <div class="pg-group-label">+ Create New Group</div>
+      </div>
+      <div id="pgNewGroupFields" style="display:none;padding:12px 16px;background:var(--bg-tertiary);border-radius:var(--radius-md);margin-top:8px;">
+        <div class="pg-new-group-row">
+          <input type="text" id="pgNewGroupName" class="form-input" placeholder="Group name..." style="flex:1;height:34px;font-size:13px;" maxlength="40">
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:8px;margin-bottom:4px;">Color</div>
+        <div class="pg-color-picker" id="pgNewGroupColorPicker"></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="padding:16px 24px;border-top:1px solid var(--border);">
+      <button class="btn btn-secondary" onclick="closePpGroupSelectModal()">Cancel</button>
+      <button class="btn btn-primary" id="pgContinueImportBtn" onclick="continuePgImport()">Continue Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Groups Modal -->
+<div id="ppManageGroupsModal" class="modal-overlay" onclick="if(event.target===this) closeManageGroupsModal()">
+  <div class="modal-content" style="max-width:520px;">
+    <div class="modal-header">
+      <h2>Manage Profile Groups</h2>
+      <button class="modal-close" onclick="closeManageGroupsModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px;max-height:60vh;overflow-y:auto;">
+      <div id="pgManageGroupList"></div>
+      <div id="pgManageEmpty" style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No custom groups created yet.</div>
+      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">Create New Group</div>
+        <div class="pg-new-group-row">
+          <input type="text" id="pgManageNewName" class="form-input" placeholder="Group name..." style="flex:1;height:34px;font-size:13px;" maxlength="40">
+          <div class="pg-color-picker" id="pgManageColorPicker" style="margin-top:0;"></div>
+          <button class="btn btn-primary btn-sm" onclick="createGroupFromManage()">Add</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="padding:16px 24px;border-top:1px solid var(--border);">
+      <button class="btn btn-secondary" onclick="closeManageGroupsModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

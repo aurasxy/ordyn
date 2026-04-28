@@ -1593,7 +1593,11 @@ function extractTrackingNumber(content) {
   if (!content) return null;
 
   // Phase 0: Extract tracking from carrier/tracking URLs (highest confidence — the URL IS the tracking)
+  // Walmart wraps carrier links through w-mt.co/...clickTracker?redirectTo=<encrypted>; the visible
+  // anchor text is the bare tracking number. Match anchor-text first, then fall back to bare domain.
   const urlPatterns = [
+    /<a[^>]+clickTracker[^>]*>\s*([A-Z0-9]{10,30})\s*<\/a>/i,      // Walmart clickTracker anchor text (current format)
+    /<a[^>]+w-mt\.co[^>]*>\s*([A-Z0-9]{10,30})\s*<\/a>/i,          // Walmart w-mt.co anchor text (fallback if path changes)
     /narvar\.com[^"']*tracking_numbers=([A-Z0-9]{10,30})/i,        // Narvar tracking URL (Pokemon Center ships FedEx via Narvar wrapper)
     /fedextrack[^"']*trknbr=(\d{12,15})/i,                         // FedEx tracking URL
     /fedex\.com[^"']*tracknumbers=(\d{12,15})/i,                   // FedEx alt URL
@@ -10235,7 +10239,10 @@ ipcMain.handle('send-discord-webhook', async (_, payload) => {
           }, (res) => {
             let data = '';
             res.on('data', chunk => data += chunk);
-            res.on('end', () => resolve({ success: res.statusCode >= 200 && res.statusCode < 300, statusCode: res.statusCode }));
+            res.on('end', () => {
+              const ok = res.statusCode >= 200 && res.statusCode < 300;
+              resolve({ success: ok, statusCode: res.statusCode, error: ok ? null : data });
+            });
           });
           req.on('error', (e) => resolve({ success: false, error: e.message }));
           req.setTimeout(10000, () => { req.destroy(); resolve({ success: false, error: 'Timeout' }); });
@@ -10306,7 +10313,10 @@ ipcMain.handle('send-discord-webhook', async (_, payload) => {
         }, (res) => {
           let data = '';
           res.on('data', chunk => data += chunk);
-          res.on('end', () => resolve({ success: res.statusCode >= 200 && res.statusCode < 300, statusCode: res.statusCode }));
+          res.on('end', () => {
+              const ok = res.statusCode >= 200 && res.statusCode < 300;
+              resolve({ success: ok, statusCode: res.statusCode, error: ok ? null : data });
+            });
         });
         req.on('error', (e) => resolve({ success: false, error: e.message }));
         req.setTimeout(30000, () => { req.destroy(); resolve({ success: false, error: 'Timeout' }); });
@@ -11190,7 +11200,12 @@ async function sendWebhookJson(webhookUrl, payload, retries = 3) {
             retryAfter = parseFloat(res.headers['retry-after'] || '0');
             try { const parsed = JSON.parse(data); if (parsed.retry_after) retryAfter = parsed.retry_after; } catch {}
           }
-          resolve({ success: res.statusCode >= 200 && res.statusCode < 300, statusCode: res.statusCode, retryAfter });
+          const ok = res.statusCode >= 200 && res.statusCode < 300;
+          let error = null;
+          if (!ok && res.statusCode !== 429) {
+            try { error = data; } catch {}
+          }
+          resolve({ success: ok, statusCode: res.statusCode, retryAfter, error });
         });
       });
       req.on('error', (e) => resolve({ success: false, error: e.message }));

@@ -63,6 +63,10 @@ jobs:
         run: npx electron-builder --mac --${{ matrix.arch }} --publish always
 
       - name: Upload artifact
+        # Non-blocking: the real deliverable is the published GitHub Release
+        # (read by electron-updater). This step is just a convenience copy and
+        # can hit GitHub's artifact storage quota — don't fail the release over it.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: mac-${{ matrix.arch }}
@@ -94,6 +98,8 @@ jobs:
         run: npx electron-builder --win --x64 --publish always
 
       - name: Upload artifact
+        # Non-blocking — see note on the macOS job's upload step.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64

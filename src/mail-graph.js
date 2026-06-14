@@ -46,9 +46,45 @@ const SELECT_FIELDS = [
 // ---------------------------------------------------------------------------
 // Adapter: Graph message JSON  →  the shape your parsers consume
 // ---------------------------------------------------------------------------
+// Convert an HTML body to a plain-text approximation, the way mailparser's
+// simpleParser() populates `parsed.text`. SOLUS's retailer parsers (amount,
+// item, address extraction) match against the plain-text body where a label
+// and its value sit adjacent (e.g. "Order total $100.25"). In raw HTML those
+// are split across tags, so without this the regexes miss and amounts come
+// back as $0 for Graph-synced (Outlook) orders.
+function htmlToPlainText(html) {
+  if (!html) return '';
+  return html
+    // Drop non-content blocks entirely
+    .replace(/<\s*(script|style|head)[^>]*>[\s\S]*?<\/\s*\1\s*>/gi, ' ')
+    // Line breaks for <br> and block-level closers so label/value stay adjacent
+    .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+    .replace(/<\s*\/\s*(p|div|tr|table|td|th|li|ul|ol|h[1-6]|span)\s*>/gi, '\n')
+    // Strip all remaining tags
+    .replace(/<[^>]+>/g, ' ')
+    // Decode the common HTML entities retailers use
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0*39;|&apos;/gi, "'")
+    .replace(/&#0*([0-9]+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    // Collapse whitespace (keep newlines)
+    .replace(/[ \t\f\v]+/g, ' ')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+}
+
 function adaptGraphMessage(msg) {
   const bodyType = msg.body?.contentType?.toLowerCase() || '';
   const bodyContent = msg.body?.content || '';
+  const isHtml = bodyType !== 'text'; // Graph returns 'html' or 'text'; default to html
+  // Populate BOTH a plain-text body (for label/value-adjacent regexes) and the
+  // raw HTML (for parsers that scrape tags/attributes like image alt text).
+  const textBody = isHtml ? htmlToPlainText(bodyContent) : bodyContent;
+  const htmlBody = isHtml ? bodyContent : '';
   return {
     // What mailparser's `simpleParser()` returns — your existing parsers
     // already destructure exactly these fields.
@@ -69,8 +105,8 @@ function adaptGraphMessage(msg) {
       text: (msg.toRecipients || []).map((r) => r.emailAddress?.address).join(', '),
     },
     date: new Date(msg.receivedDateTime),
-    text: bodyType === 'text' ? bodyContent : '',
-    html: bodyType === 'html' ? bodyContent : '',
+    text: textBody,
+    html: htmlBody,
     messageId: msg.internetMessageId || msg.id,
     // SOLUS-internal extras
     _graphId: msg.id,

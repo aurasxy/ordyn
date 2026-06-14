@@ -14208,10 +14208,15 @@ function getBaseAddress(fullAddress) {
     .replace(/\bplace\b/gi, 'pl')
     .replace(/\bterrace\b/gi, 'ter');
 
-  // Step 4: Remove letter suffix from street number if followed by street name
-  // "474a main st" → "474 main st"
-  // Matches: [digits][letter] [word] [st|ave|rd|etc]
-  streetAddress = streetAddress.replace(/^(\d+)[a-z]\s+/i, '$1 ');
+  // Step 4: Remove letter suffix from street number if followed by street name.
+  // Handles both attached and hyphenated jig formats:
+  //   "474a main st"  → "474 main st"
+  //   "474-m main st" → "474 main st"   (hyphenated suffix is the common jig)
+  //   "3109-h matrix way" / "3109-i matrix way" → "3109 matrix way" (group together)
+  // Single letter only (so ordinals like "100th ave" survive) and a separator/
+  // attachment is required (so space-separated directionals like "325 w main"
+  // are NOT treated as a suffix).
+  streetAddress = streetAddress.replace(/^(\d+)-?[a-z]\s+/i, '$1 ');
 
   // Step 5: Remove room/floor/unit designations and EVERYTHING AFTER THEM
   // This handles: "499 Lake St Rm 4", "7 Becket St Rm 4d", "499 Lake St Floor 2"

@@ -1,6 +1,6 @@
 {
   "name": "ordyn",
-  "version": "2.3.12",
+  "version": "2.3.13",
   "description": "SOLUS - Order Analytics for Walmart, Target, Pokemon Center & more",
   "main": "src-protected/main.js",
   "scripts": {
@@ -35,6 +35,9 @@
     "imap": "^0.8.19",
     "mailparser": "^3.6.5",
     "uuid": "^9.0.0"
+  },
+  "optionalDependencies": {
+    "@aycd-inc/inbox-api-client": "^1.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

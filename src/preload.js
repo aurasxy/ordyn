@@ -16,11 +16,24 @@ contextBridge.exposeInMainWorld('api', {
 
   // Accounts
   getAccounts: () => ipcRenderer.invoke('get-accounts'),
-  addAccount: (email, password) => ipcRenderer.invoke('add-account', email, password),
+  addAccount: (email, password, provider) => ipcRenderer.invoke('add-account', email, password, provider),
+  addAycdAccount: (email) => ipcRenderer.invoke('add-aycd-account', email),
+  outlookOAuthStart: () => ipcRenderer.invoke('outlook-oauth-start'),
+  clearAccountReauthFlag: (id) => ipcRenderer.invoke('clear-account-reauth-flag', id),
   deleteAccount: (id) => ipcRenderer.invoke('delete-account', id),
   updateAccountPassword: (id, password) => ipcRenderer.invoke('update-account-password', id, password),
   updateAccountNickname: (id, nickname) => ipcRenderer.invoke('update-account-nickname', id, nickname),
   testConnection: (emailOrId, password, provider) => ipcRenderer.invoke('test-connection', emailOrId, password, provider),
+
+  // AYCD Inbox
+  aycdGetConfig: () => ipcRenderer.invoke('aycd-get-config'),
+  aycdSaveCredentials: (payload) => ipcRenderer.invoke('aycd-save-credentials', payload),
+  aycdClearCredentials: () => ipcRenderer.invoke('aycd-clear-credentials'),
+  aycdTestConnection: () => ipcRenderer.invoke('aycd-test-connection'),
+  aycdGetEnabled: () => ipcRenderer.invoke('aycd-get-enabled'),
+  aycdSetEnabled: (enabled) => ipcRenderer.invoke('aycd-set-enabled', { enabled }),
+  aycdSyncAll: (dateFrom, dateTo) => ipcRenderer.invoke('aycd-sync-all', dateFrom, dateTo),
+  aycdSetAutoSync: (minutes) => ipcRenderer.invoke('aycd-set-auto-sync', { minutes }),
 
   // Product Images (local SKU lookup)
   getProductImage: (sku) => ipcRenderer.invoke('get-product-image', sku),

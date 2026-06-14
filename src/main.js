@@ -4,6 +4,15 @@ const fs = require('fs');
 const crypto = require('crypto');
 const Store = require('electron-store');
 
+// AYCD Inbox integration — optional, loaded defensively so missing deps don't
+// break SOLUS for users who don't use AYCD.
+let aycdIntegration = null;
+try {
+  aycdIntegration = require('./aycd-integration');
+} catch (e) {
+  console.warn('[AYCD] integration not available:', e.message);
+}
+
 // Suppress EPIPE errors on stdout/stderr to prevent crashes when the
 // pipe is closed (e.g. launching terminal closed, or spawned without tty).
 process.stdout?.on?.('error', (err) => { if (err.code !== 'EPIPE') throw err; });
@@ -91,6 +100,9 @@ const { v4: uuidv4 } = require('uuid');
 const { autoUpdater } = require('electron-updater');
 const licenseModule = require('./license');
 const telemetry = require('./telemetry');
+// Microsoft OAuth (Graph) — native Outlook sync, replaces broken IMAP basic-auth.
+const msoauth = require('./auth-msoauth');
+const graphMail = require('./mail-graph');
 
 // ==================== SYNC LICENSE GATE ====================
 // Cache license validation so syncs don't re-check every time
@@ -556,6 +568,31 @@ if (storedVersion < DATA_VERSION) {
   store.set('accounts', accounts);
 }
 
+// ===== AYCD Inbox wire-up =====
+// One-time migration: flag broken-IMAP Outlook accounts so the UI can prompt
+// the user to set them up via AYCD instead.
+if (aycdIntegration && !store.get('_aycdMigrationDone', false)) {
+  try {
+    const r = aycdIntegration.migrateToV4(store);
+    console.log(`[AYCD migration] flagged ${r.touched}/${r.total} Outlook account(s) for AYCD reauth`);
+    store.set('_aycdMigrationDone', true);
+  } catch (e) {
+    console.error('[AYCD migration] failed:', e.message);
+  }
+}
+
+// Wire the AYCD integration. IPC handlers register immediately; boot
+// listeners are started later in app.whenReady (they need a window to be open
+// so failures can surface, and they reference parser functions defined
+// further down in this file).
+if (aycdIntegration) {
+  try {
+    aycdIntegration.wire({ store, ipcMain, encryptPassword, decryptPassword });
+  } catch (e) {
+    console.error('[AYCD] wire() failed:', e.message);
+  }
+}
+
 /**
  * Migration: Convert v3 inventory/salesLog to v4 format (inventoryV2/salesLogV2).
  * - Each inventory item gets a single CostLot from its costPerItem/quantity
@@ -945,17 +982,19 @@ function getLicenseInfo() {
 // ==================== ACCOUNT MANAGEMENT ====================
 function getAccounts() { return store.get('accounts', []); }
 
-function addAccount(email, password, provider) {
-  // Validate inputs
-  if (!email || !password) {
+function addAccount(email, password, provider, options = {}) {
+  // Validate inputs — for AYCD-mailbox accounts the user has no password
+  // (their Outlook is connected on AYCD's side, SOLUS just calls AYCD API).
+  const isAycdMailbox = options.mailbox === 'aycd';
+  if (!email || (!password && !isAycdMailbox)) {
     return { success: false, error: 'Email and password are required' };
   }
-  
+
   const accounts = store.get('accounts', []);
   if (accounts.find(a => a.email.toLowerCase() === email.toLowerCase())) {
     return { success: false, error: 'Account already exists' };
   }
-  
+
   // Sanitize password - remove spaces for app passwords
   const sanitizedPassword = (password || '').replace(/\s+/g, '');
   
@@ -973,20 +1012,30 @@ function addAccount(email, password, provider) {
     }
   }
   
-  // Encrypt password before storing
-  const encryptedPassword = encryptPassword(sanitizedPassword);
+  // Encrypt password before storing (empty for AYCD-mailbox accounts)
+  const encryptedPassword = isAycdMailbox ? null : encryptPassword(sanitizedPassword);
 
   const newAccount = {
     id: uuidv4(),
     email,
     password: encryptedPassword,
     provider,
+    mailbox: options.mailbox || 'imap',
+    authMethod: isAycdMailbox ? 'aycd' : 'password',
     lastSynced: null,
     createdAt: new Date().toISOString()
   };
   accounts.push(newAccount);
   store.set('accounts', accounts);
-  console.log(`[ACCOUNT] Added account ${email} with provider ${provider}`);
+  console.log(`[ACCOUNT] Added account ${email} provider=${provider} mailbox=${newAccount.mailbox}`);
+
+  // If AYCD is globally enabled, kick off a monitor for this email immediately
+  if (aycdIntegration?.isEnabled?.()) {
+    aycdIntegration.onAccountAdded(newAccount).catch((e) =>
+      console.error('[AYCD] onAccountAdded failed:', e?.message || e)
+    );
+  }
+
   return { success: true, id: newAccount.id };
 }
 
@@ -1005,10 +1054,16 @@ function updateAccountPassword(id, newPassword) {
 function deleteAccount(id) {
   let accounts = store.get('accounts', []);
   let orders = store.get('orders', []);
+  const removed = accounts.find(a => a.id === id);
   accounts = accounts.filter(a => a.id !== id);
   orders = orders.filter(o => o.accountId !== id);
   store.set('accounts', accounts);
   store.set('orders', orders);
+
+  // Stop the AYCD monitor for the removed email (if any was running)
+  if (removed && aycdIntegration?.onAccountRemoved) {
+    try { aycdIntegration.onAccountRemoved(id, removed.email); } catch (_) { /* ignore */ }
+  }
   return { success: true };
 }
 
@@ -4089,12 +4144,132 @@ function parseRetailerEmail(parsed, email, retailer) {
 }
 
 // ==================== IMAP SYNC ====================
+// Persist (re)issued OAuth tokens back onto the stored account. The refresh
+// token is encrypted at rest the same way IMAP passwords are.
+function persistOauthTokens(accountId, newTokens) {
+  const accounts = store.get('accounts', []);
+  const idx = accounts.findIndex(a => a.id === accountId);
+  if (idx === -1) return;
+  accounts[idx].oauthTokens = {
+    access_token: newTokens.access_token,
+    refresh_token: newTokens.refresh_token ? encryptPassword(newTokens.refresh_token) : accounts[idx].oauthTokens?.refresh_token,
+    expires_at: newTokens.expires_at,
+  };
+  store.set('accounts', accounts);
+}
+
+// Microsoft Graph sync for Outlook OAuth accounts. Reuses the EXACT same
+// parser pipeline (getRetailer → parseRetailerEmail → saveOrder) and the same
+// "only keep orders that were confirmed (or self-validating retailers)"
+// filtering as the IMAP path — only the transport differs.
+async function syncOutlookGraph(account, dateFrom, dateTo) {
+  const sendProgress = (message, current, total) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('sync-progress', { accountId: account.id, message, current, total });
+    }
+  };
+
+  if (!account.oauthTokens || !account.oauthTokens.refresh_token) {
+    return { success: false, error: 'Outlook account not connected — click "Sign in with Microsoft" to connect.', needsReauth: true };
+  }
+
+  sendProgress('Connecting to Outlook…', 0, 0);
+
+  // mail-graph expects a RAW refresh token; decrypt our stored copy into a
+  // working clone so we never mutate the encrypted value on the record.
+  const workingAccount = {
+    ...account,
+    oauthTokens: {
+      access_token: account.oauthTokens.access_token || null,
+      refresh_token: decryptPassword(account.oauthTokens.refresh_token),
+      expires_at: account.oauthTokens.expires_at || 0,
+    },
+  };
+
+  const sinceDate = dateFrom ? new Date(dateFrom) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+  const allOrders = [];
+  const seenKeys = new Set();
+  const confirmedOrderIds = new Set();
+  const selfValidatingRetailers = new Set(['bestbuy', 'costco', 'walmart']);
+
+  // Pre-load confirmed order IDs from existing DB orders so shipped/delivered
+  // emails can match an order confirmed on a previous sync (mirrors IMAP path).
+  for (const o of store.get('orders', [])) {
+    if (o.status === 'confirmed') {
+      confirmedOrderIds.add(`${o.retailer}-${normalizeOrderId(o.orderId)}`);
+    }
+  }
+
+  try {
+    const { totalFetched } = await graphMail.syncOutlookMailbox({
+      account: workingAccount,
+      sinceDate,
+      clientId: msoauth.AZURE_CLIENT_ID,
+      onTokensUpdated: (fresh) => persistOauthTokens(account.id, fresh),
+      onProgress: ({ fetched }) => sendProgress(`Scanning ${fetched} emails…`, fetched, 0),
+      onMessage: (parsed) => {
+        const fromAddr = (parsed.from?.value?.[0]?.address || '').toLowerCase();
+        const subject = parsed.subject || '';
+        const content = (parsed.text || '') + ' ' + (parsed.html || '');
+        const retailer = getRetailer(fromAddr, subject, content);
+        if (!retailer) return;
+        const order = parseRetailerEmail(parsed, account.email, retailer);
+        if (!order) return;
+        order.accountId = account.id;
+        const key = `${order.retailer}-${order.orderId}-${order.status}`;
+        if (seenKeys.has(key)) return;
+        seenKeys.add(key);
+        allOrders.push(order);
+        if (order.status === 'confirmed' || selfValidatingRetailers.has(order.retailer)) {
+          confirmedOrderIds.add(`${order.retailer}-${normalizeOrderId(order.orderId)}`);
+        }
+      },
+    });
+
+    const filteredOrders = allOrders.filter(o =>
+      confirmedOrderIds.has(`${o.retailer}-${normalizeOrderId(o.orderId)}`) ||
+      selfValidatingRetailers.has(o.retailer)
+    );
+    const saved = saveOrdersBatch(filteredOrders);
+    updateAccountSync(account.id);
+
+    console.log(`[GRAPH] Sync ${account.email}: fetched=${totalFetched}, parsed=${allOrders.length}, saved=${saved}`);
+    sendProgress(`Done — ${saved} orders`, totalFetched || 0, totalFetched || 0);
+    return { success: true, orders: saved, ordersSaved: saved };
+  } catch (e) {
+    const msg = e?.message || String(e);
+    const needsReauth = /invalid_grant|interaction_required|AADSTS|missing OAuth|reconnect/i.test(msg);
+    console.error(`[GRAPH] Sync failed for ${account.email}:`, msg);
+    sendProgress('Sync failed', 0, 0);
+    return {
+      success: false,
+      error: needsReauth ? 'Outlook sign-in expired — please reconnect via "Sign in with Microsoft".' : msg,
+      needsReauth,
+    };
+  }
+}
+
 async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, retailerFilter = null) {
   // Yield to event loop immediately so UI can update before any blocking work
   await new Promise(resolve => setImmediate(resolve));
 
   const account = getAccountById(accountId);
   if (!account) return { success: false, error: 'Account not found' };
+
+  // ===== Outlook OAuth (Microsoft Graph) route =====
+  // Personal Outlook/Hotmail/Live accounts can't use IMAP basic-auth anymore
+  // (Microsoft disabled it Sept 2024). OAuth accounts sync via Graph instead.
+  // queueSync marked us active; we own clearing it + pumping the queue here
+  // since we return before the IMAP promise machinery (which normally does it).
+  if (account.mailbox === 'graph' || account.authMethod === 'oauth2') {
+    try {
+      return await syncOutlookGraph(account, dateFrom, dateTo);
+    } finally {
+      activeSyncs.delete(accountId);
+      processNextInQueue();
+    }
+  }
 
   // Sync debug log - captures detailed info for troubleshooting
   const syncDebugLog = [];
@@ -6525,6 +6700,88 @@ ipcMain.handle('track-event', async (_, eventName, eventData) => {
 
 ipcMain.handle('get-accounts', () => getAccounts().map(({ password, ...rest }) => rest));
 ipcMain.handle('add-account', (_, email, password, provider) => addAccount(email, password, provider));
+ipcMain.handle('add-aycd-account', (_, email) => addAccount(email, null, 'outlook', { mailbox: 'aycd' }));
+
+// Native Microsoft OAuth (Graph) — opens the MS sign-in flow, then creates or
+// reconnects the Outlook account with encrypted OAuth tokens (no AYCD needed).
+ipcMain.handle('outlook-oauth-start', async () => {
+  try {
+    await requireValidLicense();
+    const res = await msoauth.startOutlookOAuth(); // { email, displayName, refresh_token, access_token, expires_at }
+    if (!res.email) return { success: false, error: 'Microsoft did not return an email address.' };
+
+    const oauthTokens = {
+      access_token: res.access_token,
+      refresh_token: encryptPassword(res.refresh_token),
+      expires_at: res.expires_at,
+    };
+
+    const accounts = store.get('accounts', []);
+    const idx = accounts.findIndex(a => a.email.toLowerCase() === res.email.toLowerCase());
+
+    if (idx >= 0) {
+      // Reconnect / upgrade an existing account (e.g. old broken IMAP Outlook).
+      accounts[idx] = {
+        ...accounts[idx],
+        provider: 'outlook',
+        mailbox: 'graph',
+        authMethod: 'oauth2',
+        password: null,
+        needsReauth: false,
+        oauthTokens,
+      };
+      store.set('accounts', accounts);
+      console.log(`[GRAPH] Reconnected Outlook account ${res.email} via OAuth`);
+      return { success: true, email: res.email, id: accounts[idx].id, reconnected: true };
+    }
+
+    const newAccount = {
+      id: uuidv4(),
+      email: res.email,
+      password: null,
+      provider: 'outlook',
+      mailbox: 'graph',
+      authMethod: 'oauth2',
+      oauthTokens,
+      needsReauth: false,
+      lastSynced: null,
+      createdAt: new Date().toISOString(),
+    };
+    accounts.push(newAccount);
+    store.set('accounts', accounts);
+    console.log(`[GRAPH] Added Outlook account ${res.email} via OAuth`);
+    return { success: true, email: res.email, id: newAccount.id };
+  } catch (e) {
+    return { success: false, error: e?.message || String(e) };
+  }
+});
+ipcMain.handle('clear-account-reauth-flag', (_, id) => {
+  const accounts = store.get('accounts', []);
+  const idx = accounts.findIndex(a => a.id === id);
+  if (idx < 0) return { success: false, error: 'Account not found' };
+  delete accounts[idx].needsReauth;
+  delete accounts[idx].reauthReason;
+  store.set('accounts', accounts);
+  return { success: true };
+});
+
+// AYCD-only sync — runs `backfill()` against every account, emits sync-progress
+// events so the IMAP tab's progress UI works the same way.
+ipcMain.handle('aycd-sync-all', async (_, dateFrom, dateTo) => {
+  if (testModeNetworkGuard('aycd-sync-all')) return { success: false, error: 'Network blocked in test mode' };
+  await requireValidLicense();
+  if (!aycdIntegration) return { success: false, error: 'AYCD integration not loaded' };
+
+  const onProgress = (msg) => {
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('sync-progress', msg);
+      }
+    } catch (_) { /* ignore */ }
+  };
+
+  return aycdIntegration.syncAllAccountsRange({ dateFrom, dateTo, onProgress });
+});
 ipcMain.handle('delete-account', (_, id) => deleteAccount(id));
 ipcMain.handle('update-account-password', (_, id, password) => updateAccountPassword(id, password));
 ipcMain.handle('update-account-nickname', (_, id, nickname) => {
@@ -9267,6 +9524,19 @@ ipcMain.handle('sync-account', async (_, id, dateFrom, dateTo, retailerFilter) =
   if (currentMode !== 'imap') {
     throw new Error('IMAP sync is disabled in Discord mode. Switch to IMAP mode in Settings > General.');
   }
+
+  // ===== AYCD route =====
+  // AYCD mailbox accounts use AYCD's live monitor rather than IMAP. The
+  // bulk-sync call is a thin shim — AYCD is primarily live-only, so backfill
+  // returns { success: true, ordersSaved: 0, note: 'live-only' } unless the
+  // backend grows backfill support later.
+  if (aycdIntegration) {
+    const account = getAccountById(id);
+    if (account && aycdIntegration.shouldRouteToAycd(account)) {
+      return aycdIntegration.runAycdSync(account, dateFrom, dateTo);
+    }
+  }
+
   return queueSync(id, dateFrom, dateTo, retailerFilter || null);
 });
 
@@ -11518,6 +11788,35 @@ app.whenReady().then(() => {
     // Start auto-resume timer for paused syncs
     startAutoResumeTimer();
   }
+
+  // Start AYCD Inbox live monitors for any accounts using mailbox === 'aycd'.
+  // Each monitor pipes incoming parsed emails through the SAME parser dispatch
+  // the IMAP loop uses (getRetailer → parseRetailerEmail → saveOrder), so
+  // orders flow into the same store with the same merge logic.
+  if (aycdIntegration && !SOLUS_TEST_MODE) {
+    aycdIntegration.startBootListeners({
+      onParsedEmail: async (parsed, account) => {
+        try {
+          const fromAddr = (parsed.from?.value?.[0]?.address || '').toLowerCase();
+          const subject = parsed.subject || '';
+          const content = (parsed.text || '') + ' ' + (parsed.html || '');
+          const retailer = getRetailer(fromAddr, subject, content);
+          if (!retailer) return;
+          const order = parseRetailerEmail(parsed, account.email, retailer);
+          if (order) {
+            saveOrder(order);
+            updateAccountSync(account.id);
+          }
+        } catch (e) {
+          console.error('[AYCD] parsed-email handler error:', e?.message || e);
+        }
+      },
+    }).then((r) => {
+      console.log(`[AYCD] boot listeners: started=${r.started || 0} total=${r.total || 0}`);
+    }).catch((e) => {
+      console.error('[AYCD] startBootListeners failed:', e?.message || e);
+    });
+  }
 });
 
 // Auto-resume timer for paused syncs
@@ -12107,4 +12406,9 @@ app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(
 app.on('activate', () => { if (app.isReady() && BrowserWindow.getAllWindows().length === 0) createWindow(); });
 app.on('before-quit', () => {
   telemetry.trackEvent(telemetry.Events.APP_CLOSE);
+  if (aycdIntegration) {
+    aycdIntegration.stopAllListeners().catch((e) =>
+      console.error('[AYCD] stopAllListeners error:', e?.message || e)
+    );
+  }
 });

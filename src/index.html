@@ -5486,10 +5486,62 @@
             <div class="card-body">
               <div class="account-list" id="accountList"></div>
               <div class="empty" id="accountsEmpty"><div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div><div class="empty-title">No accounts added</div><div class="empty-text">Add a Gmail account to start syncing orders</div></div>
-              <div class="sync-panel" id="syncPanel" style="display:none;"><div class="sync-panel-header">Sync Options</div><div class="sync-options"><div class="form-group"><label class="form-label">From Date</label><input type="date" class="form-input" id="syncDateFrom"></div><div class="form-group"><label class="form-label">To Date</label><input type="date" class="form-input" id="syncDateTo"></div><button class="btn btn-success" id="syncRecentBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Sync Recent</button><button class="btn btn-primary" id="syncAllBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Sync All</button><button class="btn btn-secondary" onclick="relinkEmailImages()" title="Re-match product names to local SKU images"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Refresh Images</button><button class="btn btn-secondary" onclick="refreshAllData()" title="Deduplicate and merge order entries without resyncing"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Refresh Data</button><button class="btn btn-secondary" id="deepSyncBtn" onclick="startDeepSync()" title="Re-fetch all emails over a wide date range to pick up data missed by older parsers. Never deletes existing data."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m0 0a9 9 0 0 1 9-9m-9 9a9 9 0 0 0 9 9"/></svg>Deep Sync</button></div><div class="retailer-filter-row" id="retailerFilterRow"><span class="retailer-filter-label">Sites:</span><span class="retailer-chip active" data-retailer="walmart" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Walmart</span><span class="retailer-chip active" data-retailer="target" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Target</span><span class="retailer-chip active" data-retailer="pokecenter" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Pokemon Center</span><span class="retailer-chip active" data-retailer="bestbuy" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Best Buy</span><span class="retailer-chip active" data-retailer="costco" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Costco</span><span class="retailer-chip active" data-retailer="samsclub" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Sam's Club</span></div></div>
+              <div class="sync-panel" id="syncPanel" style="display:none;"><div class="sync-panel-header">Sync Options</div><div class="sync-options"><div class="form-group"><label class="form-label">From Date</label><input type="date" class="form-input" id="syncDateFrom"></div><div class="form-group"><label class="form-label">To Date</label><input type="date" class="form-input" id="syncDateTo"></div><button class="btn btn-success" id="syncRecentBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Sync Recent</button><button class="btn btn-outline" id="syncAycdBtn" title="Pull recent order emails from AYCD Inbox only (requires AYCD enabled)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 12 11 12"/></svg>Sync AYCD</button><button class="btn btn-primary" id="syncAllBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Sync All</button><button class="btn btn-secondary" onclick="relinkEmailImages()" title="Re-match product names to local SKU images"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Refresh Images</button><button class="btn btn-secondary" onclick="refreshAllData()" title="Deduplicate and merge order entries without resyncing"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Refresh Data</button><button class="btn btn-secondary" id="deepSyncBtn" onclick="startDeepSync()" title="Re-fetch all emails over a wide date range to pick up data missed by older parsers. Never deletes existing data."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m0 0a9 9 0 0 1 9-9m-9 9a9 9 0 0 0 9 9"/></svg>Deep Sync</button></div><div class="retailer-filter-row" id="retailerFilterRow"><span class="retailer-filter-label">Sites:</span><span class="retailer-chip active" data-retailer="walmart" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Walmart</span><span class="retailer-chip active" data-retailer="target" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Target</span><span class="retailer-chip active" data-retailer="pokecenter" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Pokemon Center</span><span class="retailer-chip active" data-retailer="bestbuy" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Best Buy</span><span class="retailer-chip active" data-retailer="costco" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Costco</span><span class="retailer-chip active" data-retailer="samsclub" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Sam's Club</span></div></div>
             </div>
           </div>
           <input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none;">
+
+          <!-- AYCD Inbox card -->
+          <div class="card" style="margin-top:var(--space-6);">
+            <div class="card-header">
+              <div class="card-title">
+                AYCD Inbox
+                <span id="aycdHeaderStatus" style="color:var(--text-muted);font-weight:400;font-size:12px;margin-left:8px;"></span>
+              </div>
+              <label class="aycd-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <span style="font-size:13px;color:var(--text-secondary);">Enable</span>
+                <input type="checkbox" id="aycdEnabledToggle" onchange="aycdToggleEnabled(this.checked)" style="cursor:pointer;">
+              </label>
+            </div>
+            <div class="card-body">
+              <p style="color:var(--text-muted);font-size:13px;margin:0 0 14px;">
+                AYCD Inbox routes order emails (Outlook + others) into SOLUS without IMAP.
+                Replaces the broken Outlook IMAP path Microsoft retired in Sept 2024.
+                When enabled, SOLUS monitors every account in your list via AYCD —
+                you only need to enroll each email on AYCD's site once.
+                <a href="#" onclick="window.api.openExternal('https://aycd.io/inbox-api');return false;" style="color:var(--accent);">Get an AYCD subscription</a>
+              </p>
+              <div class="form-group">
+                <label class="form-label">AYCD API Key</label>
+                <input type="password" class="form-input" id="aycdApiKeyInput" placeholder="paste your AYCD Inbox API key">
+              </div>
+              <div class="form-group">
+                <label class="form-label">User Template ID <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+                <input type="text" class="form-input" id="aycdUserTemplateIdInput" placeholder="leave blank if you don't use one">
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button class="btn btn-success" onclick="aycdSaveKey()">Save</button>
+                <button class="btn btn-outline" onclick="aycdTest()">Test connection</button>
+                <button class="btn btn-secondary" onclick="aycdClearKey()">Clear credentials</button>
+                <span id="aycdStatusText" style="color:var(--text-muted);font-size:12px;margin-left:8px;"></span>
+              </div>
+              <hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <div>
+                  <div style="font-size:13px;color:var(--text-primary);font-weight:600;">Auto-sync</div>
+                  <div style="font-size:11px;color:var(--text-muted);">Pulls AYCD backfill on this interval so gaps (SOLUS closed, missed events) get caught.</div>
+                </div>
+                <select id="aycdAutoSyncSelect" class="form-input" style="width:140px;" onchange="aycdUpdateAutoSync(this.value)">
+                  <option value="0">Off</option>
+                  <option value="15">Every 15 min</option>
+                  <option value="30" selected>Every 30 min</option>
+                  <option value="60">Every 1 hour</option>
+                  <option value="240">Every 4 hours</option>
+                </select>
+                <span id="aycdLastAutoSyncText" style="font-size:11px;color:var(--text-muted);"></span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -6237,6 +6289,7 @@
                     <button class="btn btn-secondary" onclick="clearFlexSaveFolder()">Clear</button>
                   </div>
                 </div>
+
               </div>
             </div>
 
@@ -7052,7 +7105,7 @@
     </div>
   </div>
 
-  <div class="modal-overlay" id="addModal"><div class="modal"><div class="modal-title" id="addModalTitle">Add Email Account</div><div class="form-group"><label class="form-label">Email Provider</label><select class="form-input" id="newProvider" onchange="updateProviderFields()"><option value="gmail">Gmail (Recommended)</option><option value="yahoo">Yahoo Mail</option><option value="outlook">Outlook / Hotmail</option><option value="icloud">iCloud</option></select></div><div class="form-group"><label class="form-label">Email Address</label><input type="email" class="form-input" id="newEmail" placeholder="your-email@gmail.com"></div><div class="form-group"><label class="form-label">App Password</label><input type="password" class="form-input" id="newPass" placeholder="xxxx xxxx xxxx xxxx"></div><p style="font-size:12px;color:var(--text-muted);margin-top:-8px;" id="appPasswordHelp">Generate App Password at <a href="#" onclick="openAppPasswordHelp()" style="color:var(--accent);">myaccount.google.com/apppasswords</a></p><div id="imapHelpSection" class="imap-help-section" style="display:none;"><div class="imap-help-title">Setup Help</div><div id="imapHelpContent" class="imap-help-content"></div></div><div class="modal-footer"><button class="btn btn-secondary" id="cancelAddBtn">Cancel</button><button class="btn btn-outline" id="testNewBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M12 2v6"/><path d="M6 8h12"/><path d="M6 8l-2 8h16l-2-8"/><path d="M10 16v4"/><path d="M14 16v4"/><path d="M8 20h8"/></svg> Test</button><button class="btn btn-success" id="confirmAddBtn">Add Account</button></div></div></div>
+  <div class="modal-overlay" id="addModal"><div class="modal"><div class="modal-title" id="addModalTitle">Add Email Account</div><div class="form-group"><label class="form-label">Email Provider</label><select class="form-input" id="newProvider" onchange="updateProviderFields()"><option value="gmail">Gmail (Recommended)</option><option value="yahoo">Yahoo Mail</option><option value="outlook">Outlook / Hotmail</option><option value="icloud">iCloud</option></select></div><div class="form-group" id="outlookAuthGroup" style="display:none;"><label class="form-label">Connection Method</label><select class="form-input" id="outlookAuthMethod" onchange="updateProviderFields()"><option value="oauth">Microsoft Sign-In (recommended)</option><option value="aycd">AYCD Inbox API</option></select></div><button class="btn btn-primary" id="msSignInBtn" style="display:none;width:100%;justify-content:center;margin-bottom:12px;" onclick="startOutlookOAuth()"><svg width="16" height="16" viewBox="0 0 23 23" style="vertical-align:-3px;margin-right:8px"><rect x="1" y="1" width="10" height="10" fill="#f25022"/><rect x="12" y="1" width="10" height="10" fill="#7fba00"/><rect x="1" y="12" width="10" height="10" fill="#00a4ef"/><rect x="12" y="12" width="10" height="10" fill="#ffb900"/></svg>Sign in with Microsoft</button><div class="form-group"><label class="form-label">Email Address</label><input type="email" class="form-input" id="newEmail" placeholder="your-email@gmail.com"></div><div class="form-group"><label class="form-label">App Password</label><input type="password" class="form-input" id="newPass" placeholder="xxxx xxxx xxxx xxxx"></div><p style="font-size:12px;color:var(--text-muted);margin-top:-8px;" id="appPasswordHelp">Generate App Password at <a href="#" onclick="openAppPasswordHelp()" style="color:var(--accent);">myaccount.google.com/apppasswords</a></p><div id="imapHelpSection" class="imap-help-section" style="display:none;"><div class="imap-help-title">Setup Help</div><div id="imapHelpContent" class="imap-help-content"></div></div><div class="modal-footer"><button class="btn btn-secondary" id="cancelAddBtn">Cancel</button><button class="btn btn-outline" id="testNewBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M12 2v6"/><path d="M6 8h12"/><path d="M6 8l-2 8h16l-2-8"/><path d="M10 16v4"/><path d="M14 16v4"/><path d="M8 20h8"/></svg> Test</button><button class="btn btn-success" id="confirmAddBtn">Add Account</button></div></div></div>
   
   <div class="modal-overlay" id="confirmModal"><div class="modal modal-sm"><div class="modal-title" id="confirmModalTitle">Confirm</div><p style="color:var(--text-secondary);margin-bottom:20px;" id="confirmModalMsg">Are you sure?</p><div class="modal-footer"><button class="btn btn-secondary" id="confirmModalNo">Cancel</button><button class="btn btn-danger" id="confirmModalYes">Confirm</button></div></div></div>
 
@@ -8542,6 +8595,45 @@ async function loadData() {
   renderDashboard();
   initDashboardLayout();
   await loadInventory();
+  if (document.getElementById('aycdApiKeyInput')) aycdLoadConfig();
+  maybeShowAycdMigrationBanner();
+}
+
+// ── Migration banner: prompt users with broken Outlook IMAP accounts to set up AYCD ──
+function maybeShowAycdMigrationBanner() {
+  if (sessionStorage.getItem('aycdBannerDismissed') === '1') return;
+  const reauth = (accounts || []).filter(a => a.needsReauth && a.reauthReason === 'outlook-imap-deprecated');
+  if (reauth.length === 0) return;
+  let banner = document.getElementById('aycdMigrationBanner');
+  if (banner) return;
+  banner = document.createElement('div');
+  banner.id = 'aycdMigrationBanner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#7c2d12;color:#fed7aa;padding:14px 20px;font-size:13px;display:flex;align-items:center;gap:16px;border-bottom:1px solid #ea580c;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+  banner.innerHTML = `
+    <strong style="color:#fff;">Outlook IMAP no longer works.</strong>
+    <span>${reauth.length} Outlook account${reauth.length===1?'':'s'} need to be set up via AYCD Inbox. Microsoft retired basic-auth IMAP in Sept 2024.</span>
+    <button onclick="goToAycdSetup()" style="background:#ea580c;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:600;">Set up AYCD</button>
+    <button onclick="window.api.openExternal('https://aycd.io/inbox-api')" style="background:transparent;color:#fed7aa;border:1px solid #fed7aa;padding:6px 14px;border-radius:6px;cursor:pointer;">Learn more</button>
+    <button onclick="dismissAycdBanner()" style="margin-left:auto;background:transparent;color:#fed7aa;border:none;cursor:pointer;font-size:18px;line-height:1;">×</button>
+  `;
+  document.body.appendChild(banner);
+  document.body.style.paddingTop = (banner.offsetHeight + parseInt(getComputedStyle(document.body).paddingTop) || 0) + 'px';
+}
+function dismissAycdBanner() {
+  sessionStorage.setItem('aycdBannerDismissed', '1');
+  const b = document.getElementById('aycdMigrationBanner');
+  if (b) { b.remove(); document.body.style.paddingTop = ''; }
+}
+function goToAycdSetup() {
+  // Navigate to IMAP/accounts tab where the AYCD card lives, then focus the key input
+  const imapTab = document.querySelector('[data-page="accounts"]') ||
+                  document.querySelector('[onclick*="accounts"]');
+  if (imapTab) imapTab.click();
+  setTimeout(() => {
+    const input = document.getElementById('aycdApiKeyInput');
+    if (input) { input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus(); }
+    aycdLoadConfig();
+  }, 200);
 }
 
 // Set up paused sync event listeners
@@ -9147,6 +9239,92 @@ async function disconnectLicense() {
   if (!await customConfirm('Disconnect License', 'Are you sure you want to disconnect your license?', 'Disconnect')) return;
   await window.api.deactivateLicense();
   $('appContainer').classList.remove('active'); $('licenseScreen').style.display = 'flex'; $('licenseKey').value = '';
+}
+
+// ── AYCD Inbox helpers (IMAP tab card) ─────────────────────────────────
+function _aycdSetHeaderStatus(text, color) {
+  const h = $('aycdHeaderStatus');
+  if (h) { h.textContent = text || ''; if (color) h.style.color = color; }
+}
+async function aycdLoadConfig() {
+  try {
+    const cfg = await window.api.aycdGetConfig();
+    const status = $('aycdStatusText');
+    if (status) {
+      status.textContent = cfg.configured ? 'Key configured ✓' : 'No key set';
+      status.style.color = cfg.configured ? '#10b981' : 'var(--text-muted)';
+    }
+    if (cfg.userTemplateId) $('aycdUserTemplateIdInput').value = cfg.userTemplateId;
+    const tog = $('aycdEnabledToggle');
+    if (tog) tog.checked = !!cfg.enabled;
+    if (cfg.enabled) {
+      _aycdSetHeaderStatus(`monitoring ${cfg.monitorCount || 0} account${cfg.monitorCount === 1 ? '' : 's'}`, '#10b981');
+    } else if (cfg.configured) {
+      _aycdSetHeaderStatus('disabled', 'var(--text-muted)');
+    } else {
+      _aycdSetHeaderStatus('not set up', 'var(--text-muted)');
+    }
+    // Auto-sync select + last-sync line
+    const sel = $('aycdAutoSyncSelect');
+    if (sel) sel.value = String(cfg.autoSyncMinutes ?? 30);
+    const lastText = $('aycdLastAutoSyncText');
+    if (lastText) {
+      if (cfg.lastAutoSync) {
+        const last = new Date(cfg.lastAutoSync);
+        lastText.textContent = `Last auto-sync ${timeAgo(last)}`;
+      } else {
+        lastText.textContent = '';
+      }
+    }
+  } catch (e) { console.error('[aycd] loadConfig:', e); }
+}
+
+async function aycdUpdateAutoSync(minutes) {
+  const m = parseInt(minutes, 10);
+  const r = await window.api.aycdSetAutoSync(m);
+  if (r.success) {
+    toast(m === 0 ? 'Auto-sync disabled' : `Auto-sync set to ${m} min`);
+    aycdLoadConfig();
+  } else {
+    toast(r.error || 'Could not set auto-sync', 'error');
+  }
+}
+async function aycdSaveKey() {
+  const apiKey = $('aycdApiKeyInput').value.trim();
+  const userTemplateId = $('aycdUserTemplateIdInput').value.trim();
+  if (!apiKey) { toast('Paste your AYCD API key', 'error'); return; }
+  const r = await window.api.aycdSaveCredentials({ apiKey, userTemplateId });
+  if (r.success) { toast('AYCD credentials saved'); $('aycdApiKeyInput').value = ''; aycdLoadConfig(); }
+  else toast(r.error || 'Save failed', 'error');
+}
+async function aycdTest() {
+  const status = $('aycdStatusText');
+  if (status) { status.textContent = 'Testing…'; status.style.color = 'var(--text-muted)'; }
+  const r = await window.api.aycdTestConnection();
+  if (r.success) {
+    if (status) { status.textContent = 'Connection OK ✓'; status.style.color = '#10b981'; }
+    toast('AYCD connection successful');
+  } else {
+    if (status) { status.textContent = 'Failed: ' + (r.error || 'unknown'); status.style.color = '#ef4444'; }
+    toast(r.error || 'AYCD test failed', 'error');
+  }
+}
+async function aycdClearKey() {
+  if (!confirm('Remove the saved AYCD API key? Order syncing via AYCD will stop.')) return;
+  const r = await window.api.aycdClearCredentials();
+  if (r.success) { toast('AYCD credentials cleared'); aycdLoadConfig(); }
+}
+async function aycdToggleEnabled(checked) {
+  const tog = $('aycdEnabledToggle');
+  const r = await window.api.aycdSetEnabled(checked);
+  if (r.success) {
+    toast(checked ? `AYCD on — monitoring ${r.monitorCount || 0} account(s)` : 'AYCD disabled');
+    aycdLoadConfig();
+  } else {
+    // Revert the visual toggle if the backend rejected
+    if (tog) tog.checked = !checked;
+    toast(r.error || 'Could not toggle AYCD', 'error');
+  }
 }
 
 async function loadSettings() {
@@ -11889,7 +12067,7 @@ function showAddModal() { editingAccountId = null; $('addModalTitle').textConten
 const IMAP_PROVIDERS = {
   gmail: { host: 'imap.gmail.com', port: 993, placeholder: 'your-email@gmail.com', helpUrl: 'https://myaccount.google.com/apppasswords', helpText: 'Generate App Password at <a href="#" onclick="openAppPasswordHelp()" style="color:var(--accent);">myaccount.google.com/apppasswords</a>' },
   yahoo: { host: 'imap.mail.yahoo.com', port: 993, placeholder: 'your-email@yahoo.com', helpUrl: 'https://login.yahoo.com/account/security/app-passwords', helpText: 'Generate App Password at <a href="#" onclick="openAppPasswordHelp()" style="color:var(--accent);">Yahoo Account Security</a> (requires 2FA enabled)' },
-  outlook: { host: 'outlook.office365.com', port: 993, placeholder: 'your-email@outlook.com', helpUrl: 'https://account.microsoft.com/security', helpText: 'Generate App Password at <a href="#" onclick="openAppPasswordHelp()" style="color:var(--accent);">Microsoft Account Security</a> (requires 2FA enabled)' },
+  outlook: { host: 'outlook.office365.com', port: 993, placeholder: 'your-email@outlook.com', helpUrl: 'https://aycd.io/inbox-api', helpText: '<strong style="color:#ef4444">Outlook IMAP no longer works</strong> (Microsoft retired basic auth Sept 2024). Add the account here — order syncing happens through <strong>AYCD Inbox</strong> instead. Set up AYCD in the IMAP tab → AYCD Inbox card.' },
   icloud: { host: 'imap.mail.me.com', port: 993, placeholder: 'your-email@icloud.com', helpUrl: 'https://appleid.apple.com/account/manage', helpText: 'Generate App-Specific Password at <a href="#" onclick="openAppPasswordHelp()" style="color:var(--accent);">Apple ID Settings</a> → Sign-In & Security → App-Specific Passwords' }
 };
 
@@ -11897,7 +12075,38 @@ function updateProviderFields() {
   const provider = $('newProvider').value;
   const config = IMAP_PROVIDERS[provider];
   $('newEmail').placeholder = config.placeholder;
-  $('appPasswordHelp').innerHTML = config.helpText;
+
+  const isOutlook = provider === 'outlook';
+  const passGroup = $('newPass') ? $('newPass').closest('.form-group') : null;
+  const emailGroup = $('newEmail') ? $('newEmail').closest('.form-group') : null;
+  const testBtn = $('testNewBtn');
+  const confirmBtn = $('confirmAddBtn');
+  const authGroup = $('outlookAuthGroup');
+  const msBtn = $('msSignInBtn');
+
+  // Outlook offers two connection methods: native Microsoft OAuth (default)
+  // or AYCD Inbox. Everything else is classic IMAP + app password.
+  if (authGroup) authGroup.style.display = isOutlook ? '' : 'none';
+  const outlookMethod = isOutlook ? ($('outlookAuthMethod') ? $('outlookAuthMethod').value : 'oauth') : null;
+  const isOauth = isOutlook && outlookMethod === 'oauth';
+
+  // Password + Test only apply to IMAP providers.
+  if (passGroup) passGroup.style.display = isOutlook ? 'none' : '';
+  if (testBtn) testBtn.style.display = isOutlook ? 'none' : '';
+
+  // OAuth mode: email comes from Microsoft, so hide the email field and the
+  // normal "Add Account" button — the Microsoft button drives the flow.
+  if (emailGroup) emailGroup.style.display = isOauth ? 'none' : '';
+  if (msBtn) msBtn.style.display = isOauth ? '' : 'none';
+  if (confirmBtn) confirmBtn.style.display = isOauth ? 'none' : '';
+
+  if (isOutlook && isOauth) {
+    $('appPasswordHelp').innerHTML = 'Sign in with your Microsoft account. SOLUS syncs orders directly via Microsoft Graph — no app password or AYCD needed.';
+  } else if (isOutlook) {
+    $('appPasswordHelp').innerHTML = '<strong style="color:#ef4444">Outlook IMAP no longer works</strong> (Microsoft retired basic auth Sept 2024). Enter the email connected on AYCD — syncing happens through <strong>AYCD Inbox</strong>. Set up AYCD in the IMAP tab → AYCD Inbox card.';
+  } else {
+    $('appPasswordHelp').innerHTML = config.helpText;
+  }
 }
 
 function openAppPasswordHelp() {
@@ -11907,6 +12116,34 @@ function openAppPasswordHelp() {
 }
 
 async function addAccount() {
+  const provider = $('newProvider').value;
+  const email = $('newEmail').value.trim();
+
+  // Outlook route — either native Microsoft OAuth or AYCD.
+  if (provider === 'outlook') {
+    const method = $('outlookAuthMethod') ? $('outlookAuthMethod').value : 'oauth';
+    if (method === 'oauth') { return startOutlookOAuth(); }
+    if (!email) { toast('Enter the Outlook email connected on AYCD', 'error'); return; }
+    const cfg = await window.api.aycdGetConfig();
+    if (!cfg.configured) {
+      toast('Set your AYCD API key in the IMAP tab → AYCD Inbox card first', 'error');
+      return;
+    }
+    if (!cfg.enabled) {
+      toast('Enable AYCD Inbox first (IMAP tab → AYCD Inbox card)', 'error');
+      return;
+    }
+    const r = await window.api.addAycdAccount(email);
+    if (r.success) {
+      closeAddModal();
+      await loadData();
+      toast('Outlook account added — AYCD is monitoring it now');
+    } else {
+      toast(r.error, 'error');
+    }
+    return;
+  }
+
   const pass = $('newPass').value;
   if (!pass) { toast('Enter a password', 'error'); return; }
   if (editingAccountId) {
@@ -11914,11 +12151,33 @@ async function addAccount() {
     if (r.success) { closeAddModal(); toast('Password updated'); } else toast(r.error, 'error');
     return;
   }
-  const email = $('newEmail').value.trim();
   if (!email) { toast('Enter email and password', 'error'); return; }
-  const provider = $('newProvider').value;
   const r = await window.api.addAccount(email, pass, provider);
   if (r.success) { closeAddModal(); await loadData(); toast('Account added'); } else toast(r.error, 'error');
+}
+
+// Native Microsoft OAuth — opens the MS sign-in flow in the browser, then the
+// main process creates/reconnects the Outlook account with Graph tokens.
+async function startOutlookOAuth() {
+  const btn = $('msSignInBtn');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Opening Microsoft sign-in…';
+  try {
+    const r = await window.api.outlookOAuthStart();
+    if (r && r.success) {
+      closeAddModal();
+      await loadData();
+      toast(r.reconnected ? `Reconnected ${r.email}` : `Outlook account added: ${r.email}`);
+    } else {
+      toast((r && r.error) || 'Microsoft sign-in failed', 'error');
+    }
+  } catch (e) {
+    toast('Microsoft sign-in failed', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
 }
 
 async function testNewAccount() {
@@ -12513,6 +12772,74 @@ async function syncRecentAll() {
   recordGlobalSyncTime();
 
   toast('Recent sync complete!');
+}
+
+// ── AYCD-only sync (calls AYCD backfill for every account) ──────────────
+async function syncAycdAll() {
+  if (syncingAccounts.size > 0) return;
+
+  // Pre-flight: AYCD must be enabled
+  const cfg = await window.api.aycdGetConfig();
+  if (!cfg.configured) {
+    toast('Set your AYCD API key first (AYCD Inbox card below)', 'error');
+    return;
+  }
+  if (!cfg.enabled) {
+    toast('Enable AYCD first (toggle in AYCD Inbox card)', 'error');
+    return;
+  }
+  if (!accounts || accounts.length === 0) {
+    toast('No accounts to sync', 'error');
+    return;
+  }
+
+  // Date range — default to last 7 days if no From Date set
+  const fromDateEl = $('syncDateFrom');
+  const toDateEl = $('syncDateTo');
+  let dateFrom = fromDateEl?.value;
+  let dateTo = toDateEl?.value;
+  if (!dateFrom) {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    dateFrom = localDateStr(weekAgo);
+  }
+
+  // Mark all as syncing
+  accounts.forEach(acc => {
+    syncingAccounts.add(acc.id);
+    showAccountProgress(acc.id, 0, 1, 'AYCD: queued…');
+  });
+
+  let result;
+  try {
+    result = await window.api.aycdSyncAll(dateFrom, dateTo);
+  } catch (e) {
+    result = { success: false, error: e?.message || String(e) };
+  }
+
+  // Final cleanup: clear all syncing flags
+  accounts.forEach(acc => {
+    syncingAccounts.delete(acc.id);
+    setTimeout(() => hideAccountProgress(acc.id), 1500);
+  });
+
+  if (!result.success) {
+    toast(`AYCD sync failed: ${result.error}`, 'error');
+    return;
+  }
+
+  // Reload data + refresh views
+  accounts = await window.api.getAccounts();
+  orders = await window.api.getOrders(); invalidateOrdersCache();
+  renderAccounts();
+  refreshAllViews();
+  if (['walmart','target','pokecenter','samsclub','costco','bestbuy'].includes(currentPage)) {
+    renderRetailerPage(currentPage);
+  }
+
+  recordGlobalSyncTime();
+  const summary = (result.byAccount || []).filter(r => r.count > 0).map(r => `${r.email}: ${r.count}`).join(', ');
+  toast(`AYCD sync done — ${result.ordersSaved} order(s)${summary ? ' (' + summary + ')' : ''}`);
 }
 
 
@@ -25616,6 +25943,7 @@ $('saveFlexBtn').addEventListener('click', saveFlexAsPng);
 $('flexDiscordBtn').addEventListener('click', flexToDiscord);
 $('syncAllBtn').addEventListener('click', syncAllAccounts);
 $('syncRecentBtn').addEventListener('click', syncRecentAll);
+if ($('syncAycdBtn')) $('syncAycdBtn').addEventListener('click', syncAycdAll);
 loadRetailerFilter();
 $('exportBtn2').addEventListener('click', exportData);
 $('disconnectBtn').addEventListener('click', disconnectLicense);

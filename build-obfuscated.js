@@ -216,8 +216,13 @@ function copyOtherFiles() {
     console.log('   ✓ preload.js (obfuscated)');
   }
   
-  // Copy and obfuscate license.js and telemetry.js
-  ['license.js', 'telemetry.js'].forEach(file => {
+  // Copy and obfuscate the main-process helper modules. These are require()d
+  // by main.js, so they MUST land in src-protected or the packaged build
+  // crashes on startup with "Cannot find module './auth-msoauth'" etc.
+  ['license.js', 'telemetry.js',
+   'auth-msoauth.js', 'mail-graph.js',
+   'auth-google.js', 'mail-gmail.js',
+   'aycd-integration.js', 'mail-aycd.js'].forEach(file => {
     const filePath = path.join(SRC_DIR, file);
     if (fs.existsSync(filePath)) {
       const code = fs.readFileSync(filePath, 'utf8');
@@ -339,16 +344,15 @@ async function main() {
     obfuscateIndexHTML();
     copyOtherFiles();
     updatePackageJson();
-    
+
     const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`\n⏱ Total build time: ${totalTime}s`);
-    
+
     printSummary();
   } catch (err) {
     console.error('\n❌ Build failed:', err.message);
-    process.exit(1);
-  } finally {
     restorePackageJson();
+    process.exit(1);
   }
 }
 

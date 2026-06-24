@@ -6351,6 +6351,21 @@
                 </div>
                 <p class="settings-hint">When a sync pauses (e.g., max reconnects reached), it will automatically resume after the selected delay.</p>
 
+                <!-- Fast Sync (concurrent workers) -->
+                <div class="settings-toggle-row settings-toggle-row--bordered">
+                  <div class="settings-toggle-info">
+                    <div class="settings-toggle-title">Fast Sync <span style="font-size:11px;opacity:0.7;">(Experimental)</span></div>
+                    <div class="settings-toggle-desc">Use multiple email connections at once to sync significantly faster. 1 = standard single connection (safest, proven). If you ever see sync errors, set this back to 1.</div>
+                  </div>
+                  <select id="imapWorkersSelect" class="form-input" style="width:140px;" onchange="updateImapWorkers()">
+                    <option value="1">1 (Standard)</option>
+                    <option value="2">2 connections</option>
+                    <option value="3">3 connections</option>
+                    <option value="4">4 connections</option>
+                  </select>
+                </div>
+                <p class="settings-hint">More connections = faster syncs, but some providers limit simultaneous connections. iCloud is automatically capped at 2; Gmail allows up to 4.</p>
+
                 <!-- Deep Scan Mode -->
                 <div class="settings-toggle-row settings-toggle-row--bordered settings-toggle-row--spaced">
                   <div class="settings-toggle-info">
@@ -8733,6 +8748,10 @@ async function loadSyncSettings() {
   const resumeSelect = $('autoResumeDelaySelect');
   if (resumeSelect) resumeSelect.value = settings.autoResumeDelay || 0;
 
+  // Fast Sync (concurrent workers)
+  const workersSelect = $('imapWorkersSelect');
+  if (workersSelect) workersSelect.value = settings.imapWorkers || 1;
+
   // Auto-sync interval
   const intervalSelect = $('autoSyncIntervalSelect');
   if (intervalSelect) intervalSelect.value = settings.autoSyncInterval || 0;
@@ -8907,6 +8926,17 @@ async function updateAutoResumeDelay() {
     }
   } else {
     toast('Auto-resume disabled', 'info');
+  }
+}
+
+async function updateImapWorkers() {
+  const select = $('imapWorkersSelect');
+  const workers = parseInt(select.value, 10) || 1;
+  await window.api.updateSyncSettings({ imapWorkers: workers });
+  if (workers > 1) {
+    toast(`Fast Sync on — up to ${workers} connections (provider limits apply)`, 'success');
+  } else {
+    toast('Fast Sync off — using standard single connection', 'info');
   }
 }
 
@@ -16980,15 +17010,23 @@ async function searchLiveTracking() {
       updates.push({
         tracking: td.trackingNumber,
         status: solusStatus,
-        eta: td.estimatedDelivery || null
+        eta: td.estimatedDelivery || null,
+        // For delivered shipments, capture the actual delivery date if the proxy
+        // provides one (field name varies); main process falls back to "now".
+        deliveredDate: solusStatus === 'delivered'
+          ? (td.actualDelivery || td.deliveryDate || td.deliveredDate || td.estimatedDelivery || null)
+          : null
       });
     }
     if (updates.length > 0) {
       const updateResult = await window.api.updateOrdersFromTracking(updates);
       if (updateResult.updated > 0) {
         toast(`Updated ${updateResult.updated} order${updateResult.updated !== 1 ? 's' : ''} from Live Track`, 'success');
-        // Refresh orders so dashboard reflects changes
+        // Refresh orders so dashboard reflects changes, then repaint the sibling
+        // status tabs (In Transit, Recently Delivered, calendar, dashboard) so a
+        // Live Track update flows everywhere — not just the Live Track sub-view.
         orders = await window.api.getOrders(); invalidateOrdersCache();
+        refreshAllViews();
       }
     }
   } catch (e) {

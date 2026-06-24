@@ -4874,13 +4874,31 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           batchSize: BATCH_SIZE, delayMs: BATCH_DELAY, totalEmails: ids.length
         });
 
-        // Stall detection for auto-reconnect (Gmail and iCloud large syncs)
+        // ===== FAST SYNC (opt-in, experimental) =====
+        // syncSettings.imapWorkers controls concurrent IMAP connections.
+        // Default 1 → the original single-connection path below runs unchanged.
+        // >1 → routed to fetchAllConcurrent() (self-contained, does not touch the
+        // single-connection code). Per-provider safety caps prevent connection bans.
+        let fastWorkers = parseInt((store.get('syncSettings', {}) || {}).imapWorkers, 10);
+        if (!Number.isFinite(fastWorkers) || fastWorkers < 1) fastWorkers = 1;
+        if (fastWorkers > 4) fastWorkers = 4;
+        if (fastWorkers > 1) {
+          if (ids.length < 100) {
+            fastWorkers = 1; // not worth extra connections for small syncs
+          } else {
+            const cap = isGmail ? 4 : (isICloud ? 2 : 3); // per-provider safety caps
+            fastWorkers = Math.min(fastWorkers, cap);
+          }
+        }
+
+        // Stall detection for auto-reconnect (Gmail and iCloud large syncs).
+        // Single-connection mode only — Fast Sync relies on per-batch retry instead.
         let lastEmailTime = Date.now();
         // Reset outer-scope reconnect tracking for this fetch run
         reconnectAttempts = 0;
         const STALL_THRESHOLD_MS = 20000; // 20 seconds without progress = stall
 
-        if ((isGmail || isICloud) && isLargeSync) {
+        if ((isGmail || isICloud) && isLargeSync && fastWorkers <= 1) {
           stallCheckInterval = setInterval(() => {
             if (cancelled || resolved) {
               clearInterval(stallCheckInterval);
@@ -5688,8 +5706,190 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           }, 60000);
         }
 
-        // Start fetching - batched for iCloud/Gmail large syncs, unified approach for all
-        fetchBatchWithImap(imap, ids, 0);
+        // ============================================================
+        // FAST SYNC: concurrent worker fetch (opt-in). Self-contained.
+        // Reuses processEmailBuffer() so parsing/dedupe/counters/saves are
+        // byte-identical to the single-connection path. Worker 0 reuses the
+        // already-open `imap`; extra workers open their own connections.
+        // ============================================================
+        function fetchAllConcurrent(allIds, desiredWorkers) {
+          let dispatchedCount = 0;       // messages reaching a terminal state at the fetch layer
+          let activeWorkers = 0;
+          let pausing = false;
+          let finalized = false;
+          const pausedRemainingIds = [];  // arrays of un-fetched ids (pause/error)
+          const extraConns = [];          // worker connections beyond worker 0 (imap)
+
+          function endExtraConns() {
+            for (const c of extraConns) { try { c.end(); } catch (e) { /* ignore */ } }
+          }
+
+          function finalizeConcurrent() {
+            if (finalized) return;
+            finalized = true;
+            const filteredOrders = allOrders.filter(o => confirmedOrderIds.has(`${o.retailer}-${o.orderId}`));
+            const grandTotalProcessed = cumulativePreviouslyProcessed + processedCount;
+            const grandTotalEmails = cumulativeOriginalTotal > 0 ? cumulativeOriginalTotal : totalEmails;
+            const retailerCounts = {};
+            filteredOrders.forEach(o => { retailerCounts[o.retailer] = (retailerCounts[o.retailer] || 0) + 1; });
+            logDebug('info', 'Fast sync complete', { processed: processedCount, dispatched: dispatchedCount, matchedOrders: filteredOrders.length, byRetailer: retailerCounts });
+            saveOrdersBatch(filteredOrders);
+            updateAccountSync(accountId);
+            sendProgress(`Done! ${filteredOrders.length} orders`, grandTotalEmails, grandTotalEmails);
+            addUserLog(`✓ ✓ Fast Sync complete! Processed ${grandTotalProcessed} emails total, found ${filteredOrders.length} orders`, 'success');
+            if (filteredOrders.length > 0) {
+              addUserLog(`  └ ${Object.entries(retailerCounts).map(([r, c]) => `${r}: ${c}`).join(', ')}`);
+            }
+            if (logSaveTimer) clearTimeout(logSaveTimer);
+            saveSyncLog();
+            endExtraConns();
+            try { imap.end(); } catch (e) { /* ignore */ }
+            safeResolve({ success: true, orders: filteredOrders.length });
+          }
+
+          function savePausedConcurrent() {
+            if (finalized) return;
+            finalized = true;
+            endExtraConns();
+            try { imap.end(); } catch (e) { /* ignore */ }
+            const filteredOrders = allOrders.filter(o => confirmedOrderIds.has(`${o.retailer}-${o.orderId}`));
+            if (filteredOrders.length > 0) { saveOrdersBatch(filteredOrders); updateAccountSync(accountId); }
+            const remainingIds = [].concat(...pausedRemainingIds);
+            const pausedSyncs = store.get('pausedSyncs', {});
+            const syncSettings = store.get('syncSettings', {});
+            const autoResumeDelay = syncSettings.autoResumeDelay || 0;
+            const autoResumeAt = autoResumeDelay > 0 ? Date.now() + (autoResumeDelay * 60 * 1000) : null;
+            pausedSyncs[accountId] = {
+              remainingIds,
+              processedCount: cumulativePreviouslyProcessed + processedCount,
+              totalEmails,
+              originalTotalEmails: cumulativeOriginalTotal > 0 ? cumulativeOriginalTotal : totalEmails,
+              ordersFound: filteredOrders.length,
+              pausedAt: Date.now(), dateFrom, dateTo, autoResumeAt
+            };
+            store.set('pausedSyncs', pausedSyncs);
+            sendProgress(`Paused: ${filteredOrders.length} orders saved`, processedCount, totalEmails);
+            addUserLog(`⏸ Fast Sync paused - ${filteredOrders.length} orders saved. ${remainingIds.length} emails remaining.`, 'warning');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('sync-paused', { accountId, remainingCount: remainingIds.length, ordersFound: filteredOrders.length, autoResumeAt });
+            }
+            saveSyncLog();
+            safeResolve({ success: false, paused: true, error: `Sync paused - click Resume to continue.`, partialOrders: filteredOrders.length, remainingEmails: remainingIds.length });
+          }
+
+          function onWorkerDone() {
+            activeWorkers--;
+            if (activeWorkers > 0) return;
+            if (pausing) { savePausedConcurrent(); return; }
+            // Wait for async parses to settle (processedCount catches up to dispatchedCount).
+            const poll = setInterval(() => {
+              if (processedCount >= dispatchedCount) { clearInterval(poll); finalizeConcurrent(); }
+            }, 100);
+            setTimeout(() => { clearInterval(poll); finalizeConcurrent(); }, 60000); // safety
+          }
+
+          function runWorkerLoop(conn, chunkIds, workerIdx) {
+            let offset = 0;
+            function nextBatch() {
+              if (cancelled) { pausedRemainingIds.push(chunkIds.slice(offset)); onWorkerDone(); return; }
+              if (!pausing && pauseRequested.has(accountId)) { pausing = true; pauseRequested.delete(accountId); }
+              if (pausing) { pausedRemainingIds.push(chunkIds.slice(offset)); onWorkerDone(); return; }
+              if (offset >= chunkIds.length) { onWorkerDone(); return; }
+
+              const startOffset = offset;
+              const batch = chunkIds.slice(startOffset, startOffset + BATCH_SIZE);
+              offset = startOffset + batch.length;
+
+              let received = 0; const expected = batch.length; let advanced = false;
+              function batchDone() { if (advanced) return; advanced = true; setTimeout(nextBatch, BATCH_DELAY); }
+
+              let f;
+              try { f = conn.fetch(batch, { bodies: '' }); }
+              catch (e) {
+                logDebug('error', `[FAST] worker ${workerIdx} fetch threw`, { error: e.message });
+                pausedRemainingIds.push(chunkIds.slice(startOffset)); onWorkerDone(); return;
+              }
+
+              f.on('message', (msg) => {
+                let buffer = ''; let done = false;
+                const to = setTimeout(() => {
+                  if (done) return; done = true;
+                  fetchTimeoutCount++; processedCount++; dispatchedCount++; received++;
+                  sendProgress(`${processedCount}/${totalEmails}`, processedCount, totalEmails);
+                  if (received >= expected) batchDone();
+                }, 15000);
+                msg.on('body', (stream) => { stream.on('data', (chunk) => { if (!done) buffer += chunk.toString('utf8'); }); });
+                msg.once('end', () => {
+                  clearTimeout(to);
+                  if (done) return; done = true;
+                  dispatchedCount++; received++;
+                  processEmailBuffer(buffer);
+                  if (received >= expected) batchDone();
+                });
+              });
+              f.once('end', () => { if (!advanced) batchDone(); });
+              f.once('error', (err) => {
+                if (advanced) return; advanced = true;
+                logDebug('error', `[FAST] worker ${workerIdx} batch error`, { error: err.message });
+                pausedRemainingIds.push(chunkIds.slice(startOffset)); onWorkerDone();
+              });
+            }
+            nextBatch();
+          }
+
+          function startWorkers(conns) {
+            const n = conns.length;
+            activeWorkers = n;
+            addUserLog(`⚡ Fast Sync: ${n} connection${n !== 1 ? 's' : ''} working in parallel`);
+            logDebug('info', `[FAST] starting ${n} workers for ${allIds.length} emails`);
+            const chunkSize = Math.ceil(allIds.length / n);
+            for (let i = 0; i < n; i++) {
+              const chunk = allIds.slice(i * chunkSize, (i + 1) * chunkSize);
+              if (chunk.length === 0) { activeWorkers--; continue; }
+              runWorkerLoop(conns[i], chunk, i);
+            }
+            if (activeWorkers === 0) finalizeConcurrent();
+          }
+
+          // Worker 0 reuses the already-open `imap`; open extra connections for the rest.
+          const extraNeeded = desiredWorkers - 1;
+          if (extraNeeded <= 0) { startWorkers([imap]); return; }
+          let pending = extraNeeded;
+          for (let i = 0; i < extraNeeded; i++) {
+            const wc = new Imap({
+              user: account.email, password: sanitizedPassword, host, port,
+              tls: true, tlsOptions: { rejectUnauthorized: false },
+              connTimeout: 45000, authTimeout: 30000, keepalive: false
+            });
+            let settled = false;
+            const settle = (ok) => {
+              if (settled) return; settled = true;
+              if (ok) extraConns.push(wc);
+              pending--;
+              if (pending === 0) startWorkers([imap, ...extraConns]);
+            };
+            // Persistent error listener prevents an unhandled 'error' from crashing the process.
+            wc.on('error', (err) => {
+              if (!settled) { logDebug('warn', '[FAST] worker connect failed', { error: err.message }); settle(false); return; }
+              logDebug('warn', '[FAST] worker connection error', { error: err.message });
+            });
+            wc.once('ready', () => {
+              wc.openBox(openedMailboxName, true, (err) => {
+                if (err) { logDebug('warn', '[FAST] worker openBox failed', { error: err.message }); try { wc.end(); } catch (e) {} settle(false); }
+                else settle(true);
+              });
+            });
+            try { wc.connect(); } catch (e) { settle(false); }
+          }
+        }
+
+        // Start fetching. Fast Sync (opt-in) uses concurrent connections; otherwise
+        // the original single-connection batched path runs unchanged.
+        if (fastWorkers > 1) {
+          fetchAllConcurrent(ids, fastWorkers);
+        } else {
+          fetchBatchWithImap(imap, ids, 0);
+        }
       }
     });
 
@@ -10160,6 +10360,12 @@ ipcMain.handle('update-orders-from-tracking', async (_, updates) => {
       // Update ETA if provided
       if (upd.eta && upd.eta !== order.eta) {
         order.eta = upd.eta;
+        changed = true;
+      }
+      // Stamp delivery date when delivered (so Recently Delivered shows a real date
+      // instead of "Unknown"). Use the proxy's date if given, else observation time.
+      if (upd.status === 'delivered' && !order.deliveredDate) {
+        order.deliveredDate = upd.deliveredDate || new Date().toISOString();
         changed = true;
       }
       if (changed) updated++;

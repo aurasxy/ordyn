@@ -4155,7 +4155,139 @@ function persistOauthTokens(accountId, newTokens) {
     refresh_token: newTokens.refresh_token ? encryptPassword(newTokens.refresh_token) : accounts[idx].oauthTokens?.refresh_token,
     expires_at: newTokens.expires_at,
   };
+  // A successful (re)issue means the account is healthy again — clear any stale
+  // "token expired" reauth flag we set on a prior failure. (We deliberately do
+  // NOT clear other reasons like 'outlook-imap-deprecated'.)
+  if (accounts[idx].needsReauth && accounts[idx].reauthReason === 'oauth-token-expired') {
+    delete accounts[idx].needsReauth;
+    delete accounts[idx].reauthReason;
+  }
   store.set('accounts', accounts);
+}
+
+// True for accounts that authenticate to Outlook via Microsoft Graph OAuth.
+function isOauthAccount(a) {
+  return !!a
+    && (a.mailbox === 'graph' || a.authMethod === 'oauth2')
+    && !!(a.oauthTokens && a.oauthTokens.refresh_token);
+}
+
+// Mark an account as needing an interactive re-login and tell the renderer.
+function flagAccountNeedsReauth(accountId, reason) {
+  const accounts = store.get('accounts', []);
+  const idx = accounts.findIndex(a => a.id === accountId);
+  if (idx === -1) return;
+  accounts[idx].needsReauth = true;
+  accounts[idx].reauthReason = reason;
+  store.set('accounts', accounts);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('account-needs-reauth', { accountId, reason, email: accounts[idx].email });
+  }
+}
+
+// In-flight refresh promises keyed by accountId. Microsoft rotates the refresh
+// token on every redemption, so two concurrent refreshes of the SAME account
+// (e.g. the keepalive timer racing an active sync) would each get a new token
+// but only one rotation would be persisted — orphaning the other and risking
+// invalidation of the token family. This lock guarantees one refresh at a time
+// per account; concurrent callers await the same in-flight result.
+const oauthRefreshLocks = new Map();
+
+// Redeem (rotate) one account's OAuth refresh token and persist the result.
+// Serialized per account. Returns { success, tokens?, needsReauth?, error? }.
+async function refreshAccountToken(accountId) {
+  if (oauthRefreshLocks.has(accountId)) return oauthRefreshLocks.get(accountId);
+
+  const p = (async () => {
+    const account = getAccountById(accountId);
+    if (!isOauthAccount(account)) return { success: false, error: 'not-an-oauth-account' };
+
+    let refreshToken;
+    try {
+      refreshToken = decryptPassword(account.oauthTokens.refresh_token);
+    } catch (e) {
+      return { success: false, error: 'refresh-token-decrypt-failed' };
+    }
+    if (!refreshToken) return { success: false, error: 'no-refresh-token' };
+
+    try {
+      const fresh = await msoauth.refreshAccessToken({
+        refreshToken,
+        clientId: msoauth.AZURE_CLIENT_ID,
+      });
+      persistOauthTokens(accountId, fresh);
+      return { success: true, tokens: fresh };
+    } catch (e) {
+      const msg = e?.message || String(e);
+      // Only terminal OAuth errors mean the user must actually sign in again.
+      // Transient failures (throttling, network, service blips) must NOT flag
+      // the account — they'll simply retry on the next cycle/sync.
+      const needsReauth = /invalid_grant|interaction_required|missing OAuth|reconnect/i.test(msg);
+      if (needsReauth) flagAccountNeedsReauth(accountId, 'oauth-token-expired');
+      return { success: false, error: msg, needsReauth };
+    }
+  })().finally(() => oauthRefreshLocks.delete(accountId));
+
+  oauthRefreshLocks.set(accountId, p);
+  return p;
+}
+
+// ==================== OAUTH TOKEN KEEPALIVE ====================
+// Outlook OAuth refresh tokens live on a *rolling* window: Microsoft keeps them
+// valid (up to 90 days) only if they're redeemed regularly; left idle they lapse
+// and force an interactive re-login. Previously tokens were only ever refreshed
+// during an active email sync, so accounts a user didn't sync often would quietly
+// expire — the "I have to re-login every account every week" problem, worst for
+// users with many accounts. This timer redeems (and rotates) every OAuth
+// account's refresh token on startup and every 6 hours, independent of sync, so
+// the rolling window is perpetually renewed and tokens never go idle.
+let oauthKeepaliveTimer = null;
+let oauthKeepaliveRunning = false;
+const OAUTH_KEEPALIVE_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+async function runOauthKeepalive(reason = 'interval') {
+  if (oauthKeepaliveRunning) return; // never overlap cycles
+  oauthKeepaliveRunning = true;
+  try {
+    const accounts = store.get('accounts', []).filter(isOauthAccount);
+    if (accounts.length === 0) return;
+    console.log(`[OAuth Keepalive] (${reason}) checking ${accounts.length} Outlook account(s)`);
+    let refreshed = 0, skipped = 0, failed = 0;
+    for (const account of accounts) {
+      // An in-progress sync will refresh this account itself — skip so we never
+      // redeem the same refresh token twice at once. (refreshAccountToken's lock
+      // is the hard guarantee; this is a cheap early-out.)
+      if (activeSyncs.has(account.id)) { skipped++; continue; }
+      const r = await refreshAccountToken(account.id);
+      if (r.success) {
+        refreshed++;
+      } else {
+        failed++;
+        if (r.needsReauth) {
+          console.warn(`[OAuth Keepalive] ${account.email} needs re-login: ${r.error}`);
+        } else {
+          console.warn(`[OAuth Keepalive] ${account.email} refresh failed (will retry): ${r.error}`);
+        }
+      }
+      // Small stagger so we don't hammer Microsoft's token endpoint when a user
+      // has many accounts.
+      await new Promise((res) => setTimeout(res, 750));
+    }
+    console.log(`[OAuth Keepalive] done — refreshed=${refreshed} skipped=${skipped} failed=${failed}`);
+  } catch (e) {
+    console.error('[OAuth Keepalive] cycle error:', e?.message || e);
+  } finally {
+    oauthKeepaliveRunning = false;
+  }
+}
+
+function startOauthKeepalive() {
+  // First pass shortly after boot (let the window + initial sync settle first).
+  setTimeout(() => { runOauthKeepalive('startup'); }, 20 * 1000);
+  oauthKeepaliveTimer = setInterval(() => {
+    runOauthKeepalive('interval');
+  }, OAUTH_KEEPALIVE_INTERVAL_MS);
+  console.log('[OAuth Keepalive] Timer started — refreshing Outlook tokens every 6h');
 }
 
 // Microsoft Graph sync for Outlook OAuth accounts. Reuses the EXACT same
@@ -4239,7 +4371,13 @@ async function syncOutlookGraph(account, dateFrom, dateTo) {
     return { success: true, orders: saved, ordersSaved: saved };
   } catch (e) {
     const msg = e?.message || String(e);
-    const needsReauth = /invalid_grant|interaction_required|AADSTS|missing OAuth|reconnect/i.test(msg);
+    // Only TERMINAL OAuth errors mean the user must sign in again. The old check
+    // matched `AADSTS` — which prefixes EVERY Microsoft error including transient
+    // throttling/service blips — so a temporary failure would wrongly force a
+    // re-login. invalid_grant / interaction_required are the standard OAuth2
+    // codes for "refresh token dead" / "interactive auth required".
+    const needsReauth = /invalid_grant|interaction_required|missing OAuth|reconnect/i.test(msg);
+    if (needsReauth) flagAccountNeedsReauth(account.id, 'oauth-token-expired');
     console.error(`[GRAPH] Sync failed for ${account.email}:`, msg);
     sendProgress('Sync failed', 0, 0);
     return {
@@ -11993,6 +12131,8 @@ app.whenReady().then(() => {
   if (!SOLUS_TEST_MODE) {
     // Start auto-resume timer for paused syncs
     startAutoResumeTimer();
+    // Keep Outlook OAuth tokens alive so users never have to re-login
+    startOauthKeepalive();
   }
 
   // Start AYCD Inbox live monitors for any accounts using mailbox === 'aycd'.

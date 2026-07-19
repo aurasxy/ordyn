@@ -4,6 +4,19 @@ All notable changes to SOLUS are documented in this file.
 
 ---
 
+## [2.3.17] - July 2026
+
+### Fixed
+
+#### Outlook OAuth accounts no longer sign out
+- **Background token keepalive** — Outlook (Microsoft) sign-ins now stay connected indefinitely. Previously, accounts a user didn't sync often would quietly expire after about a week and require re-logging in to every account. SOLUS now silently refreshes every Outlook OAuth token on startup and every 6 hours, keeping them alive whether or not you sync.
+- **No more double-refresh conflicts** — Token refreshes are now serialized per account, so the keepalive and an active sync can never collide and invalidate a login (which especially affected users with many accounts).
+- **Smarter re-login prompts** — Temporary hiccups (throttling, network blips) no longer wrongly flag an account as needing re-login; only a genuinely expired sign-in does.
+
+> Note: the keepalive runs while SOLUS is open. Opening the app at least once a week keeps all Outlook logins alive permanently.
+
+---
+
 ## [2.0.0] - February 2026
 
 ### Major New Features

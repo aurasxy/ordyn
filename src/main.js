@@ -307,6 +307,21 @@ const store = new Store({
   }
 });
 
+// TLS options for every IMAP connection.
+//
+// Certificate validation must stay ON: all four supported providers (Gmail, iCloud,
+// Outlook, Yahoo) present valid public certificates, and disabling it hands the
+// account's app password and full mailbox contents to anyone on a hostile network.
+// The opt-in below exists only for users behind a corporate MITM proxy that injects
+// its own root; it is off unless explicitly enabled.
+function imapTlsOptions(host) {
+  if (store.get('allowInsecureTls', false) === true) {
+    console.warn('[IMAP] TLS certificate validation DISABLED via allowInsecureTls setting');
+    return { rejectUnauthorized: false };
+  }
+  return { rejectUnauthorized: true, servername: host };
+}
+
 // Track active syncs for cancellation
 const activeSyncs = new Map(); // accountId -> { imap, cancel: () => void }
 
@@ -2010,6 +2025,11 @@ function extractCancelInfo(text, html, retailer) {
   // Retailer-forced cancel reasons
   // nonPenalizing = true means it does NOT affect stick rate (not the account's fault)
   const categorized = [
+    // Retailer-side "technical issue" (Target: "due to a technical issue" / "an issue on our end").
+    // PENALIZES: on high-demand drops this wording is how Target dresses up a bot/soft-ban cancel,
+    // so it counts as a lost order rather than being excused like a real stockout.
+    { pattern: /(?:due to|because of)\s+(?:an?\s+)?(?:technical|system)\s+(?:issue|problem|error|glitch)/i, reason: 'Retailer technical issue', nonPenalizing: false },
+    { pattern: /(?:issue|problem|error)\s+on\s+our\s+end/i, reason: 'Retailer technical issue', nonPenalizing: false },
     // Policy review / flagged (Walmart: "flagged by our policy review team") — penalizes stick rate
     { pattern: /flagged\s+by\s+(?:our\s+)?policy\s+review/i, reason: 'Policy review', nonPenalizing: false },
     // Quantity / purchase limits — does NOT penalize (retailer limit, not account fault)
@@ -2416,10 +2436,17 @@ function parseTargetEmail(parsed, accountEmail) {
     }
   }
   
-  // Find order ID - Target uses 15-digit order numbers
-  const orderMatch = html.match(/order\s*#?\s*:?\s*(\d{15})/i) ||
-                     text.match(/order\s*#?\s*:?\s*(\d{15})/i) ||
-                     subject.match(/#?(\d{15})/);
+  // Find order ID - Target uses 15-digit order numbers.
+  // Some templates (e.g. "We canceled your items due to a technical issue.") put markup between
+  // the "Order #" label and the digits — `Order #<font><a href="...">912003654785399</a></font>`
+  // in HTML, and a click-tracking URL on its own line in plain text. The direct matches miss
+  // those, so fall back to tag-stripped / URL-stripped copies where label and number are adjacent.
+  const ORDER_ID_RE = /order\s*#?\s*:?\s*#?\s*(\d{15})/i;
+  const orderMatch = html.match(ORDER_ID_RE) ||
+                     text.match(ORDER_ID_RE) ||
+                     subject.match(/#?(\d{15})/) ||
+                     html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;?/gi, ' ').replace(/\s+/g, ' ').match(ORDER_ID_RE) ||
+                     text.replace(/https?:\/\/\S+/g, ' ').replace(/\s+/g, ' ').match(ORDER_ID_RE);
   console.log(`[TARGET] Order ID search: subject="${subject.substring(0, 80)}", found=${orderMatch ? orderMatch[1] : 'NONE'}, htmlLen=${html.length}, textLen=${text.length}`);
   if (!orderMatch) return null;
   const orderId = orderMatch[1];
@@ -2691,10 +2718,11 @@ function parseTargetEmail(parsed, accountEmail) {
       if (/click\.oe1\.target\.com/i.test(line)) {
         // Look at next few lines for potential product name
         for (let j = i + 1; j < Math.min(i + 4, textLines.length); j++) {
-          const nextLine = textLines[j];
+          // Target's plain-text part carries raw entities (Pok&#233;mon), so decode before use
+          const nextLine = decodeHtmlEntities(textLines[j]).trim();
           // Skip empty-ish lines and URLs
           if (nextLine.length < 10 || /^https?:/i.test(nextLine) || /click\.oe1/i.test(nextLine)) continue;
-          
+
           if (isValidProductName(nextLine)) {
             itemName = nextLine.substring(0, 150);
             break;
@@ -2714,7 +2742,7 @@ function parseTargetEmail(parsed, accountEmail) {
     
     let altMatch = imgAltRegex.exec(html);
     if (altMatch) {
-      const candidate = altMatch[2].replace(/&amp;/g, '&').replace(/&#\d+;/g, '').replace(/&mdash;/g, '—').replace(/&nbsp;/g, ' ').trim();
+      const candidate = decodeHtmlEntities(altMatch[2]).trim();
       if (isValidProductName(candidate)) {
         itemName = candidate;
         pairedImageUrl = altMatch[1].replace(/&amp;/g, '&');
@@ -2724,7 +2752,7 @@ function parseTargetEmail(parsed, accountEmail) {
     if (!itemName) {
       altMatch = imgAltRegex2.exec(html);
       if (altMatch) {
-        const candidate = altMatch[1].replace(/&amp;/g, '&').replace(/&#\d+;/g, '').replace(/&mdash;/g, '—').replace(/&nbsp;/g, ' ').trim();
+        const candidate = decodeHtmlEntities(altMatch[1]).trim();
         if (isValidProductName(candidate)) {
           itemName = candidate;
           pairedImageUrl = altMatch[2].replace(/&amp;/g, '&');
@@ -2739,7 +2767,7 @@ function parseTargetEmail(parsed, accountEmail) {
     const h2LinkRegex = /<h2[^>]*>[\s\S]*?<a[^>]*>([^<]{10,150})<\/a>[\s\S]*?<\/h2>/gi;
     let h2Match;
     while ((h2Match = h2LinkRegex.exec(html)) !== null) {
-      const candidate = h2Match[1].replace(/&amp;/g, '&').replace(/&#\d+;/g, '').replace(/&mdash;/g, '—').replace(/&nbsp;/g, ' ').trim();
+      const candidate = decodeHtmlEntities(h2Match[1]).trim();
       if (isValidProductName(candidate)) {
         itemName = candidate;
         break;
@@ -2753,8 +2781,8 @@ function parseTargetEmail(parsed, accountEmail) {
     const textLines = text.split(/[\r\n]+/).map(l => l.trim()).filter(l => l.length > 0);
     
     for (let i = 0; i < textLines.length; i++) {
-      const line = textLines[i];
-      
+      const line = decodeHtmlEntities(textLines[i]).trim();
+
       // Check if a nearby line has Qty
       const nextLines = textLines.slice(i + 1, i + 5).join(' ');
       if (/Qty:\s*\d+/i.test(nextLines)) {
@@ -4599,7 +4627,7 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
       host: host,
       port: port,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false },
+      tlsOptions: imapTlsOptions(host),
       connTimeout: 45000,
       authTimeout: 30000,
       keepalive: false
@@ -4796,6 +4824,10 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           { subject: 'Thank you for shopping', retailer: 'pokecenter' },
           { subject: 'has been canceled', retailer: null },
           { subject: 'has been cancelled', retailer: null },
+          // Target's retailer-forced cancel subjects never say "has been canceled":
+          // "We canceled your items due to a technical issue." / "Sorry, we had to cancel order #..."
+          { subject: 'we canceled', retailer: null },
+          { subject: 'had to cancel', retailer: null },
           { subject: 'Shipped:', retailer: null },
           { subject: 'Delivered', retailer: null },
           { subject: 'has shipped', retailer: null },
@@ -5158,7 +5190,7 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
             host: host,
             port: port,
             tls: true,
-            tlsOptions: { rejectUnauthorized: false },
+            tlsOptions: imapTlsOptions(host),
             connTimeout: 45000,
             authTimeout: 30000,
             keepalive: false
@@ -5996,7 +6028,7 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           for (let i = 0; i < extraNeeded; i++) {
             const wc = new Imap({
               user: account.email, password: sanitizedPassword, host, port,
-              tls: true, tlsOptions: { rejectUnauthorized: false },
+              tls: true, tlsOptions: imapTlsOptions(host),
               connTimeout: 45000, authTimeout: 30000, keepalive: false
             });
             let settled = false;
@@ -6612,7 +6644,8 @@ function decodeHtmlEntities(str) {
     .replace(/&#(\d+);/g, (_, c) => String.fromCharCode(parseInt(c)))
     .replace(/&#x([0-9a-f]+);/gi, (_, c) => String.fromCharCode(parseInt(c, 16)))
     .replace(/&amp;/g, '&').replace(/&mdash;/g, '—').replace(/&ndash;/g, '–')
-    .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ');
 }
 
 // Apply a chosen Target image to orders in ONE drop only (never overwrites existing images)
@@ -7217,7 +7250,7 @@ ipcMain.handle('test-connection', async (_, emailOrIdOrConfig, password, provide
       host: host,
       port: port,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false },
+      tlsOptions: imapTlsOptions(host),
       connTimeout: 30000,
       authTimeout: 30000,
       keepalive: false
@@ -9895,14 +9928,24 @@ ipcMain.handle('resync-drop', async (_, retailer, date) => {
   // Walmart ship emails have date:null + amount:$0, making orders invisible.
   // Instead, let saveOrdersBatch merge new data into existing orders.
 
-  // Sync all accounts for just this one day, filtered to target retailer
+  // Sync all accounts for this drop, filtered to the target retailer.
+  // Scan a few days PAST the drop date — cancel/ship/delivery emails routinely land 1-3 days
+  // after the order, and a single-day window never fetched them, so a drop resynced the same
+  // day it happened kept showing cancelled orders as confirmed. Merge keeps the confirmed
+  // email's date, so the extra days don't move anything out of this drop's grouping.
+  const CANCEL_LOOKAHEAD_DAYS = 3;
+  const lookaheadTo = new Date(date + 'T00:00:00');
+  lookaheadTo.setDate(lookaheadTo.getDate() + CANCEL_LOOKAHEAD_DAYS);
+  // Fall back to the single-day window if the drop date isn't parseable
+  const dateTo = isNaN(lookaheadTo) ? date : localDateStr(lookaheadTo);
+
   let totalOrders = 0;
   let successCount = 0;
   const errors = [];
 
   for (const account of accounts) {
     try {
-      const result = await queueSync(account.id, date, date, retailer);
+      const result = await queueSync(account.id, date, dateTo, retailer);
       if (result && result.success !== false) {
         successCount++;
         totalOrders += result.orders || 0;
@@ -10157,9 +10200,44 @@ ipcMain.handle('refresh-all-data', () => {
 ipcMain.handle('get-jig-settings', () => getJigSettings());
 ipcMain.handle('save-jig-settings', (_, settings) => saveJigSettings(settings));
 
+// ---- Renderer-initiated file writes ----------------------------------------
+// The renderer supplies both the folder and the file name for the save-* handlers
+// below. Resolving the name against a caller-supplied folder only prevents escaping
+// a directory the caller already chose, so it is no protection at all: the renderer
+// could name Startup, or any other sensitive directory. Instead the main process
+// keeps a set of folders the *user* picked through a dialog, and writes are only
+// permitted into one of those, with an extension allow-list on top.
+const authorizedSaveFolders = new Set();
+function authorizeSaveFolder(folderPath) {
+  if (folderPath) authorizedSaveFolders.add(path.resolve(folderPath));
+  return folderPath;
+}
+// Folders persisted from an earlier session were still chosen through the dialog.
+authorizeSaveFolder(store.get('pdfSaveFolder', ''));
+authorizeSaveFolder(store.get('flexSaveFolder', ''));
+
+function resolveSafeSavePath(folderPath, fileName, allowedExts) {
+  if (!folderPath || !fileName) return { error: 'Missing folder or file name' };
+  const resolvedFolder = path.resolve(String(folderPath));
+  if (!authorizedSaveFolders.has(resolvedFolder)) {
+    return { error: 'Folder not authorized — choose a save folder first' };
+  }
+  const base = path.basename(String(fileName));
+  if (!base || base !== String(fileName) || base === '.' || base === '..') {
+    return { error: 'Invalid file name' };
+  }
+  const ext = path.extname(base).toLowerCase();
+  if (!allowedExts.includes(ext)) {
+    return { error: `Unsupported file type: ${ext || '(none)'}` };
+  }
+  const fullPath = path.resolve(resolvedFolder, base);
+  if (path.dirname(fullPath) !== resolvedFolder) return { error: 'Invalid file path' };
+  return { fullPath };
+}
+
 // PDF export folder handlers
 ipcMain.handle('get-pdf-folder', () => {
-  return store.get('pdfSaveFolder', '');
+  return authorizeSaveFolder(store.get('pdfSaveFolder', ''));
 });
 
 ipcMain.handle('choose-pdf-folder', async () => {
@@ -10174,6 +10252,7 @@ ipcMain.handle('choose-pdf-folder', async () => {
     if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
       const folderPath = result.filePaths[0];
       store.set('pdfSaveFolder', folderPath);
+      authorizeSaveFolder(folderPath);
       console.log('[PDF Folder] Saved folder:', folderPath);
       return { success: true, path: folderPath };
     }
@@ -10191,13 +10270,9 @@ ipcMain.handle('clear-pdf-folder', () => {
 
 ipcMain.handle('save-pdf-to-folder', async (_, folderPath, fileName, arrayBuffer) => {
   try {
-    const fullPath = path.join(folderPath, fileName);
-    // Path traversal protection
-    const resolvedFolder = path.resolve(folderPath);
-    const resolvedFull = path.resolve(fullPath);
-    if (!resolvedFull.startsWith(resolvedFolder + path.sep) && resolvedFull !== resolvedFolder) {
-      return { success: false, error: 'Invalid file path' };
-    }
+    const check = resolveSafeSavePath(folderPath, fileName, ['.pdf']);
+    if (check.error) return { success: false, error: check.error };
+    const fullPath = check.fullPath;
     const buffer = Buffer.from(arrayBuffer);
     await fs.promises.writeFile(fullPath, buffer);
     return { success: true, path: fullPath };
@@ -10322,7 +10397,10 @@ ipcMain.handle('choose-save-folder', async () => {
       return { success: false, canceled: true };
     }
 
-    return { success: true, folderPath: result.filePaths[0] };
+    // Persisted in the main store (not just renderer localStorage) so the folder
+    // stays authorized for writes after a restart.
+    store.set('flexSaveFolder', result.filePaths[0]);
+    return { success: true, folderPath: authorizeSaveFolder(result.filePaths[0]) };
   } catch (err) {
     console.error('[Choose Folder Error]', err);
     return { success: false, error: err.message };
@@ -10332,18 +10410,16 @@ ipcMain.handle('choose-save-folder', async () => {
 // Save image to file
 ipcMain.handle('save-image-to-file', (_, dataUrl, folderPath, fileName) => {
   try {
-    // Convert data URL to buffer
+    const check = resolveSafeSavePath(folderPath, fileName, ['.png']);
+    if (check.error) return { success: false, error: check.error };
+    const filePath = check.fullPath;
+
+    // Convert data URL to buffer — reject anything that isn't an actual PNG data URL
+    if (typeof dataUrl !== 'string' || !/^data:image\/png;base64,/.test(dataUrl)) {
+      return { success: false, error: 'Expected a PNG data URL' };
+    }
     const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
-
-    // Create full file path
-    const filePath = path.join(folderPath, fileName);
-    // Path traversal protection
-    const resolvedFolder = path.resolve(folderPath);
-    const resolvedFull = path.resolve(filePath);
-    if (!resolvedFull.startsWith(resolvedFolder + path.sep) && resolvedFull !== resolvedFolder) {
-      return { success: false, error: 'Invalid file path' };
-    }
 
     // Write file
     fs.writeFileSync(filePath, buffer);

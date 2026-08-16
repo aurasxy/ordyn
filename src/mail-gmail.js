@@ -332,7 +332,7 @@ class GmailIdleListener {
       host: IMAP_HOST,
       port: IMAP_PORT,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false },
+      tlsOptions: { rejectUnauthorized: true, servername: IMAP_HOST },
       keepalive: { interval: 10000, idleInterval: 300000, forceNoop: true },
       authTimeout: 30000,
       connTimeout: 45000,

@@ -15,7 +15,14 @@ const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/license-api`;
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxtYnBjdGtveHhkaGJtdWR1ZHp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzgyOTgsImV4cCI6MjA4NDAxNDI5OH0.idygxFnWQE6FDKOyU7MCFXfzZ5_meAyahuA4xcWjuzk';
 
 const HEARTBEAT_INTERVAL = 60 * 60 * 1000;
-const OFFLINE_GRACE_PERIOD = 30 * 60 * 1000;
+// Grace when the licensing server is UNREACHABLE (offline, DNS failure, 5xx).
+// Must be comfortably longer than HEARTBEAT_INTERVAL, or the cache is already
+// "expired" by the time the next validation runs and one missed heartbeat on a
+// flaky connection locks a paying user out.
+const OFFLINE_GRACE_PERIOD = 7 * 24 * 60 * 60 * 1000;
+// Grace when the server gives a definitive "this key is not valid" verdict.
+// Deliberately short so revocation and expiry take effect promptly.
+const REVOKED_GRACE_PERIOD = 30 * 60 * 1000;
 
 const getCachePath = () => {
   const userDataPath = app.getPath('userData');
@@ -136,27 +143,36 @@ function readCache() {
       if (raw.sig && raw.payload) {
         const verified = verifyCacheData(raw);
         if (!verified) {
-          // Don't clear — try to recover the payload and re-sign
-          console.error('[License] Cache signature invalid — attempting recovery');
-          try {
-            const payload = JSON.parse(raw.payload);
-            if (payload && payload.licenseKey) {
-              console.log('[License] Recovered cache payload, re-signing with current key');
-              payload.machineId = getHardwareMachineId();
-              writeCache(payload);
-              return payload;
-            }
-          } catch {}
-          console.error('[License] Recovery failed — clearing cache');
+          // A bad signature means the file was tampered with or hand-written.
+          // Never parse and re-sign it — that would accept any forged payload
+          // (including an attacker-chosen validatedAt and plan) and make the
+          // whole HMAC layer decorative. verifyCacheData already handles the
+          // one legitimate mismatch, the v1 -> v2 key migration.
+          console.error('[License] Cache signature invalid — clearing cache');
           clearCache();
           return null;
         }
         return verified;
       }
-      // Legacy unsigned cache — migrate it by re-writing signed
-      raw.machineId = getHardwareMachineId();
-      writeCache(raw);
-      return raw;
+      // Legacy unsigned cache. The key is kept so the user isn't forced to
+      // re-enter it, but validatedAt is discarded: an unsigned file proves
+      // nothing, so it must not be able to satisfy the offline grace window.
+      // The next online validation re-signs it properly.
+      if (!raw.licenseKey) {
+        clearCache();
+        return null;
+      }
+      const migrated = {
+        licenseKey: raw.licenseKey,
+        licenseId: raw.licenseId,
+        activationId: raw.activationId,
+        machineId: getHardwareMachineId(),
+        validatedAt: 0,
+        plan: raw.plan,
+        expiresAt: raw.expiresAt
+      };
+      writeCache(migrated);
+      return migrated;
     }
   } catch (err) {
     console.error('Failed to read license cache:', err);
@@ -198,7 +214,9 @@ async function callEdgeFunction(action, body) {
   const result = await response.json();
 
   if (!response.ok) {
-    throw new Error(result.error || `API Error: ${response.status}`);
+    const err = new Error(result.error || `API Error: ${response.status}`);
+    err.httpStatus = response.status;
+    throw err;
   }
 
   return result;
@@ -213,7 +231,11 @@ async function validateLicense(licenseKey) {
     return result;
   } catch (err) {
     console.error('License validation error:', err);
-    return { valid: false, error: err.message };
+    // Distinguish "the server said this key is bad" from "we could not reach the
+    // server". Only a 4xx is a verdict; a transport failure or a 5xx is not, and
+    // must never be allowed to revoke a paying user's license.
+    const isVerdict = err.httpStatus >= 400 && err.httpStatus < 500;
+    return { valid: false, networkError: !isVerdict, error: err.message };
   }
 }
 
@@ -284,20 +306,33 @@ async function checkLicense() {
       startHeartbeat();
 
       return { valid: true };
-    } else {
-      if (cacheAge < OFFLINE_GRACE_PERIOD) {
-        console.log('License invalid but within grace period');
-        return { valid: true, offline: true, warning: validation.error };
-      }
-
-      clearCache();
-      return { valid: false, error: validation.error };
     }
+
+    if (validation.networkError) {
+      // Could not reach the licensing server. This is not a verdict, so the
+      // cache must survive it — clearing here logged users out over a brief
+      // Supabase blip or any offline launch.
+      console.warn('[License] Could not reach licensing server:', validation.error);
+      if (cacheAge < OFFLINE_GRACE_PERIOD) {
+        return { valid: true, offline: true };
+      }
+      return { valid: false, offline: true, error: 'Unable to validate license — check your connection' };
+    }
+
+    // The server gave a definitive answer: this key is not valid.
+    if (cacheAge < REVOKED_GRACE_PERIOD) {
+      console.log('License invalid but within grace period');
+      return { valid: true, offline: true, warning: validation.error };
+    }
+
+    clearCache();
+    return { valid: false, error: validation.error };
   } catch (err) {
-    console.error('Online validation failed:', err);
+    // validateLicense catches its own errors, so reaching here means something
+    // unexpected threw (e.g. writeCache). Do not clear the cache.
+    console.error('Online validation failed unexpectedly:', err);
 
     if (cacheAge < OFFLINE_GRACE_PERIOD) {
-      console.log('Network error but within grace period');
       return { valid: true, offline: true };
     }
 

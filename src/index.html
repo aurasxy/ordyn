@@ -7689,6 +7689,39 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+// Encode a value for use inside a SINGLE-QUOTED JS string that lives inside an
+// HTML attribute, e.g. onclick="fn('${jsStr(name)}')".
+//
+// The browser HTML-decodes the attribute BEFORE parsing it as JS, so the value
+// must survive two layers: escape for the JS string literal first, then escape
+// for the attribute. Doing it in the other order (or calling escapeHtml alone)
+// does not work — escapeHtml already turns ' into &#39;, so any subsequent
+// .replace(/'/g, ...) matches nothing and the entity decodes back to a bare
+// quote that terminates the JS string.
+function jsStr(value) {
+  return escapeHtml(
+    String(value == null ? '' : value)
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\r/g, '\\r')
+      .replace(/\n/g, '\\n')
+  );
+}
+
+// Validate a CSS colour before interpolating it into a style attribute.
+function safeColor(value, fallback) {
+  return /^#[0-9a-fA-F]{3,8}$/.test(String(value || '')) ? String(value) : (fallback || '#57F287');
+}
+
+// Decode HTML entities without ever parsing the input as live HTML.
+// A <textarea>'s value decodes entities but never executes markup, unlike innerHTML.
+function decodeEntities(str) {
+  if (str == null) return '';
+  const ta = document.createElement('textarea');
+  ta.innerHTML = String(str).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return ta.value;
+}
+
 let orders = [], accounts = [], pausedSyncs = {};
 let emailNicknames = {};
 
@@ -8870,7 +8903,15 @@ async function setupAutoSyncInterval() {
       localStorage.setItem('lastGlobalSyncTime', now.toString());
 
       // Sync recent orders for all accounts (faster than full sync)
-      await syncRecentAll();
+      try {
+        await syncRecentAll();
+      } catch (err) {
+        // Never let a throw escape the interval callback — it would surface as an
+        // unhandled rejection and leave syncingAccounts populated.
+        console.error('[Auto-Sync] Scheduled sync threw:', err);
+        debugLog.error('sync', `Scheduled auto-sync failed: ${err && err.message ? err.message : err}`);
+        if (syncingAccounts) syncingAccounts.clear();
+      }
     }
   }, 60000); // Check every minute
 
@@ -11820,7 +11861,7 @@ function renderInsights(filteredOrders, allOrders) {
 
   // Helper to make item name clickable - searches for the item on the first matching retailer page
   function clickableItemName(name) {
-    const escaped = escapeHtml(name).replace(/'/g, '&#39;');
+    const escaped = jsStr(name);
     return `<div class="insight-name clickable" onclick="searchInsightItem('${escaped}')">${escapeHtml(name)}</div>`;
   }
 
@@ -11945,10 +11986,9 @@ function renderInsights(filteredOrders, allOrders) {
 
 // Navigate to retailer page and search for an insight item
 function searchInsightItem(itemName) {
-  // Decode HTML entities
-  const tmp = document.createElement('span');
-  tmp.innerHTML = itemName;
-  const decoded = tmp.textContent;
+  // Decode HTML entities WITHOUT parsing as HTML — assigning to innerHTML here
+  // would execute markup from parsed order emails (e.g. <img src=x onerror=...>).
+  const decoded = decodeEntities(itemName);
 
   // Find which retailer has matching orders
   const allOrders = computeOrderStatuses();
@@ -12660,8 +12700,6 @@ async function syncAllAccounts() {
   const promises = accounts.map(acc => {
     return window.api.syncAccount(acc.id, $('syncDateFrom').value, toDate, retailerFilter)
       .then(async result => {
-        syncingAccounts.delete(acc.id);
-
         if (result.success) {
           showAccountProgress(acc.id, 100, 100, `✓ ${result.orders}`);
           // Don't reload orders or re-render per-account — final refresh after Promise.all handles it.
@@ -12671,10 +12709,19 @@ async function syncAllAccounts() {
           setTimeout(() => hideAccountProgress(acc.id), 3000);
         }
         return result;
-      });
+      })
+      .catch(err => {
+        // Without this, a rejected IPC call leaves the id in syncingAccounts
+        // forever and every later sync silently no-ops until restart.
+        console.error('[SYNC] Account sync failed:', acc.email, err);
+        showAccountProgress(acc.id, 0, 0, '✗ Error');
+        setTimeout(() => hideAccountProgress(acc.id), 3000);
+        return { success: false, error: err && err.message ? err.message : String(err) };
+      })
+      .finally(() => syncingAccounts.delete(acc.id));
   });
 
-  // Wait for all to complete
+  // Wait for all to complete (each promise catches its own errors above, so this never rejects)
   await Promise.all(promises);
 
   // Final refresh of all views after all syncs complete (single re-render, not per-account)
@@ -12762,8 +12809,6 @@ async function syncRecentAll() {
 
     return window.api.syncAccount(acc.id, fromDate, toDate, retailerFilter)
       .then(async result => {
-        syncingAccounts.delete(acc.id);
-
         // Capture detailed debug log from main process
         if (result && result.debugLog && Array.isArray(result.debugLog)) {
           console.log('[DEBUG] Recent sync - Adding', result.debugLog.length, 'IMAP debug entries for', acc.email);
@@ -12783,7 +12828,17 @@ async function syncRecentAll() {
           setTimeout(() => hideAccountProgress(acc.id), 3000);
         }
         return result;
-      });
+      })
+      .catch(err => {
+        // Without this, a rejected IPC call leaves the id in syncingAccounts
+        // forever and every later sync silently no-ops until restart.
+        console.error('[SYNC] Recent sync failed:', acc.email, err);
+        debugLog.error('sync', `Recent sync failed for ${acc.email}: ${err && err.message ? err.message : err}`);
+        showAccountProgress(acc.id, 0, 0, '✗ Error');
+        setTimeout(() => hideAccountProgress(acc.id), 3000);
+        return { success: false, error: err && err.message ? err.message : String(err) };
+      })
+      .finally(() => syncingAccounts.delete(acc.id));
   });
 
   await Promise.all(promises);
@@ -14122,7 +14177,7 @@ function renderAccountPerfCards() {
       <div class="account-perf-card">
         <div class="account-perf-rank ${rankClass}">${overallIdx + 1}</div>
         <div class="account-perf-info">
-          <div class="account-perf-email" style="cursor:pointer;" onclick="editEmailNickname('${acc.email}')" title="${acc.email}">${resolveEmailName(acc.email)}</div>
+          <div class="account-perf-email" style="cursor:pointer;" onclick="editEmailNickname('${jsStr(acc.email)}')" title="${escapeHtml(acc.email)}">${escapeHtml(resolveEmailName(acc.email))}</div>
         </div>
         <div class="account-perf-stats">
           <div class="account-perf-rate ${rateClass}">${acc.rate.toFixed(0)}%</div>
@@ -15054,7 +15109,7 @@ function renderAccountStatsCards(data, allOrders) {
           <div class="account-score-badge" style="background:${getScoreColor(scoreData.score)};color:${getScoreBadgeTextColor(scoreData.score)};" title="Score: ${scoreData.score.toFixed(0)}/100&#10;Stick Rate: ${scoreData.breakdown.stickRate.toFixed(1)}%&#10;Volume Confidence: ${scoreData.breakdown.volumeConfidence.toFixed(0)}%&#10;Trend: ${scoreData.breakdown.trend}%">${scoreData.score.toFixed(0)}</div>
           <div class="account-stats-card-header">
             <div class="account-stats-rank">${rankEmoji}</div>
-            <div class="account-stats-email" title="${item.email}" style="cursor:pointer;" onclick="event.stopPropagation();editEmailNickname('${item.email}')">${resolveEmailName(item.email)}</div>
+            <div class="account-stats-email" title="${escapeHtml(item.email)}" style="cursor:pointer;" onclick="event.stopPropagation();editEmailNickname('${jsStr(item.email)}')">${escapeHtml(resolveEmailName(item.email))}</div>
           </div>
           <div class="account-stats-card-body">
             <div class="account-stats-rate-container">
@@ -15088,7 +15143,7 @@ function renderAccountStatsCards(data, allOrders) {
             </div>
           </div>
           <div class="account-stats-card-footer">
-            <button class="account-expand-btn" aria-expanded="${item.isExpanded}" onclick="toggleAccountOrders('${item.email.replace(/'/g, "\\'")}', '${item.retailer}')">
+            <button class="account-expand-btn" aria-expanded="${item.isExpanded}" onclick="toggleAccountOrders('${jsStr(item.email)}', '${jsStr(item.retailer)}')">
               ${item.isExpanded ? '&#9650; Hide Orders' : `&#9660; ${item.totalOrders} Orders`}
             </button>
           </div>
@@ -15183,7 +15238,7 @@ function renderAccountStatsCards(data, allOrders) {
             ` : ''}
           </div>
           <div class="account-stats-card-footer">
-            <button class="account-expand-btn" aria-expanded="${item.isExpanded}" onclick="toggleProfileOrders('${escapeHtml(item.profileName).replace(/'/g, "\\'")}', '${item.retailer || ''}')">
+            <button class="account-expand-btn" aria-expanded="${item.isExpanded}" onclick="toggleProfileOrders('${jsStr(item.profileName)}', '${jsStr(item.retailer || '')}')">
               ${item.isExpanded ? '&#9650; Hide Orders' : `&#9660; ${item.totalOrders} Orders`}
             </button>
           </div>
@@ -15212,7 +15267,7 @@ function renderAccountStatsCards(data, allOrders) {
         variantsHtml = `
           <div class="pkc-variants-container">
             ${sortedVariants.map(v => {
-              const variantKey = `${item.baseAddress}|${v.address}|${v.email}`.replace(/'/g, "\\'");
+              const variantKey = jsStr(`${item.baseAddress}|${v.address}|${v.email}`);
               const isOrdersExpanded = expandedVariantOrders.has(`${item.baseAddress}|${v.address}|${v.email}`);
               const ordersHtml = isOrdersExpanded ? renderVariantOrdersMini(v.orders) : '';
               return `
@@ -15274,7 +15329,7 @@ function renderAccountStatsCards(data, allOrders) {
             ${variantsHtml}
           </div>
           <div class="account-stats-card-footer">
-            <button class="pkc-expand-btn" aria-expanded="${item.isExpanded}" style="width:100%;background:var(--accent);color:white;border-color:var(--accent);" onclick="togglePKCVariants('${item.baseAddress.replace(/'/g, "\\'")}')">
+            <button class="pkc-expand-btn" aria-expanded="${item.isExpanded}" style="width:100%;background:var(--accent);color:white;border-color:var(--accent);" onclick="togglePKCVariants('${jsStr(item.baseAddress)}')">
               ${item.isExpanded ? '▲ Hide Details' : '▼ Show Details'}
             </button>
           </div>
@@ -15342,7 +15397,7 @@ function renderAccountStatsListView(data, allOrders) {
         <div class="account-stats-list-item${item.tier === 'diamond' ? ' diamond-tier' : ''}" style="flex-wrap:wrap;">
           <div class="account-stats-list-rank">${rankEmoji}</div>
           <div class="account-stats-list-info">
-            <div class="account-stats-list-email" style="cursor:pointer;" onclick="event.stopPropagation();editEmailNickname('${item.email}')">${resolveEmailName(item.email)}${recLabel}</div>
+            <div class="account-stats-list-email" style="cursor:pointer;" onclick="event.stopPropagation();editEmailNickname('${jsStr(item.email)}')">${escapeHtml(resolveEmailName(item.email))}${recLabel}</div>
             <div class="account-stats-list-meta">Last: ${lastOrder.text} <span class="last-order-relative ${lastOrder.relClass}">${lastOrder.relText}</span>${addrInfoList}</div>
             ${primaryAddrList && accountStatsSort === 'address' ? `<div class="account-stats-list-meta" style="font-size:10px;color:var(--text-muted);margin-top:2px;">&#128205; ${escapeHtml(primaryAddrList)}</div>` : ''}
           </div>
@@ -15371,7 +15426,7 @@ function renderAccountStatsListView(data, allOrders) {
             </div>
           </div>
           <div class="account-stats-list-actions">
-            <button class="account-expand-btn" aria-expanded="${item.isExpanded}" onclick="toggleAccountOrders('${item.email.replace(/'/g, "\\'")}', '${item.retailer}')">
+            <button class="account-expand-btn" aria-expanded="${item.isExpanded}" onclick="toggleAccountOrders('${jsStr(item.email)}', '${jsStr(item.retailer)}')">
               ${item.isExpanded ? '&#9650; Hide Orders' : `&#9660; ${item.totalOrders} Orders`}
             </button>
           </div>
@@ -15438,7 +15493,7 @@ function renderAccountStatsListView(data, allOrders) {
             </div>
           </div>
           <div class="account-stats-list-actions">
-            <button class="account-expand-btn" aria-expanded="${item.isExpanded}" onclick="toggleProfileOrders('${escapeHtml(item.profileName).replace(/'/g, "\\'")}', '${item.retailer || ''}')">
+            <button class="account-expand-btn" aria-expanded="${item.isExpanded}" onclick="toggleProfileOrders('${jsStr(item.profileName)}', '${jsStr(item.retailer || '')}')">
               ${item.isExpanded ? '&#9650; Hide Orders' : `&#9660; ${item.totalOrders} Orders`}
             </button>
           </div>
@@ -15465,7 +15520,7 @@ function renderAccountStatsListView(data, allOrders) {
         variantsHtml = `
           <div class="account-stats-list-expand">
             ${sortedVariants.map(v => {
-              const variantKey = `${item.baseAddress}|${v.address}|${v.email}`.replace(/'/g, "\\'");
+              const variantKey = jsStr(`${item.baseAddress}|${v.address}|${v.email}`);
               const isOrdersExpanded = expandedVariantOrders.has(`${item.baseAddress}|${v.address}|${v.email}`);
               const ordersHtml = isOrdersExpanded ? renderVariantOrdersMini(v.orders) : '';
               return `
@@ -15519,7 +15574,7 @@ function renderAccountStatsListView(data, allOrders) {
             </div>
           </div>
           <div class="account-stats-list-actions">
-            <button class="btn btn-sm" aria-expanded="${item.isExpanded}" style="background:var(--accent);color:white;border-color:var(--accent);" onclick="togglePKCVariantsListView('${item.baseAddress.replace(/'/g, "\\'")}')">
+            <button class="btn btn-sm" aria-expanded="${item.isExpanded}" style="background:var(--accent);color:white;border-color:var(--accent);" onclick="togglePKCVariantsListView('${jsStr(item.baseAddress)}')">
               ${item.isExpanded ? '▲ Hide Details' : '▼ Show Details'}
             </button>
           </div>
@@ -17309,7 +17364,15 @@ async function saveFlexAsPng() {
         }
       } catch (saveErr) {
         console.error('[Flex] Failed to save to folder:', saveErr);
-        toast('Failed to save, but copied to clipboard', 'warning');
+        if (/not authorized/i.test(saveErr && saveErr.message)) {
+          // Folder was picked before writes were restricted to dialog-chosen
+          // folders — clear it so the user is prompted to pick it again.
+          localStorage.removeItem('flexSaveFolder');
+          if (typeof updateFlexSaveFolderDisplay === 'function') updateFlexSaveFolderDisplay();
+          toast('Re-select your flex save folder in Settings (copied to clipboard)', 'warning');
+        } else {
+          toast('Failed to save, but copied to clipboard', 'warning');
+        }
       }
     } else {
       // No predetermined folder - use default browser download
@@ -18402,7 +18465,7 @@ function renderInventory() {
   // Render Grid View
   grid.innerHTML = items.map(item => {
     const totalInvestment = item.costPerItem * item.quantity;
-    const escapedName = (item.name || 'Unknown').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const escapedName = jsStr(item.name || 'Unknown');
 
     return `
       <div class="inv-item-card">
@@ -18434,7 +18497,7 @@ function renderInventory() {
   // Render List View
   list.innerHTML = items.map(item => {
     const totalInvestment = item.costPerItem * item.quantity;
-    const escapedName = (item.name || 'Unknown').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const escapedName = jsStr(item.name || 'Unknown');
 
     return `
       <div class="inv-list-item">
@@ -18568,7 +18631,7 @@ function renderTCGTracker() {
 
 function renderTCGCard(item) {
   const marketValue = (item.marketPrice || 0) * item.quantity;
-  const escapedName = (item.name || 'Unknown').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  const escapedName = jsStr(item.name || 'Unknown');
 
   return `
     <div class="inv-item-card" onclick="showInvDetail('${item.id}')">
@@ -18588,7 +18651,7 @@ function renderTCGCard(item) {
 
 function renderTCGListItem(item) {
   const marketValue = (item.marketPrice || 0) * item.quantity;
-  const escapedName = (item.name || 'Unknown').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  const escapedName = jsStr(item.name || 'Unknown');
 
   return `
     <div class="inv-list-item">
@@ -19783,7 +19846,7 @@ function renderImportItem(item) {
 
       <div style="flex:1;min-width:0;">
         <div style="font-weight:600;font-size:13px;margin-bottom:4px;color:var(--text-primary);">
-          ${item.itemName}
+          ${escapeHtml(item.itemName)}
         </div>
         <div style="font-size:11px;color:var(--text-muted);">
           ${retailerIcon} ${retailerName}
@@ -21261,7 +21324,7 @@ function renderStockTable(items) {
         <div class="inv-table-cell muted">${addedDate ? addedStr : '-'}</div>
         <div class="inv-table-cell"><div class="inv-table-actions">
           <button class="portfolio-grid-action-btn" onclick="event.stopPropagation();showLogSaleModal('${item.id}')" title="Log Sale">$</button>
-          <button class="portfolio-grid-action-btn danger" onclick="event.stopPropagation();quickDeleteInventoryItem('${item.id}','${escapeHtml((item.name || '').replace(/'/g, "\\'"))}')" title="Delete">x</button>
+          <button class="portfolio-grid-action-btn danger" onclick="event.stopPropagation();quickDeleteInventoryItem('${jsStr(item.id)}','${jsStr(item.name || '')}')" title="Delete">x</button>
         </div></div>
       </div>`;
     });
@@ -21294,7 +21357,7 @@ function renderStockGrid(items) {
     return `<div class="portfolio-grid-card${isSelected ? ' selected' : ''}" data-item-id="${item.id}" onclick="showInvDetailV2('${item.id}')">
       <div class="portfolio-grid-card-actions">
         <button class="portfolio-grid-action-btn" onclick="event.stopPropagation();showLogSaleModal('${item.id}')" title="Log Sale">$</button>
-        <button class="portfolio-grid-action-btn danger" onclick="event.stopPropagation();quickDeleteInventoryItem('${item.id}','${escapeHtml((item.name || '').replace(/'/g, "\\'"))}')" title="Delete">x</button>
+        <button class="portfolio-grid-action-btn danger" onclick="event.stopPropagation();quickDeleteInventoryItem('${jsStr(item.id)}','${jsStr(item.name || '')}')" title="Delete">x</button>
       </div>
       <img class="portfolio-grid-card-img" src="${imageUrl || fallbackImg}" onerror="this.onerror=null;this.src='${fallbackImg}'">
       <div class="portfolio-grid-card-body">
@@ -23281,7 +23344,7 @@ async function loadSkuOverrides() {
       <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; margin-bottom: 4px; background: rgba(255,255,255,0.02); border-radius: 6px; font-size: 12px;">
         <span style="color: #ccc; flex: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${name}">${name}</span>
         <span style="color: var(--accent, #8b5cf6); flex: 1; text-align: center; font-family: monospace;">${sku}</span>
-        <button onclick="deleteSkuOverride('${name.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #666; cursor: pointer; padding: 2px 6px; font-size: 14px;" title="Remove">&times;</button>
+        <button onclick="deleteSkuOverride('${jsStr(name)}')" style="background: none; border: none; color: #666; cursor: pointer; padding: 2px 6px; font-size: 14px;" title="Remove">&times;</button>
       </div>
     `).join('');
   } catch (err) {
@@ -23979,7 +24042,7 @@ function renderAcoUsers() {
   for (const u of userList) {
     const safeId = escapeHtml(u.discordUserId);
     const profileSummary = u.profiles.map(p => {
-      const safePName = escapeHtml(p.name).replace(/'/g, '&#39;');
+      const safePName = jsStr(p.name);
       const isChecked = _acoBulkSelection.has(p.name);
       const sites = Object.keys(p.sites);
       const siteStr = sites.length > 0 ? sites.join(', ') : '';
@@ -24025,7 +24088,7 @@ function renderAcoUsers() {
       </label>
     </div>`;
     for (const p of filteredUnmapped) {
-      const safeName = escapeHtml(p.name).replace(/'/g, '&#39;');
+      const safeName = jsStr(p.name);
       const sites = Object.keys(p.sites);
       const siteStr = sites.length > 0 ? ' &middot; ' + escapeHtml(sites.join(', ')) : '';
       const botBadge = p.botType ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:rgba(139,92,246,0.15);color:#8b5cf6">${escapeHtml(p.botType)}</span>` : '';
@@ -24076,7 +24139,7 @@ function showAcoUserDetail(discordUserId) {
   if (!user) { hideAcoUserDetail(); return; }
 
   const safeId = escapeHtml(discordUserId);
-  const safeUsername = escapeHtml(user.discordUsername).replace(/'/g, '&#39;');
+  const safeUsername = jsStr(user.discordUsername);
   const tierColors = { diamond: '#B9F2FF', perfect: '#8b5cf6', good: '#00A86B', okay: '#F97316', 'at-risk': '#EF4444' };
   const tierLabels = { diamond: 'Diamond', perfect: 'Perfect', good: 'Good', okay: 'Okay', 'at-risk': 'At Risk' };
 
@@ -24141,7 +24204,7 @@ function showAcoUserDetail(discordUserId) {
   let profileCardsHtml = '';
   let visibleProfileCount = 0;
   for (const { profile, _sSpent: pSpent } of sortableProfiles) {
-    const safeName = escapeHtml(profile.name).replace(/'/g, '&#39;');
+    const safeName = jsStr(profile.name);
     const botBadge = profile.botType ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:rgba(139,92,246,0.15);color:#8b5cf6;margin-left:6px">${escapeHtml(profile.botType)}</span>` : '';
 
     // Filter sites
@@ -24173,7 +24236,7 @@ function showAcoUserDetail(discordUserId) {
       const siteStick = siteData.total > 0 ? Math.round((siteData.confirmed / siteData.total) * 100) : 0;
       const siteKey = profile.name + '|' + siteName;
       const isExpanded = _acoExpandedSites.has(siteKey);
-      const safeKey = escapeHtml(siteKey).replace(/'/g, '&#39;');
+      const safeKey = jsStr(siteKey);
       const siteDeclined = siteData.declined || 0;
       const siteCancelled = siteData.cancelled || 0;
       const subCounts = [];
@@ -24274,7 +24337,7 @@ function showAcoUserDetail(discordUserId) {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm btn-primary" onclick="showAddMappingForm(null, '${safeId}', '${safeUsername}')" style="font-size:11px;padding:5px 12px">+ Add Profile</button>
-        <button class="btn btn-sm" onclick="testAcoForward('${escapeHtml(user.profiles[0]?.name || '').replace(/'/g, '&#39;')}')" style="font-size:11px;padding:5px 12px">Send Test Forward</button>
+        <button class="btn btn-sm" onclick="testAcoForward('${jsStr(user.profiles[0]?.name || '')}')" style="font-size:11px;padding:5px 12px">Send Test Forward</button>
       </div>
     </div>
 
@@ -24332,7 +24395,7 @@ function showAcoProfileDetail(profileName) {
   const profile = unmapped.find(p => p.name === profileName);
   if (!profile) { hideAcoUserDetail(); return; }
 
-  const safeName = escapeHtml(profileName).replace(/'/g, '&#39;');
+  const safeName = jsStr(profileName);
   const tierColors = { diamond: '#B9F2FF', perfect: '#8b5cf6', good: '#00A86B', okay: '#F97316', 'at-risk': '#EF4444' };
   const tierLabels = { diamond: 'Diamond', perfect: 'Perfect', good: 'Good', okay: 'Okay', 'at-risk': 'At Risk' };
 
@@ -24417,7 +24480,7 @@ function showAcoProfileDetail(profileName) {
     const siteStick = fsd.total > 0 ? Math.round((fsd.confirmed / fsd.total) * 100) : 0;
     const siteKey = profile.name + '|' + siteName;
     const isExpanded = _acoExpandedSites.has(siteKey);
-    const safeKey = escapeHtml(siteKey).replace(/'/g, '&#39;');
+    const safeKey = jsStr(siteKey);
     const subCounts = [];
     if (fsd.declined > 0) subCounts.push(`<span style="color:var(--red)">${fsd.declined} decl</span>`);
     if (fsd.cancelled > 0) subCounts.push(`<span style="color:#EAB308">${fsd.cancelled} canc</span>`);
@@ -25386,7 +25449,7 @@ function generateQuickReport() {
         const effectiveTotal = item.total - item.declined;
         const rate = effectiveTotal > 0 ? ((item.confirmed / effectiveTotal) * 100).toFixed(1) : 0;
         const bg = i % 2 === 0 ? '' : 'background:var(--bg-secondary);';
-        const itemNameEsc = escapeHtml(item.name).replace(/'/g, "\\'");
+        const itemNameEsc = jsStr(item.name);
         html += '<tr style="' + bg + 'cursor:pointer;" onclick="openReportDrilldown(\'' + itemNameEsc + '\', o => (o.item || \'Unknown\') === \'' + itemNameEsc + '\')" onmouseover="this.style.background=\'var(--bg-tertiary)\'" onmouseout="this.style.background=\'' + (i % 2 === 0 ? '' : 'var(--bg-secondary)') + '\'">';
         html += '<td style="' + tdStyle + '">' + escapeHtml(item.name) + '</td>';
         html += '<td style="' + tdCenterStyle + '">' + item.total + '</td>';
@@ -25420,7 +25483,7 @@ function generateQuickReport() {
         const scoreData = calculateAccountScore({ email: a.email, stickRate: parseFloat(rate), totalOrders: a.total }, allOrders);
         const scoreColor = getScoreColor(scoreData.score);
         const bg = i % 2 === 0 ? '' : 'background:var(--bg-secondary);';
-        const emailEsc = escapeHtml(a.email).replace(/'/g, "\\'");
+        const emailEsc = jsStr(a.email);
         html += '<tr style="' + bg + 'cursor:pointer;" onclick="openReportDrilldown(\'' + emailEsc + '\', o => o.email === \'' + emailEsc + '\')" onmouseover="this.style.background=\'var(--bg-tertiary)\'" onmouseout="this.style.background=\'' + (i % 2 === 0 ? '' : 'var(--bg-secondary)') + '\'">';
         html += '<td style="' + tdStyle + '">' + escapeHtml(a.email) + '</td>';
         html += '<td style="' + tdCenterStyle + '">' + a.total + '</td>';
@@ -25451,7 +25514,7 @@ function generateQuickReport() {
       carriers.forEach((c, i) => {
         const pct = c.shipments > 0 ? ((c.delivered / c.shipments) * 100).toFixed(1) : 0;
         const bg = i % 2 === 0 ? '' : 'background:var(--bg-secondary);';
-        const carrierEsc = escapeHtml(c.name).replace(/'/g, "\\'");
+        const carrierEsc = jsStr(c.name);
         html += '<tr style="' + bg + 'cursor:pointer;" onclick="openReportDrilldown(\'' + carrierEsc + '\', o => o.carrier === \'' + carrierEsc + '\')" onmouseover="this.style.background=\'var(--bg-tertiary)\'" onmouseout="this.style.background=\'' + (i % 2 === 0 ? '' : 'var(--bg-secondary)') + '\'">';
         html += '<td style="' + tdStyle + 'font-weight:500;">' + escapeHtml(c.name) + '</td>';
         html += '<td style="' + tdCenterStyle + '">' + c.shipments + '</td>';
@@ -26091,7 +26154,7 @@ function renderProfilePerfGroupCards() {
   container.innerHTML = ppData.groups.map(g => {
     const stickColor = g.stickRate >= 80 ? 'var(--green)' : g.stickRate >= 60 ? 'var(--yellow)' : 'var(--red)';
     const retailerLabel = g.topRetailer ? g.topRetailer.charAt(0).toUpperCase() + g.topRetailer.slice(1) : 'N/A';
-    const colorBar = g.color ? `<div class="pg-group-card-color-bar" style="background:${g.color};"></div>` : '';
+    const colorBar = g.color ? `<div class="pg-group-card-color-bar" style="background:${safeColor(g.color)};"></div>` : '';
     const isActive = currentFilter === g.name.toLowerCase();
     return `<div class="pp-group-card${isActive ? ' active' : ''}" onclick="filterProfilePerfByGroup('${escapeHtml(g.name)}')" style="${g.color ? 'border-left:3px solid ' + g.color + ';' : ''}">
       ${colorBar}
@@ -26269,7 +26332,7 @@ function renderProfilePerfTable() {
   for (const p of profiles) {
     const tier = ppGetTier(p.stickRate, p.totalOrders);
     const isExpanded = ppExpandedRow === p.name;
-    html += `<tr class="pp-row${isExpanded ? ' active' : ''}" onclick="toggleProfilePerfRow('${escapeHtml(p.name).replace(/'/g, "\\'")}')">
+    html += `<tr class="pp-row${isExpanded ? ' active' : ''}" onclick="toggleProfilePerfRow('${jsStr(p.name)}')">
       <td style="font-weight:600;color:var(--text-primary);">${escapeHtml(p.name)}</td>
       <td style="color:var(--text-secondary);">${escapeHtml(p.group)}</td>`;
     if (showEmail) html += `<td class="pp-col-email"><span class="pp-email-masked">${escapeHtml(maskEmail(p.email))}</span></td>`;
@@ -26346,7 +26409,7 @@ function buildProfilePerfDetail(p) {
     </div>
     <div class="pp-detail-section">
       <div class="pp-detail-title">Profile Info</div>
-      <div class="pp-detail-row"><span>Group</span><span>${escapeHtml(p.group)} <select class="pp-group-reassign" onchange="reassignProfileGroup('${escapeHtml(p.name).replace(/'/g, "\\'")}', this.value)" onclick="event.stopPropagation();">${buildGroupOptions(p.group)}</select></span></div>
+      <div class="pp-detail-row"><span>Group</span><span>${escapeHtml(p.group)} <select class="pp-group-reassign" onchange="reassignProfileGroup('${jsStr(p.name)}', this.value)" onclick="event.stopPropagation();">${buildGroupOptions(p.group)}</select></span></div>
       <div class="pp-detail-row"><span>Email</span><span>${escapeHtml(p.email || 'N/A')}</span></div>
       <div class="pp-detail-row"><span>Email Domain</span><span>${escapeHtml(p.emailDomain || 'N/A')}</span></div>
       <div class="pp-detail-row"><span>Location</span><span>${escapeHtml([p.city, p.state].filter(Boolean).join(', ') || 'N/A')}</span></div>
@@ -26660,8 +26723,8 @@ async function renderManageGroupList() {
         <div class="pg-group-label">${escapeHtml(g.name)}</div>
         <div class="pg-group-count">${count} profile${count !== 1 ? 's' : ''}</div>
         <div class="pg-manage-actions">
-          <button class="btn btn-secondary btn-sm" onclick="editProfileGroup('${g.id}','${escapeHtml(g.name).replace(/'/g, "\\'")}','${g.color}')">Edit</button>
-          <button class="btn btn-secondary btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteProfileGroup('${g.id}','${escapeHtml(g.name).replace(/'/g, "\\'")}')">Delete</button>
+          <button class="btn btn-secondary btn-sm" onclick="editProfileGroup('${jsStr(g.id)}','${jsStr(g.name)}','${jsStr(safeColor(g.color))}')">Edit</button>
+          <button class="btn btn-secondary btn-sm" style="color:var(--red);border-color:var(--red);" onclick="deleteProfileGroup('${jsStr(g.id)}','${jsStr(g.name)}')">Delete</button>
         </div>
       </div>`;
     }).join('');

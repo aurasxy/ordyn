@@ -4416,7 +4416,7 @@ async function syncOutlookGraph(account, dateFrom, dateTo) {
   }
 }
 
-async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, retailerFilter = null) {
+async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, retailerFilter = null, mailboxOverride = null) {
   // Yield to event loop immediately so UI can update before any blocking work
   await new Promise(resolve => setImmediate(resolve));
 
@@ -4747,10 +4747,13 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
       addUserLog('Connected to email server');
       sendProgress('Connecting...', 0, 100);
 
-      // Try different mailbox names based on provider
-      const mailboxes = provider === 'gmail'
-        ? ['[Gmail]/All Mail', 'INBOX']
-        : ['INBOX', 'Archive', 'All Mail', '[Gmail]/All Mail'];
+      // Try different mailbox names based on provider. When mailboxOverride is
+      // set (e.g. the Include-Spam second pass), scan ONLY that mailbox.
+      const mailboxes = mailboxOverride
+        ? [mailboxOverride]
+        : (provider === 'gmail'
+          ? ['[Gmail]/All Mail', 'INBOX']
+          : ['INBOX', 'Archive', 'All Mail', '[Gmail]/All Mail']);
 
       function tryOpenMailbox(index) {
         if (index >= mailboxes.length) {
@@ -9888,6 +9891,21 @@ ipcMain.handle('clear-target-drop-images', (_, dropDate) => clearTargetDropImage
 ipcMain.handle('get-orders', (_, retailer) => getOrders(retailer));
 ipcMain.handle('mark-order-delivered', (_, retailer, orderId) => markOrderDelivered(retailer, orderId));
 ipcMain.handle('delete-order', (_, retailer, orderId) => deleteOrder(retailer, orderId));
+// Provider-specific Spam/Junk mailbox name for the Include-Spam second pass.
+// Returns null for Graph/OAuth accounts (folders handled separately) so the
+// spam pass is skipped there.
+function spamMailboxName(account) {
+  if (!account) return null;
+  if (account.mailbox === 'graph' || account.authMethod === 'oauth2') return null;
+  switch (account.provider) {
+    case 'gmail': return '[Gmail]/Spam';
+    case 'yahoo': return 'Bulk Mail';
+    case 'icloud': return 'Junk';
+    case 'outlook': return 'Junk';
+    default: return 'Junk';
+  }
+}
+
 ipcMain.handle('sync-account', async (_, id, dateFrom, dateTo, retailerFilter) => {
   if (testModeNetworkGuard('IMAP sync-account')) return { success: false, error: 'Network blocked in test mode' };
   await requireValidLicense();
@@ -9908,7 +9926,30 @@ ipcMain.handle('sync-account', async (_, id, dateFrom, dateTo, retailerFilter) =
     }
   }
 
-  return queueSync(id, dateFrom, dateTo, retailerFilter || null);
+  const result = await queueSync(id, dateFrom, dateTo, retailerFilter || null);
+
+  // Include-Spam second pass: after the primary mailbox, scan the Spam/Junk box
+  // too (Gmail's All-Mail excludes Spam, where cancellations often land). Reuses
+  // the same scan pipeline via mailboxOverride; saveOrdersBatch upserts so orders
+  // are merged, not double-counted. Best-effort — never fails the primary sync.
+  try {
+    const ss = store.get('syncSettings', {}) || {};
+    const acct = getAccountById(id);
+    const spamBox = spamMailboxName(acct);
+    if (ss.includeSpamEnabled && spamBox && !activeSyncs.has(id)) {
+      activeSyncs.set(id, { pending: true, spamPass: true });
+      try {
+        await syncAccount(id, dateFrom, dateTo, null, retailerFilter || null, spamBox);
+      } catch (e) {
+        console.log('[SPAM-PASS] skipped: ' + (e && e.message));
+      } finally {
+        activeSyncs.delete(id);
+        processNextInQueue();
+      }
+    }
+  } catch (e) { console.log('[SPAM-PASS] error: ' + (e && e.message)); }
+
+  return result;
 });
 
 ipcMain.handle('resync-drop', async (_, retailer, date) => {
@@ -10118,7 +10159,8 @@ const defaultSyncSettings = {
   autoSyncInterval: 0,        // Minutes between auto-syncs (0 = disabled)
   syncOnStartup: true,        // Whether to sync on app startup
   skipStartupCooldown: false, // Whether to skip 2-hour cooldown on startup
-  deepScanEnabled: false      // Whether to scan ALL emails instead of targeted searches
+  deepScanEnabled: false,     // Whether to scan ALL emails instead of targeted searches
+  includeSpamEnabled: false   // Whether to ALSO scan the Spam/Junk mailbox each sync
 };
 
 ipcMain.handle('get-sync-settings', () => {

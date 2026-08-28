@@ -6375,6 +6375,16 @@
                   <div class="toggle-switch" id="deepScanToggle" onclick="toggleDeepScan()"></div>
                 </div>
                 <p class="settings-hint">Only enable if you suspect missing orders. First sync may take 30+ minutes with deep scan on.</p>
+
+                <!-- Include Spam -->
+                <div class="settings-toggle-row settings-toggle-row--bordered settings-toggle-row--spaced">
+                  <div class="settings-toggle-info">
+                    <div class="settings-toggle-title">Include Spam Folder</div>
+                    <div class="settings-toggle-desc">Also scans the Spam/Junk mailbox on every sync. Cancellation emails frequently land in Spam and are otherwise missed (Gmail's All-Mail excludes Spam).</div>
+                  </div>
+                  <div class="toggle-switch" id="includeSpamToggle" onclick="toggleIncludeSpam()"></div>
+                </div>
+                <p class="settings-hint">Recommended on — a small time cost, but keeps cancel counts accurate.</p>
               </div>
             </div>
           </div>
@@ -8801,6 +8811,10 @@ async function loadSyncSettings() {
   const deepScanToggle = $('deepScanToggle');
   if (deepScanToggle) deepScanToggle.classList.toggle('active', settings.deepScanEnabled || false);
 
+  // Include spam folder
+  const includeSpamToggle = $('includeSpamToggle');
+  if (includeSpamToggle) includeSpamToggle.classList.toggle('active', settings.includeSpamEnabled || false);
+
   // Update displays
   updateLastSyncDisplay();
   setupAutoSyncInterval();
@@ -8987,6 +9001,14 @@ async function toggleDeepScan() {
   toggle.classList.toggle('active', isEnabled);
   await window.api.updateSyncSettings({ deepScanEnabled: isEnabled });
   toast(isEnabled ? 'Deep scan mode enabled - next sync will scan all emails' : 'Deep scan mode disabled', isEnabled ? 'warning' : 'success');
+}
+
+async function toggleIncludeSpam() {
+  const toggle = $('includeSpamToggle');
+  const isEnabled = !toggle.classList.contains('active');
+  toggle.classList.toggle('active', isEnabled);
+  await window.api.updateSyncSettings({ includeSpamEnabled: isEnabled });
+  toast(isEnabled ? 'Include Spam enabled - syncs will also scan the Spam folder' : 'Include Spam disabled', isEnabled ? 'success' : 'success');
 }
 
 // Check if we should auto-sync on startup

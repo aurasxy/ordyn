@@ -9974,7 +9974,15 @@ ipcMain.handle('resync-drop', async (_, retailer, date) => {
   // after the order, and a single-day window never fetched them, so a drop resynced the same
   // day it happened kept showing cancelled orders as confirmed. Merge keeps the confirmed
   // email's date, so the extra days don't move anything out of this drop's grouping.
-  const CANCEL_LOOKAHEAD_DAYS = 3;
+  //
+  // Pokemon Center is the exception: it cancels high-demand / preorder drops WEEKS late.
+  // Its "Your order has been canceled" email routinely lands 3-4 weeks after the order date
+  // (observed: ordered Sep 30, canceled email Oct 28 = 28 days), so a 3-day window never
+  // fetched it and those orders stayed stuck on "confirmed". Use a much wider lookahead for
+  // PKC — and for all-retailer resyncs (retailer == null), which include PKC. The wider
+  // window only changes which emails are fetched; merge still keeps the confirmed email's
+  // date, so nothing moves out of this drop's grouping.
+  const CANCEL_LOOKAHEAD_DAYS = (retailer === 'pokecenter' || !retailer) ? 45 : 3;
   const lookaheadTo = new Date(date + 'T00:00:00');
   lookaheadTo.setDate(lookaheadTo.getDate() + CANCEL_LOOKAHEAD_DAYS);
   // Fall back to the single-day window if the drop date isn't parseable

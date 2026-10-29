@@ -4211,8 +4211,20 @@ function parseAppleEmail(parsed, accountEmail) {
   if (dm) { try { const d = new Date(dm[1]); if (!isNaN(d)) orderDate = localDateStr(d); } catch (e) {} }
   if (!orderDate && (status === 'confirmed' || status === 'cancelled')) orderDate = toLocalDateString(parsed.date);
 
+  // Product image(s): Apple serves product shots from store.storeimages.cdn-apple.com /
+  // as-images.apple.com/is/. The other images (email.images.apple.com) are icons/spacers — skip them.
+  const productImages = [];
+  const imgRe = /https?:\/\/(?:store\.storeimages\.cdn-apple\.com|[\w.-]*as-images\.apple\.com)\/[^\s"'<>)]+/gi;
+  let im;
+  while ((im = imgRe.exec(html || '')) !== null) {
+    const u = im[0].replace(/&amp;/g, '&');
+    if (/as-images\.apple\.com\/is\/|storeimages\.cdn-apple\.com/i.test(u) && !productImages.includes(u)) productImages.push(u);
+  }
+  const imageUrl = productImages[0] || null;
+
   return {
     orderId, email: accountEmail, item, amount, date: orderDate, status, retailer: 'apple', quantity,
+    imageUrl, productImages,
     subject: subject.substring(0, 100), source: 'email',
     ...(status === 'cancelled' ? (() => { const ci = extractCancelInfo(text, html, 'apple'); return ci ? { cancelReason: ci.reason, manualCancel: ci.manualCancel } : {}; })() : {})
   };

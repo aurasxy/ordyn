@@ -545,6 +545,10 @@
     .retailer-logo.samsclub { background: var(--samsclub); }
     .retailer-logo.costco { background: var(--costco); }
     .retailer-logo.bestbuy { background: var(--bestbuy); }
+    .retailer-card.apple:hover { border-color: var(--apple); background: rgba(85,85,85,0.06); box-shadow: 0 0 0 1px var(--apple), var(--shadow-md); }
+    .retailer-logo.apple { background: var(--apple); }
+    .retailer-card.bandai:hover { border-color: var(--bandai); background: rgba(228,0,43,0.05); box-shadow: 0 0 0 1px var(--bandai), var(--shadow-md); }
+    .retailer-logo.bandai { background: var(--bandai); }
     .retailer-name { font-size: var(--text-xl); font-weight: 600; }
     .retailer-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
     .retailer-stat { text-align: center; }
@@ -4810,6 +4814,8 @@
           <a class="nav-item" data-page="samsclub"><span class="nav-icon"><span class="nav-retailer-dot" style="background:var(--samsclub)"></span></span><span class="nav-label">Sam's Club</span><span class="nav-badge" id="navSamsclubCount">0</span></a>
           <a class="nav-item" data-page="costco"><span class="nav-icon"><span class="nav-retailer-dot" style="background:var(--costco)"></span></span><span class="nav-label">Costco</span><span class="nav-badge" id="navCostcoCount">0</span></a>
           <a class="nav-item" data-page="bestbuy"><span class="nav-icon"><span class="nav-retailer-dot" style="background:var(--bestbuy)"></span></span><span class="nav-label">Best Buy</span><span class="nav-badge" id="navBestbuyCount">0</span></a>
+          <a class="nav-item" data-page="apple"><span class="nav-icon"><span class="nav-retailer-dot" style="background:var(--apple)"></span></span><span class="nav-label">Apple</span><span class="nav-badge" id="navAppleCount">0</span></a>
+          <a class="nav-item" data-page="bandai"><span class="nav-icon"><span class="nav-retailer-dot" style="background:var(--bandai)"></span></span><span class="nav-label">P-Bandai</span><span class="nav-badge" id="navBandaiCount">0</span></a>
         </div>
       </nav>
       <div class="sidebar-footer"><button class="btn btn-secondary btn-block" id="checkUpdatesBtn" onclick="checkForUpdates()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Check for Updates</button><div class="app-version" id="appVersion"></div></div>
@@ -4844,6 +4850,8 @@
           <label class="customize-toggle"><input type="checkbox" checked data-widget="retailer-samsclub" onchange="toggleDashboardWidget('retailer-samsclub', this.checked)"> Sam's Club</label>
           <label class="customize-toggle"><input type="checkbox" checked data-widget="retailer-costco" onchange="toggleDashboardWidget('retailer-costco', this.checked)"> Costco</label>
           <label class="customize-toggle"><input type="checkbox" checked data-widget="retailer-bestbuy" onchange="toggleDashboardWidget('retailer-bestbuy', this.checked)"> Best Buy</label>
+          <label class="customize-toggle"><input type="checkbox" checked data-widget="retailer-apple" onchange="toggleDashboardWidget('retailer-apple', this.checked)"> Apple</label>
+          <label class="customize-toggle"><input type="checkbox" checked data-widget="retailer-bandai" onchange="toggleDashboardWidget('retailer-bandai', this.checked)"> P-Bandai</label>
           <div class="customize-label" style="margin-top:6px;">Sections:</div>
           <label class="customize-toggle"><input type="checkbox" checked data-widget="stats" onchange="toggleDashboardWidget('stats', this.checked)"> Overall Statistics</label>
           <label class="customize-toggle"><input type="checkbox" checked data-widget="quickStats" onchange="toggleDashboardWidget('quickStats', this.checked)"> Quick Stats Bar</label>
@@ -4858,6 +4866,8 @@
               <div class="retailer-card samsclub" data-retailer="samsclub" data-retailer-widget="retailer-samsclub"><div class="retailer-header"><div class="retailer-logo samsclub">S</div><div class="retailer-name">Sam's Club</div></div><div class="retailer-stats"><div class="retailer-stat"><div class="retailer-stat-value green" id="scConfirmed">0</div><div class="retailer-stat-label">Confirmed</div></div><div class="retailer-stat"><div class="retailer-stat-value red" id="scCancelled">0</div><div class="retailer-stat-label">Cancelled</div></div><div class="retailer-stat"><div class="retailer-stat-value yellow" id="scShipped">0</div><div class="retailer-stat-label">Shipped</div></div><div class="retailer-stat"><div class="retailer-stat-value cyan" id="scDelivered">0</div><div class="retailer-stat-label">Delivered</div></div></div></div>
               <div class="retailer-card costco" data-retailer="costco" data-retailer-widget="retailer-costco"><div class="retailer-header"><div class="retailer-logo costco">C</div><div class="retailer-name">Costco</div></div><div class="retailer-stats"><div class="retailer-stat"><div class="retailer-stat-value green" id="coConfirmed">0</div><div class="retailer-stat-label">Confirmed</div></div><div class="retailer-stat"><div class="retailer-stat-value red" id="coCancelled">0</div><div class="retailer-stat-label">Cancelled</div></div><div class="retailer-stat"><div class="retailer-stat-value yellow" id="coShipped">0</div><div class="retailer-stat-label">Shipped</div></div><div class="retailer-stat"><div class="retailer-stat-value cyan" id="coDelivered">0</div><div class="retailer-stat-label">Delivered</div></div></div></div>
               <div class="retailer-card bestbuy" data-retailer="bestbuy" data-retailer-widget="retailer-bestbuy"><div class="retailer-header"><div class="retailer-logo bestbuy">B</div><div class="retailer-name">Best Buy</div></div><div class="retailer-stats"><div class="retailer-stat"><div class="retailer-stat-value green" id="bbConfirmed">0</div><div class="retailer-stat-label">Confirmed</div></div><div class="retailer-stat"><div class="retailer-stat-value red" id="bbCancelled">0</div><div class="retailer-stat-label">Cancelled</div></div><div class="retailer-stat"><div class="retailer-stat-value yellow" id="bbShipped">0</div><div class="retailer-stat-label">Shipped</div></div><div class="retailer-stat"><div class="retailer-stat-value cyan" id="bbDelivered">0</div><div class="retailer-stat-label">Delivered</div></div></div></div>
+              <div class="retailer-card apple" data-retailer="apple" data-retailer-widget="retailer-apple"><div class="retailer-header"><div class="retailer-logo apple">A</div><div class="retailer-name">Apple</div></div><div class="retailer-stats"><div class="retailer-stat"><div class="retailer-stat-value green" id="apConfirmed">0</div><div class="retailer-stat-label">Confirmed</div></div><div class="retailer-stat"><div class="retailer-stat-value red" id="apCancelled">0</div><div class="retailer-stat-label">Cancelled</div></div><div class="retailer-stat"><div class="retailer-stat-value yellow" id="apShipped">0</div><div class="retailer-stat-label">Shipped</div></div><div class="retailer-stat"><div class="retailer-stat-value cyan" id="apDelivered">0</div><div class="retailer-stat-label">Delivered</div></div></div></div>
+              <div class="retailer-card bandai" data-retailer="bandai" data-retailer-widget="retailer-bandai"><div class="retailer-header"><div class="retailer-logo bandai">P</div><div class="retailer-name">P-Bandai</div></div><div class="retailer-stats"><div class="retailer-stat"><div class="retailer-stat-value green" id="bnConfirmed">0</div><div class="retailer-stat-label">Confirmed</div></div><div class="retailer-stat"><div class="retailer-stat-value red" id="bnCancelled">0</div><div class="retailer-stat-label">Cancelled</div></div><div class="retailer-stat"><div class="retailer-stat-value yellow" id="bnShipped">0</div><div class="retailer-stat-label">Shipped</div></div><div class="retailer-stat"><div class="retailer-stat-value cyan" id="bnDelivered">0</div><div class="retailer-stat-label">Delivered</div></div></div></div>
             </div>
           </div>
           <div id="dashboardEmpty" class="empty-state-cta" style="display:none;">
@@ -5029,6 +5039,8 @@
                 <button class="retailer-btn" data-retailer="samsclub" onclick="setAnalyticsRetailer('samsclub')"><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:4px"><circle cx="6" cy="6" r="6" fill="var(--samsclub)"/></svg>Sam's Club</button>
                 <button class="retailer-btn" data-retailer="costco" onclick="setAnalyticsRetailer('costco')"><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:4px"><circle cx="6" cy="6" r="6" fill="var(--costco)"/></svg>Costco</button>
                 <button class="retailer-btn" data-retailer="bestbuy" onclick="setAnalyticsRetailer('bestbuy')"><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:4px"><circle cx="6" cy="6" r="6" fill="var(--bestbuy)"/></svg>Best Buy</button>
+                <button class="retailer-btn" data-retailer="apple" onclick="setAnalyticsRetailer('apple')"><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:4px"><circle cx="6" cy="6" r="6" fill="var(--apple)"/></svg>Apple</button>
+                <button class="retailer-btn" data-retailer="bandai" onclick="setAnalyticsRetailer('bandai')"><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:4px"><circle cx="6" cy="6" r="6" fill="var(--bandai)"/></svg>P-Bandai</button>
               </div>
               <div class="period-selector tab-group">
                 <button class="tab-item" data-period="7" onclick="setAnalyticsPeriod(7)">7 Days</button>
@@ -5164,6 +5176,8 @@
                 <button class="retailer-btn" data-retailer="samsclub" onclick="setAccountStatsRetailer('samsclub')"><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:4px"><circle cx="6" cy="6" r="6" fill="var(--samsclub)"/></svg>Sam's Club</button>
                 <button class="retailer-btn" data-retailer="costco" onclick="setAccountStatsRetailer('costco')"><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:4px"><circle cx="6" cy="6" r="6" fill="var(--costco)"/></svg>Costco</button>
                 <button class="retailer-btn" data-retailer="bestbuy" onclick="setAccountStatsRetailer('bestbuy')"><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:4px"><circle cx="6" cy="6" r="6" fill="var(--bestbuy)"/></svg>Best Buy</button>
+                <button class="retailer-btn" data-retailer="apple" onclick="setAccountStatsRetailer('apple')"><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:4px"><circle cx="6" cy="6" r="6" fill="var(--apple)"/></svg>Apple</button>
+                <button class="retailer-btn" data-retailer="bandai" onclick="setAccountStatsRetailer('bandai')"><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:4px"><circle cx="6" cy="6" r="6" fill="var(--bandai)"/></svg>P-Bandai</button>
               </div>
               <div class="period-selector tab-group">
                 <button class="tab-item" data-period="7" onclick="setAccountStatsPeriod(7)">7 Days</button>
@@ -5486,7 +5500,7 @@
             <div class="card-body">
               <div class="account-list" id="accountList"></div>
               <div class="empty" id="accountsEmpty"><div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div><div class="empty-title">No accounts added</div><div class="empty-text">Add a Gmail account to start syncing orders</div></div>
-              <div class="sync-panel" id="syncPanel" style="display:none;"><div class="sync-panel-header">Sync Options</div><div class="sync-options"><div class="form-group"><label class="form-label">From Date</label><input type="date" class="form-input" id="syncDateFrom"></div><div class="form-group"><label class="form-label">To Date</label><input type="date" class="form-input" id="syncDateTo"></div><button class="btn btn-success" id="syncRecentBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Sync Recent</button><button class="btn btn-outline" id="syncAycdBtn" title="Pull recent order emails from AYCD Inbox only (requires AYCD enabled)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 12 11 12"/></svg>Sync AYCD</button><button class="btn btn-primary" id="syncAllBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Sync All</button><button class="btn btn-secondary" onclick="relinkEmailImages()" title="Re-match product names to local SKU images"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Refresh Images</button><button class="btn btn-secondary" onclick="refreshAllData()" title="Deduplicate and merge order entries without resyncing"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Refresh Data</button><button class="btn btn-secondary" id="deepSyncBtn" onclick="startDeepSync()" title="Re-fetch all emails over a wide date range to pick up data missed by older parsers. Never deletes existing data."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m0 0a9 9 0 0 1 9-9m-9 9a9 9 0 0 0 9 9"/></svg>Deep Sync</button></div><div class="retailer-filter-row" id="retailerFilterRow"><span class="retailer-filter-label">Sites:</span><span class="retailer-chip active" data-retailer="walmart" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Walmart</span><span class="retailer-chip active" data-retailer="target" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Target</span><span class="retailer-chip active" data-retailer="pokecenter" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Pokemon Center</span><span class="retailer-chip active" data-retailer="bestbuy" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Best Buy</span><span class="retailer-chip active" data-retailer="costco" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Costco</span><span class="retailer-chip active" data-retailer="samsclub" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Sam's Club</span></div></div>
+              <div class="sync-panel" id="syncPanel" style="display:none;"><div class="sync-panel-header">Sync Options</div><div class="sync-options"><div class="form-group"><label class="form-label">From Date</label><input type="date" class="form-input" id="syncDateFrom"></div><div class="form-group"><label class="form-label">To Date</label><input type="date" class="form-input" id="syncDateTo"></div><button class="btn btn-success" id="syncRecentBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Sync Recent</button><button class="btn btn-outline" id="syncAycdBtn" title="Pull recent order emails from AYCD Inbox only (requires AYCD enabled)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 12 11 12"/></svg>Sync AYCD</button><button class="btn btn-primary" id="syncAllBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Sync All</button><button class="btn btn-secondary" onclick="relinkEmailImages()" title="Re-match product names to local SKU images"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Refresh Images</button><button class="btn btn-secondary" onclick="refreshAllData()" title="Deduplicate and merge order entries without resyncing"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Refresh Data</button><button class="btn btn-secondary" id="deepSyncBtn" onclick="startDeepSync()" title="Re-fetch all emails over a wide date range to pick up data missed by older parsers. Never deletes existing data."><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m0 0a9 9 0 0 1 9-9m-9 9a9 9 0 0 0 9 9"/></svg>Deep Sync</button></div><div class="retailer-filter-row" id="retailerFilterRow"><span class="retailer-filter-label">Sites:</span><span class="retailer-chip active" data-retailer="walmart" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Walmart</span><span class="retailer-chip active" data-retailer="target" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Target</span><span class="retailer-chip active" data-retailer="pokecenter" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Pokemon Center</span><span class="retailer-chip active" data-retailer="bestbuy" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Best Buy</span><span class="retailer-chip active" data-retailer="costco" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Costco</span><span class="retailer-chip active" data-retailer="samsclub" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Sam's Club</span><span class="retailer-chip active" data-retailer="apple" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>Apple</span><span class="retailer-chip active" data-retailer="bandai" onclick="toggleRetailerChip(this)"><span class="chip-dot"></span>P-Bandai</span></div></div>
             </div>
           </div>
           <input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none;">
@@ -6129,6 +6143,8 @@
                     <option value="samsclub">Sam's Club</option>
                     <option value="costco">Costco</option>
                     <option value="bestbuy">Best Buy</option>
+                    <option value="apple">Apple</option>
+                    <option value="bandai">P-Bandai</option>
                   </select>
                 </div>
               </div>
@@ -7103,7 +7119,59 @@
           </div>
         </div>
       </div>
-    </main>
+    <div id="page-apple" class="page">
+        <div class="page-header">
+          <h1><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:8px"><circle cx="6" cy="6" r="6" fill="var(--apple)"/></svg>Apple</h1>
+          <div class="period-filter tab-group" style="display:flex;gap:8px;margin-left:auto;">
+            <button class="tab-item" data-period="7" onclick="setRetailerPeriod(7)">7D</button>
+            <button class="tab-item" data-period="30" onclick="setRetailerPeriod(30)">30D</button>
+            <button class="tab-item" data-period="90" onclick="setRetailerPeriod(90)">90D</button>
+            <button class="tab-item active" data-period="all" onclick="setRetailerPeriod('all')">All</button>
+          </div>
+        </div>
+        <div class="page-body">
+          <div class="back-btn" id="apBackBtn" onclick="showPage('dashboard')">← Back to Dashboard</div>
+          <div class="stats-context" id="apStatsContext">Showing all orders</div>
+          <div class="stats-grid"><div class="stat-box confirmed"><div class="stat-label">Confirmed</div><div class="stat-value" id="apStatConfirmed">0</div></div><div class="stat-box cancelled"><div class="stat-label">Cancelled</div><div class="stat-value" id="apStatCancelled">0</div></div><div class="stat-box shipped"><div class="stat-label">Shipped</div><div class="stat-value" id="apStatShipped">0</div></div><div class="stat-box delivered"><div class="stat-label">Delivered</div><div class="stat-value" id="apStatDelivered">0</div></div><div class="stat-box"><div class="stat-label">Total</div><div class="stat-value" id="apStatTotal">0</div></div><div class="stat-box spent"><div class="stat-label">Spent</div><div class="stat-value" id="apStatSpent">$0</div></div></div>
+          <div class="retailer-landing" id="apLanding">
+          <div class="section"><div class="section-header"><div class="section-title">Drops<span class="section-subtitle">(by order date)</span></div></div><div class="drops-container"><div class="drops-grid" id="apDropsGrid"></div></div><div class="empty" id="apDropsEmpty" style="display:none;"><div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="empty-title">No drops yet</div><div class="empty-text">Drops group your orders by date — they'll appear after syncing your email.</div></div></div>
+          </div>
+          <div class="retailer-detail" id="apDetail" style="display:none;">
+          <div class="drop-detail-header" id="apDropHeader"></div>
+          <div class="search-container"><div class="search-bar"><span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span><input type="text" class="search-input" id="apSearchInput" placeholder="Search by item, order ID, email, address, tracking..."><span class="search-shortcut">/</span><button class="search-clear" id="apSearchClear" onclick="clearSearch('apple')">✕ Clear</button></div><div class="search-results-info" id="apSearchInfo" onclick="scrollToOrders('apple')"><span class="search-results-count" id="apSearchCount">0</span> results for "<span class="search-results-query" id="apSearchQuery"></span>"<span class="search-results-hint">↓ Click to view</span><button class="search-results-clear" onclick="event.stopPropagation();clearSearch('apple')">✕ Clear</button></div></div>
+          <div class="section"><div class="section-header"><div class="section-title">Items<span class="section-subtitle" id="apItemsSubtitle">(click to filter)</span></div><span class="text-link" id="apClearFilter" style="display:none;">✕ Clear</span></div><div class="items-grid" id="apItemsGrid"></div><div class="empty" id="apItemsEmpty" style="display:none;"><div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div><div class="empty-title">No items</div><div class="empty-text">Items will appear here after your first sync — each unique product gets its own card.</div></div></div>
+          <div class="section"><div class="section-header"><div class="section-title">Orders<span class="section-subtitle" id="apOrdersCount"></span></div><div class="view-controls"><div class="view-toggle"><button class="view-toggle-btn active" onclick="setViewMode('apple','grid')" title="Grid View">▦</button><button class="view-toggle-btn" onclick="setViewMode('apple','list')" title="List View">☰</button></div><div class="column-menu"><button class="column-menu-btn" onclick="toggleColumnMenu('apple')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:2px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Columns</button><div class="column-dropdown" id="apColumnMenu"><label class="column-option"><input type="checkbox" data-col="item" checked onchange="toggleColumn('apple','item')"> Item Name</label><label class="column-option"><input type="checkbox" data-col="email" onchange="toggleColumn('apple','email')"> Account</label><label class="column-option"><input type="checkbox" data-col="eta" onchange="toggleColumn('apple','eta')"> ETA</label><label class="column-option"><input type="checkbox" data-col="address" onchange="toggleColumn('apple','address')"> Address</label><label class="column-option"><input type="checkbox" data-col="track" onchange="toggleColumn('apple','track')"> Track</label><label class="column-option"><input type="checkbox" data-col="perUnit" onchange="toggleColumn('apple','perUnit')"> Per Unit</label></div></div></div><div class="filter-tabs tab-group" id="apFilterTabs"><button class="filter-tab tab-item active" data-status="all">All</button><button class="filter-tab tab-item" data-status="confirmed">Confirmed</button><button class="filter-tab tab-item" data-status="shipped">Shipped</button><button class="filter-tab tab-item" data-status="delivered">Delivered</button><button class="filter-tab tab-item" data-status="cancelled">Cancelled</button><button class="filter-tab tab-item advanced-filter-toggle" onclick="toggleAdvancedFilters('apple')">Advanced</button></div></div><div class="orders-container" id="apOrdersContainer"><div class="orders-grid" id="apOrdersGrid"></div><div class="orders-list" id="apOrdersList" style="display:none;"></div></div><div class="empty" id="apOrdersEmpty" style="display:none;"><div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></div><div class="empty-title">No orders</div><div class="empty-text">No orders yet — sync your email accounts to get started.</div></div></div>
+          </div>
+        </div>
+      </div>
+    
+<div id="page-bandai" class="page">
+        <div class="page-header">
+          <h1><svg width="12" height="12" viewBox="0 0 12 12" style="vertical-align:-1px;margin-right:8px"><circle cx="6" cy="6" r="6" fill="var(--bandai)"/></svg>P-Bandai</h1>
+          <div class="period-filter tab-group" style="display:flex;gap:8px;margin-left:auto;">
+            <button class="tab-item" data-period="7" onclick="setRetailerPeriod(7)">7D</button>
+            <button class="tab-item" data-period="30" onclick="setRetailerPeriod(30)">30D</button>
+            <button class="tab-item" data-period="90" onclick="setRetailerPeriod(90)">90D</button>
+            <button class="tab-item active" data-period="all" onclick="setRetailerPeriod('all')">All</button>
+          </div>
+        </div>
+        <div class="page-body">
+          <div class="back-btn" id="bnBackBtn" onclick="showPage('dashboard')">← Back to Dashboard</div>
+          <div class="stats-context" id="bnStatsContext">Showing all orders</div>
+          <div class="stats-grid"><div class="stat-box confirmed"><div class="stat-label">Confirmed</div><div class="stat-value" id="bnStatConfirmed">0</div></div><div class="stat-box cancelled"><div class="stat-label">Cancelled</div><div class="stat-value" id="bnStatCancelled">0</div></div><div class="stat-box shipped"><div class="stat-label">Shipped</div><div class="stat-value" id="bnStatShipped">0</div></div><div class="stat-box delivered"><div class="stat-label">Delivered</div><div class="stat-value" id="bnStatDelivered">0</div></div><div class="stat-box"><div class="stat-label">Total</div><div class="stat-value" id="bnStatTotal">0</div></div><div class="stat-box spent"><div class="stat-label">Spent</div><div class="stat-value" id="bnStatSpent">$0</div></div></div>
+          <div class="retailer-landing" id="bnLanding">
+          <div class="section"><div class="section-header"><div class="section-title">Drops<span class="section-subtitle">(by order date)</span></div></div><div class="drops-container"><div class="drops-grid" id="bnDropsGrid"></div></div><div class="empty" id="bnDropsEmpty" style="display:none;"><div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="empty-title">No drops yet</div><div class="empty-text">Drops group your orders by date — they'll appear after syncing your email.</div></div></div>
+          </div>
+          <div class="retailer-detail" id="bnDetail" style="display:none;">
+          <div class="drop-detail-header" id="bnDropHeader"></div>
+          <div class="search-container"><div class="search-bar"><span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span><input type="text" class="search-input" id="bnSearchInput" placeholder="Search by item, order ID, email, address, tracking..."><span class="search-shortcut">/</span><button class="search-clear" id="bnSearchClear" onclick="clearSearch('bandai')">✕ Clear</button></div><div class="search-results-info" id="bnSearchInfo" onclick="scrollToOrders('bandai')"><span class="search-results-count" id="bnSearchCount">0</span> results for "<span class="search-results-query" id="bnSearchQuery"></span>"<span class="search-results-hint">↓ Click to view</span><button class="search-results-clear" onclick="event.stopPropagation();clearSearch('bandai')">✕ Clear</button></div></div>
+          <div class="section"><div class="section-header"><div class="section-title">Items<span class="section-subtitle" id="bnItemsSubtitle">(click to filter)</span></div><span class="text-link" id="bnClearFilter" style="display:none;">✕ Clear</span></div><div class="items-grid" id="bnItemsGrid"></div><div class="empty" id="bnItemsEmpty" style="display:none;"><div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div><div class="empty-title">No items</div><div class="empty-text">Items will appear here after your first sync — each unique product gets its own card.</div></div></div>
+          <div class="section"><div class="section-header"><div class="section-title">Orders<span class="section-subtitle" id="bnOrdersCount"></span></div><div class="view-controls"><div class="view-toggle"><button class="view-toggle-btn active" onclick="setViewMode('bandai','grid')" title="Grid View">▦</button><button class="view-toggle-btn" onclick="setViewMode('bandai','list')" title="List View">☰</button></div><div class="column-menu"><button class="column-menu-btn" onclick="toggleColumnMenu('bandai')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:2px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Columns</button><div class="column-dropdown" id="bnColumnMenu"><label class="column-option"><input type="checkbox" data-col="item" checked onchange="toggleColumn('bandai','item')"> Item Name</label><label class="column-option"><input type="checkbox" data-col="email" onchange="toggleColumn('bandai','email')"> Account</label><label class="column-option"><input type="checkbox" data-col="eta" onchange="toggleColumn('bandai','eta')"> ETA</label><label class="column-option"><input type="checkbox" data-col="address" onchange="toggleColumn('bandai','address')"> Address</label><label class="column-option"><input type="checkbox" data-col="track" onchange="toggleColumn('bandai','track')"> Track</label><label class="column-option"><input type="checkbox" data-col="perUnit" onchange="toggleColumn('bandai','perUnit')"> Per Unit</label></div></div></div><div class="filter-tabs tab-group" id="bnFilterTabs"><button class="filter-tab tab-item active" data-status="all">All</button><button class="filter-tab tab-item" data-status="confirmed">Confirmed</button><button class="filter-tab tab-item" data-status="shipped">Shipped</button><button class="filter-tab tab-item" data-status="delivered">Delivered</button><button class="filter-tab tab-item" data-status="cancelled">Cancelled</button><button class="filter-tab tab-item advanced-filter-toggle" onclick="toggleAdvancedFilters('bandai')">Advanced</button></div></div><div class="orders-container" id="bnOrdersContainer"><div class="orders-grid" id="bnOrdersGrid"></div><div class="orders-list" id="bnOrdersList" style="display:none;"></div></div><div class="empty" id="bnOrdersEmpty" style="display:none;"><div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></div><div class="empty-title">No orders</div><div class="empty-text">No orders yet — sync your email accounts to get started.</div></div></div>
+          </div>
+        </div>
+      </div>
+    
+</main>
 
     <!-- Quick Stats Bar -->
     <div class="quick-stats-bar" id="quickStatsBar">
@@ -8240,7 +8308,7 @@ function debounce(func, wait) {
 
 // Search functions
 function handleSearch(retailer, query) {
-  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : 'pc'))));
+  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : (retailer === 'apple' ? 'ap' : (retailer === 'bandai' ? 'bn' : 'pc'))))));
   retailerFilters[retailer].searchQuery = query.toLowerCase().trim();
   
   // Update UI
@@ -8258,7 +8326,7 @@ function handleSearch(retailer, query) {
 }
 
 function clearSearch(retailer) {
-  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : 'pc'))));
+  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : (retailer === 'apple' ? 'ap' : (retailer === 'bandai' ? 'bn' : 'pc'))))));
   $(`${pre}SearchInput`).value = '';
   retailerFilters[retailer].searchQuery = '';
   $(`${pre}SearchClear`).classList.remove('visible');
@@ -8267,7 +8335,7 @@ function clearSearch(retailer) {
 }
 
 function scrollToOrders(retailer) {
-  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : 'pc'))));
+  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : (retailer === 'apple' ? 'ap' : (retailer === 'bandai' ? 'bn' : 'pc'))))));
   const ordersContainer = $(`${pre}OrdersContainer`);
   if (ordersContainer) {
     ordersContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -8445,8 +8513,8 @@ function filterOrdersBySearch(orders, query) {
 
 // Initialize search input listeners
 function initSearchListeners() {
-  ['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy'].forEach(retailer => {
-    const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : 'pc'))));
+  ['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy', 'apple', 'bandai'].forEach(retailer => {
+    const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : (retailer === 'apple' ? 'ap' : (retailer === 'bandai' ? 'bn' : 'pc'))))));
     const input = $(`${pre}SearchInput`);
     if (input) {
       input.addEventListener('input', (e) => {
@@ -8497,7 +8565,7 @@ function loadViewSettings() {
     if (saved) {
       const parsed = JSON.parse(saved);
       // Merge with defaults to ensure new columns exist
-      for (const r of ['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy']) {
+      for (const r of ['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy', 'apple', 'bandai']) {
         if (parsed[r]) {
           viewSettings[r] = { 
             ...viewSettings[r], 
@@ -8523,7 +8591,7 @@ function setViewMode(retailer, mode) {
   viewSettings[retailer].mode = mode;
   saveViewSettings();
   
-  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : 'pc'))));
+  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : (retailer === 'apple' ? 'ap' : (retailer === 'bandai' ? 'bn' : 'pc'))))));
   
   // Update toggle buttons - find them in the section header
   const pageBody = $(`page-${retailer}`).querySelector('.page-body');
@@ -8538,7 +8606,7 @@ function setViewMode(retailer, mode) {
 function clearItemFilter(retailer) {
   retailerFilters[retailer].skus.clear();
   // Deselect all item cards
-  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : 'pc'))));
+  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : (retailer === 'apple' ? 'ap' : (retailer === 'bandai' ? 'bn' : 'pc'))))));
   document.querySelectorAll(`#${pre}ItemsGrid .item-card`).forEach(c => c.classList.remove('selected'));
   renderRetailerPage(retailer);
 }
@@ -8552,7 +8620,7 @@ function toggleColumn(retailer, column) {
 
 // Toggle column menu dropdown
 function toggleColumnMenu(retailer) {
-  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : 'pc'))));
+  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : (retailer === 'apple' ? 'ap' : (retailer === 'bandai' ? 'bn' : 'pc'))))));
   const menu = $(`${pre}ColumnMenu`);
   menu.classList.toggle('show');
   
@@ -9578,7 +9646,7 @@ function showPage(page) {
   }
   if (page === 'aco-panel') loadAcoPanel();
   // Defer retailer page rendering using requestAnimationFrame for better performance
-  if (['walmart','target','pokecenter','samsclub','costco','bestbuy'].includes(page)) {
+  if (['walmart','target','pokecenter','samsclub','costco','bestbuy','apple','bandai'].includes(page)) {
     retailerView = 'landing';
     retailerViewDrop = null;
     requestAnimationFrame(() => renderRetailerPage(page));
@@ -9699,8 +9767,8 @@ function renderDashboard() {
     });
   }
 
-  const wm = all.filter(o => o.retailer === 'walmart'), tg = all.filter(o => o.retailer === 'target'), pc = all.filter(o => o.retailer === 'pokecenter'), sc = all.filter(o => o.retailer === 'samsclub'), co = all.filter(o => o.retailer === 'costco'), bb = all.filter(o => o.retailer === 'bestbuy');
-  const wmS = getStatsFor(wm), tgS = getStatsFor(tg), pcS = getStatsFor(pc), scS = getStatsFor(sc), coS = getStatsFor(co), bbS = getStatsFor(bb), totS = getStatsFor(all);
+  const wm = all.filter(o => o.retailer === 'walmart'), tg = all.filter(o => o.retailer === 'target'), pc = all.filter(o => o.retailer === 'pokecenter'), sc = all.filter(o => o.retailer === 'samsclub'), co = all.filter(o => o.retailer === 'costco'), bb = all.filter(o => o.retailer === 'bestbuy'), ap = all.filter(o => o.retailer === 'apple'), bn = all.filter(o => o.retailer === 'bandai');
+  const wmS = getStatsFor(wm), tgS = getStatsFor(tg), pcS = getStatsFor(pc), scS = getStatsFor(sc), coS = getStatsFor(co), bbS = getStatsFor(bb), apS = getStatsFor(ap), bnS = getStatsFor(bn), totS = getStatsFor(all);
 
   // Show/hide dashboard empty state
   const dashEmpty = $('dashboardEmpty');
@@ -9714,6 +9782,8 @@ function renderDashboard() {
   $('scConfirmed').textContent = scS.confirmed; $('scCancelled').textContent = scS.cancelled; $('scShipped').textContent = scS.shipped; $('scDelivered').textContent = scS.delivered;
   $('coConfirmed').textContent = coS.confirmed; $('coCancelled').textContent = coS.cancelled; $('coShipped').textContent = coS.shipped; $('coDelivered').textContent = coS.delivered;
   $('bbConfirmed').textContent = bbS.confirmed; $('bbCancelled').textContent = bbS.cancelled; $('bbShipped').textContent = bbS.shipped; $('bbDelivered').textContent = bbS.delivered;
+  if ($('apConfirmed')) { $('apConfirmed').textContent = apS.confirmed; $('apCancelled').textContent = apS.cancelled; $('apShipped').textContent = apS.shipped; $('apDelivered').textContent = apS.delivered; }
+  if ($('bnConfirmed')) { $('bnConfirmed').textContent = bnS.confirmed; $('bnCancelled').textContent = bnS.cancelled; $('bnShipped').textContent = bnS.shipped; $('bnDelivered').textContent = bnS.delivered; }
   $('totalConfirmed').textContent = totS.confirmed; $('totalCancelled').textContent = totS.cancelled; $('totalShipped').textContent = totS.shipped; $('totalDelivered').textContent = totS.delivered;
   $('totalOrders').textContent = totS.total - (totS.declined || 0); $('totalSpent').textContent = '$' + totS.spent.toFixed(2);
   $('navWalmartCount').textContent = wm.length - (wmS.declined || 0); $('navTargetCount').textContent = tg.length - (tgS.declined || 0); $('navPokecenterCount').textContent = pc.length - (pcS.declined || 0); $('navSamsclubCount').textContent = sc.length - (scS.declined || 0); $('navCostcoCount').textContent = co.length - (coS.declined || 0); $('navBestbuyCount').textContent = bb.length - (bbS.declined || 0);
@@ -9956,7 +10026,7 @@ function setSourceFilter(source) {
   const currentPage = document.querySelector('.nav-item.active');
   const page = currentPage ? (currentPage.dataset.page || 'dashboard') : 'dashboard';
   if (page === 'dashboard') renderDashboard();
-  else if (['walmart','target','pokemoncenter','samsclub','costco','bestbuy'].includes(page)) renderRetailerPage(page);
+  else if (['walmart','target','pokemoncenter','samsclub','costco','bestbuy','apple','bandai'].includes(page)) renderRetailerPage(page);
   else if (page === 'analytics') renderAnalytics();
   else if (page === 'deliveries') renderDeliveryHub();
   else if (page === 'accountstats') renderAccountStats();
@@ -10725,7 +10795,7 @@ document.addEventListener('click', (e) => {
 });
 
 function renderDeliveryByRetailer(orders) {
-  const retailers = ['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy'];
+  const retailers = ['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy', 'apple', 'bandai'];
   let html = '';
 
   retailers.forEach(retailer => {
@@ -12014,7 +12084,7 @@ function searchInsightItem(itemName) {
 
   // Find which retailer has matching orders
   const allOrders = computeOrderStatuses();
-  const retailers = ['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy'];
+  const retailers = ['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy', 'apple', 'bandai'];
   let targetRetailer = null;
 
   for (const r of retailers) {
@@ -12636,7 +12706,7 @@ async function syncAccount(id) {
     setTimeout(() => {
       refreshAllViews();
       // Also refresh current retailer page if viewing one
-      if (['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy'].includes(currentPage)) {
+      if (['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy', 'apple', 'bandai'].includes(currentPage)) {
         renderRetailerPage(currentPage);
       }
     }, 50);
@@ -12752,7 +12822,7 @@ async function syncAllAccounts() {
   console.log(`[SYNC] Final load: ${orders.length} orders total`);
   renderAccounts();
   refreshAllViews();
-  if (['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy'].includes(currentPage)) {
+  if (['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy', 'apple', 'bandai'].includes(currentPage)) {
     renderRetailerPage(currentPage);
   }
 
@@ -12763,7 +12833,7 @@ async function syncAllAccounts() {
 }
 
 // --- Retailer Filter Chips ---
-const ALL_RETAILERS = ['walmart', 'target', 'pokecenter', 'bestbuy', 'costco', 'samsclub'];
+const ALL_RETAILERS = ['walmart', 'target', 'pokecenter', 'bestbuy', 'costco', 'samsclub', 'apple', 'bandai'];
 
 function toggleRetailerChip(el) {
   el.classList.toggle('active');
@@ -12871,7 +12941,7 @@ async function syncRecentAll() {
   console.log(`[SYNC] Final load: ${orders.length} orders total`);
   renderAccounts();
   refreshAllViews();
-  if (['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy'].includes(currentPage)) {
+  if (['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy', 'apple', 'bandai'].includes(currentPage)) {
     renderRetailerPage(currentPage);
   }
 
@@ -12940,7 +13010,7 @@ async function syncAycdAll() {
   orders = await window.api.getOrders(); invalidateOrdersCache();
   renderAccounts();
   refreshAllViews();
-  if (['walmart','target','pokecenter','samsclub','costco','bestbuy'].includes(currentPage)) {
+  if (['walmart','target','pokecenter','samsclub','costco','bestbuy','apple','bandai'].includes(currentPage)) {
     renderRetailerPage(currentPage);
   }
 
@@ -13179,7 +13249,7 @@ function renderRetailerPage(retailer) {
 
   const filter = retailerFilters[retailer];
   const drops = getDrops(all);
-  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : 'pc'))));
+  const pre = retailer === 'walmart' ? 'wm' : (retailer === 'target' ? 'tg' : (retailer === 'samsclub' ? 'sc' : (retailer === 'costco' ? 'co' : (retailer === 'bestbuy' ? 'bb' : (retailer === 'apple' ? 'ap' : (retailer === 'bandai' ? 'bn' : 'pc'))))));
 
   // Show/hide landing vs detail views
   const landingEl = $(`${pre}Landing`);
@@ -16163,7 +16233,7 @@ async function getExportFilteredAccounts() {
   const retailer = accountStatsRetailer;
   const isAllRetailers = retailer === 'all';
   const retailers = isAllRetailers
-    ? ['walmart', 'target', 'pokecenter', 'samsclub', 'costco']
+    ? ['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'apple', 'bandai']
     : [retailer];
 
   const currentDataMode = await window.api.getDataMode();
@@ -18135,7 +18205,7 @@ async function startDeepSync() {
       orders = await window.api.getOrders(); invalidateOrdersCache();
       renderAccounts();
       refreshAllViews();
-      if (['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy'].includes(currentPage)) {
+      if (['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy', 'apple', 'bandai'].includes(currentPage)) {
         renderRetailerPage(currentPage);
       }
 
@@ -25429,7 +25499,7 @@ function generateQuickReport() {
   }
 
   if (sections.includes('retailers') && retailer === 'all') {
-    const retailers = ['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy'];
+    const retailers = ['walmart', 'target', 'pokecenter', 'samsclub', 'costco', 'bestbuy', 'apple', 'bandai'];
     html += '<div style="margin-bottom:24px;"><div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:10px;">Retailer Breakdown</div>';
     html += '<table style="' + tableStyle + '"><thead><tr>';
     html += '<th style="' + thStyle + 'border-radius:8px 0 0 0;">Retailer</th><th style="' + thStyle + '">Orders</th><th style="' + thStyle + '">Confirmed</th><th style="' + thStyle + '">Cancelled</th><th style="' + thStyle + '">Stick Rate</th><th style="' + thStyle + 'border-radius:0 8px 0 0;">Spent</th>';
@@ -26012,7 +26082,7 @@ function showImapHelp(email) {
 // ==========================================
 
 function toggleAdvancedFilters(retailer) {
-  const pre = retailer === 'walmart' ? 'wm' : retailer === 'target' ? 'tg' : retailer === 'samsclub' ? 'sc' : retailer === 'costco' ? 'co' : retailer === 'bestbuy' ? 'bb' : 'pc';
+  const pre = retailer === 'walmart' ? 'wm' : retailer === 'target' ? 'tg' : retailer === 'samsclub' ? 'sc' : retailer === 'costco' ? 'co' : retailer === 'bestbuy' ? 'bb' : (retailer === 'apple' ? 'ap' : (retailer === 'bandai' ? 'bn' : 'pc'));
   let panel = $(`${pre}AdvancedFilters`);
   if (!panel) {
     // Create the panel dynamically
@@ -26034,7 +26104,7 @@ function toggleAdvancedFilters(retailer) {
 }
 
 function applyAdvancedFilters(retailer) {
-  const pre = retailer === 'walmart' ? 'wm' : retailer === 'target' ? 'tg' : retailer === 'samsclub' ? 'sc' : retailer === 'costco' ? 'co' : retailer === 'bestbuy' ? 'bb' : 'pc';
+  const pre = retailer === 'walmart' ? 'wm' : retailer === 'target' ? 'tg' : retailer === 'samsclub' ? 'sc' : retailer === 'costco' ? 'co' : retailer === 'bestbuy' ? 'bb' : (retailer === 'apple' ? 'ap' : (retailer === 'bandai' ? 'bn' : 'pc'));
   const f = retailerFilters[retailer];
   if (!f.advancedFilters) f.advancedFilters = {};
   f.advancedFilters = {
@@ -26049,7 +26119,7 @@ function applyAdvancedFilters(retailer) {
 }
 
 function clearAdvancedFilters(retailer) {
-  const pre = retailer === 'walmart' ? 'wm' : retailer === 'target' ? 'tg' : retailer === 'samsclub' ? 'sc' : retailer === 'costco' ? 'co' : retailer === 'bestbuy' ? 'bb' : 'pc';
+  const pre = retailer === 'walmart' ? 'wm' : retailer === 'target' ? 'tg' : retailer === 'samsclub' ? 'sc' : retailer === 'costco' ? 'co' : retailer === 'bestbuy' ? 'bb' : (retailer === 'apple' ? 'ap' : (retailer === 'bandai' ? 'bn' : 'pc'));
   retailerFilters[retailer].advancedFilters = { dateFrom: '', dateTo: '', amountMin: '', amountMax: '', hasTracking: 'any' };
   ['AdvDateFrom', 'AdvDateTo', 'AdvAmtMin', 'AdvAmtMax'].forEach(id => { const el = $(`${pre}${id}`); if (el) el.value = ''; });
   const sel = $(`${pre}AdvTracking`); if (sel) sel.value = 'any';

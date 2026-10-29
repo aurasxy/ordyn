@@ -4951,8 +4951,10 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           // Sam's Club
           { from: 'samsclub', retailer: 'samsclub' },
           { from: "sam's club", retailer: 'samsclub' },
-          // Apple (orders.apple.com — order mail only)
+          // Apple (orders.apple.com — order mail only). Second term matches iCloud
+          // Hide-My-Email relays, which rewrite dots to underscores (orders_apple_com).
           { from: 'orders.apple.com', retailer: 'apple' },
+          { from: 'orders_apple_com', retailer: 'apple' },
           // Premium Bandai
           { from: 'p-bandai', retailer: 'bandai' },
           { subject: 'PREMIUM BANDAI', retailer: 'bandai' },

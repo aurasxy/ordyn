@@ -1398,7 +1398,9 @@ function buildShippingWebhookPayload(order, settings) {
     pokecenter: 'Pokemon Center',
     bestbuy: 'Best Buy',
     costco: 'Costco',
-    samsclub: "Sam's Club"
+    samsclub: "Sam's Club",
+    apple: 'Apple',
+    bandai: 'P-Bandai'
   };
 
   const retailerDisplay = retailerNames[order.retailer] || order.retailer || 'Unknown';
@@ -1934,6 +1936,11 @@ function getRetailer(from, subject, content = '') {
   if (fromLower.includes('samsclub') || fromLower.includes("sam's club") || fromLower.includes('sams club') || fromLower.includes('info.samsclub') || fromLower.includes('em.samsclub') || fromLower.includes('_at_samsclub') || fromLower.includes('_em_samsclub') || fromLower.includes('_samsclub_')) return 'samsclub';
   if (fromLower.includes('costco') || fromLower.includes('_at_costco') || fromLower.includes('_em_costco')) return 'costco';
   if (fromLower.includes('bestbuy') || fromLower.includes('best buy') || fromLower.includes('_at_bestbuy') || fromLower.includes('_em_bestbuy')) return 'bestbuy';
+  // Apple — ORDER mail only (orders.apple.com, incl. iCloud HME _at_ encodings). Marketing
+  // (insideapple.apple.com, news@) and receipts (email.apple.com) are intentionally NOT matched here.
+  if (fromLower.includes('orders.apple.com') || fromLower.includes('_orders_apple_com') || fromLower.includes('_at_orders_apple')) return 'apple';
+  // Premium Bandai (P-Bandai) — info-us@p-bandai.com
+  if (fromLower.includes('p-bandai') || fromLower.includes('_p-bandai') || fromLower.includes('p_bandai_com')) return 'bandai';
 
   // Check subject
   if (subjectLower.includes('walmart')) return 'walmart';
@@ -1942,6 +1949,7 @@ function getRetailer(from, subject, content = '') {
   if (subjectLower.includes("sam's club") || subjectLower.includes('samsclub.com')) return 'samsclub';
   if (subjectLower.includes('costco')) return 'costco';
   if (subjectLower.includes('best buy') || subjectLower.includes('bestbuy')) return 'bestbuy';
+  if (subjectLower.includes('premium bandai')) return 'bandai';
 
   // Fallback: check email content for retailer-specific patterns
   if (contentLower.includes('walmart.com/ip/') || contentLower.includes('i5.walmartimages.com') || contentLower.includes('walmart.com/orders')) return 'walmart';
@@ -1950,6 +1958,8 @@ function getRetailer(from, subject, content = '') {
   if (contentLower.includes('samsclub.com') || contentLower.includes('scene7.samsclub.com') || contentLower.includes('em.samsclub.com')) return 'samsclub';
   if (contentLower.includes('costco.com') || contentLower.includes('costco-static.com')) return 'costco';
   if (contentLower.includes('bestbuy.com') || contentLower.includes('bbystatic.com') || contentLower.includes('bby01-')) return 'bestbuy';
+  if (contentLower.includes('p-bandai.com') || contentLower.includes('premium bandai')) return 'bandai';
+  if (contentLower.includes('orders.apple.com') || /order number:?\s*w\d{8,12}/i.test(content)) return 'apple';
 
   return null;
 }
@@ -4157,6 +4167,114 @@ function extractOriginalRecipient(parsed, fallbackEmail) {
   return fallbackEmail;
 }
 
+// ==================== APPLE PARSING ====================
+// Apple retail order mail from orders.apple.com. One subject carries the status
+// ("We're processing your order W…", "…ready for pickup", "…has shipped", "We've
+// canceled…"). Order number is W + 8-12 digits. Pickup + ship-to-home share a layout.
+function parseAppleEmail(parsed, accountEmail) {
+  const subject = parsed.subject || '';
+  const html = parsed.html || '';
+  const text = parsed.text || '';
+  const from = (parsed.from?.text || parsed.from?.value?.[0]?.address || '').toLowerCase();
+  const combined = (text + ' ' + html.replace(/<[^>]+>/g, ' ')).replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
+  const subjectLower = subject.toLowerCase();
+
+  if (!from.includes('apple')) return null;
+  // Order number is the hard gate — rejects Apple marketing/receipts that slipped through.
+  const orderMatch = combined.match(/Order Number:?\s*(W\d{8,12})/i) || subject.match(/\b(W\d{8,12})\b/) || combined.match(/\b(W\d{9,12})\b/);
+  if (!orderMatch) return null;
+  const orderId = orderMatch[1];
+
+  let status = null;
+  if (/cancel/i.test(subjectLower)) status = 'cancelled';
+  else if (/picked up|delivered/i.test(subjectLower)) status = 'delivered';
+  else if (/ready (?:for|to) pick|ready to collect|ready for collection|is ready/i.test(subjectLower)) status = 'shipped';
+  else if (/shipped|has shipped|on its way|out for delivery|prepared to ship/i.test(subjectLower)) status = 'shipped';
+  else if (/processing|thank you for your order|order confirmation|we.?re processing|preparing your order/i.test(subjectLower)) status = 'confirmed';
+  if (!status) status = determineStatus(combined, subject) || 'confirmed';
+
+  let amount = 0;
+  const amt = combined.match(/Order Total\s*\$?([\d,]+\.\d{2})/i) || combined.match(/\bGrand Total\s*\$?([\d,]+\.\d{2})/i) || combined.match(/\bTotal\s*\$?([\d,]+\.\d{2})/i);
+  if (amt) amount = parseFloat(amt[1].replace(/,/g, ''));
+
+  let quantity = 1;
+  const q = combined.match(/Qty\s*(\d+)/i) || combined.match(/Quantity\s*:?\s*(\d+)/i);
+  if (q) quantity = parseInt(q[1]) || 1;
+
+  // Best-effort product name: match a known Apple product family up to the next price/field.
+  let item = null;
+  const prod = combined.match(/\b((?:iPhone|iPad|MacBook|iMac|Mac\s?(?:Studio|mini|Pro)?|Apple\s?Watch|Watch\s?(?:Ultra|Series|SE)|AirPods(?:\s?(?:Pro|Max))?|AirTag|Apple\s?Pencil|HomePod|Apple\s?TV|Magic\s?(?:Keyboard|Mouse|Trackpad))[^$\n]{0,45})/i);
+  if (prod) item = prod[1].replace(/\s+/g, ' ').trim().replace(/\b(Pickup Date|Qty|Carrier|Check.?in|Available|Ordered on).*$/i, '').trim().slice(0, 120) || null;
+
+  let orderDate = null;
+  const dm = combined.match(/Ordered on:?\s*([A-Z][a-z]{2,8}\s+\d{1,2},?\s+\d{4})/i);
+  if (dm) { try { const d = new Date(dm[1]); if (!isNaN(d)) orderDate = localDateStr(d); } catch (e) {} }
+  if (!orderDate && (status === 'confirmed' || status === 'cancelled')) orderDate = toLocalDateString(parsed.date);
+
+  return {
+    orderId, email: accountEmail, item, amount, date: orderDate, status, retailer: 'apple', quantity,
+    subject: subject.substring(0, 100), source: 'email',
+    ...(status === 'cancelled' ? (() => { const ci = extractCancelInfo(text, html, 'apple'); return ci ? { cancelReason: ci.reason, manualCancel: ci.manualCancel } : {}; })() : {})
+  };
+}
+
+// ==================== PREMIUM BANDAI (P-BANDAI) PARSING ====================
+// P-Bandai sends clean plaintext. Order emails carry "[Order NO.] <digits>"; the same
+// sender also sends membership-registration + marketing with NO order number — those are
+// rejected by the required order-number gate. NOTE: order-confirmation bodies contain the
+// boilerplate "Order will be cancelled if we are unable to deliver", so cancel status is
+// taken ONLY from the subject, never the body.
+function parsePremiumBandaiEmail(parsed, accountEmail) {
+  const subject = parsed.subject || '';
+  const html = parsed.html || '';
+  const text = parsed.text || '';
+  const from = (parsed.from?.text || parsed.from?.value?.[0]?.address || '').toLowerCase();
+  const body = (text && text.length > 40) ? text : (text + ' ' + html.replace(/<[^>]+>/g, ' ')).replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+  const subjectLower = subject.toLowerCase();
+
+  if (!from.includes('bandai') && !subjectLower.includes('premium bandai')) return null;
+  const orderMatch = body.match(/\[Order\s*NO\.?\]\s*(\d{9,12})/i);
+  if (!orderMatch) return null; // registration / marketing / non-order notice
+  const orderId = orderMatch[1];
+
+  let status = null;
+  if (/cancel/i.test(subjectLower)) status = 'cancelled';
+  else if (/shipp|dispatch|on its way|tracking/i.test(subjectLower)) status = 'shipped';
+  else if (/deliver/i.test(subjectLower)) status = 'delivered';
+  else status = 'confirmed'; // "Order Confirmation" / "Edit Order Information"
+
+  let orderDate = null;
+  const dm = body.match(/\[Order\s*Date\]\s*([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})/i);
+  if (dm) { try { const d = new Date(dm[1].replace(/\./g, '').replace(/([A-Za-z]+)\s+(\d+)\s+(\d{4})/, '$1 $2, $3')); if (!isNaN(d)) orderDate = localDateStr(d); } catch (e) {} }
+  if (!orderDate && (status === 'confirmed' || status === 'cancelled')) orderDate = toLocalDateString(parsed.date);
+
+  // Items: each line in [Order Details]…[Order Amount] is "NAME US$ P × N ＝ US$ T"
+  const items = [];
+  const block = (body.match(/\[Order\s*Details\]([\s\S]*?)\[Order\s*Amount\]/i) || [])[1] || '';
+  const lineRe = /(.+?)\s*US\$\s*([\d,]+\.?\d*)\s*[×xX]\s*(\d+)\s*[＝=]\s*US\$\s*([\d,]+\.?\d*)/g;
+  let lm;
+  while ((lm = lineRe.exec(block)) !== null) {
+    const name = lm[1].replace(/\s+/g, ' ').trim();
+    if (name.length > 2) items.push({ name: name.slice(0, 150), price: parseFloat(lm[2].replace(/,/g, '')), quantity: parseInt(lm[3]) || 1, lineTotal: parseFloat(lm[4].replace(/,/g, '')) });
+  }
+  const item = items.length ? items[0].name : null;
+  const quantity = items.length ? items.reduce((s, i) => s + (i.quantity || 1), 0) : 1;
+
+  let amount = 0;
+  const t = body.match(/Order Total\s*:?\s*US\$\s*([\d,]+\.?\d*)/i);
+  if (t) amount = parseFloat(t[1].replace(/,/g, ''));
+  let subtotal = 0;
+  const st = body.match(/Item Total\s*:?\s*US\$\s*([\d,]+\.?\d*)/i);
+  if (st) subtotal = parseFloat(st[1].replace(/,/g, ''));
+
+  return {
+    orderId, email: accountEmail, item, amount, subtotal, date: orderDate, status, retailer: 'bandai',
+    quantity, items, itemCount: items.length, isMulticart: items.length > 1,
+    subject: subject.substring(0, 100), source: 'email',
+    ...(status === 'cancelled' ? (() => { const ci = extractCancelInfo(text, html, 'bandai'); return ci ? { cancelReason: ci.reason, manualCancel: ci.manualCancel } : {}; })() : {})
+  };
+}
+
 function parseRetailerEmail(parsed, email, retailer) {
   // Extract original recipient once — all parsers use this instead of account email
   const originalRecipient = extractOriginalRecipient(parsed, email);
@@ -4167,6 +4285,8 @@ function parseRetailerEmail(parsed, email, retailer) {
     case 'samsclub': return parseSamsClubEmail(parsed, originalRecipient);
     case 'costco': return parseCostcoEmail(parsed, originalRecipient);
     case 'bestbuy': return parseBestBuyEmail(parsed, originalRecipient);
+    case 'apple': return parseAppleEmail(parsed, originalRecipient);
+    case 'bandai': return parsePremiumBandaiEmail(parsed, originalRecipient);
     default: return null;
   }
 }
@@ -4819,6 +4939,11 @@ async function syncAccount(accountId, dateFrom, dateTo, resumeFromIds = null, re
           // Sam's Club
           { from: 'samsclub', retailer: 'samsclub' },
           { from: "sam's club", retailer: 'samsclub' },
+          // Apple (orders.apple.com — order mail only)
+          { from: 'orders.apple.com', retailer: 'apple' },
+          // Premium Bandai
+          { from: 'p-bandai', retailer: 'bandai' },
+          { subject: 'PREMIUM BANDAI', retailer: 'bandai' },
           // === SUBJECT fallback (critical for iCloud HME where FROM searches fail) ===
           { subject: 'PokemonCenter', retailer: 'pokecenter' },
           { subject: 'Pokemon Center', retailer: 'pokecenter' },

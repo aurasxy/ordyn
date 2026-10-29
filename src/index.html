@@ -18,7 +18,7 @@
       --blue: #0071dc; --green: #22b8a0; --red: #ef4444; --yellow: #f59e0b; --purple: #8b5cf6; --cyan: #818cf8; --orange: #f97316;
       --green-dim: rgba(34,184,160,0.15); --red-dim: rgba(239,68,68,0.15); --yellow-dim: rgba(245,158,11,0.15); --cyan-dim: rgba(129,140,248,0.15); --blue-dim: rgba(0,113,220,0.15); --purple-dim: rgba(139,92,246,0.15);
       --accent: #8b5cf6; --accent-dim: rgba(139, 92, 246, 0.15); --accent-text: #a78bfa;
-      --walmart: #0071dc; --target: #cc0000; --pokecenter: #f59e0b; --amazon: #ff9900; --samsclub: #0067a0; --costco: #e31837; --bestbuy: #0046be;
+      --walmart: #0071dc; --target: #cc0000; --pokecenter: #f59e0b; --amazon: #ff9900; --samsclub: #0067a0; --costco: #e31837; --bestbuy: #0046be; --apple: #555555; --bandai: #e4002b;
       --danger: #ef4444; --success: #22c55e; --purple-hover: #7c3aed; --purple-light: #c4b5fd;
       --primary: var(--accent); --surface-2: var(--bg-tertiary); --border-color: var(--border); --text-tertiary: var(--text-muted);
       --discord: #5865F2; --discord-hover: #4752C4;
@@ -9825,7 +9825,7 @@ function renderRecentOrdersFromCache() {
   container.className = isGrid ? 'recent-orders-grid' : 'recent-orders-list';
 
   const retailerColors = { walmart: 'var(--walmart)', target: 'var(--target)', pokecenter: 'var(--pokecenter)', samsclub: 'var(--samsclub)', costco: 'var(--costco)', bestbuy: 'var(--bestbuy)' };
-  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
 
   container.innerHTML = recent.map(o => {
     const status = o.finalStatus || o.status || 'confirmed';
@@ -11172,7 +11172,7 @@ function renderAnalytics() {
   }
   
   // Update empty state message based on filter
-  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
   const emptyMsg = analyticsRetailer === 'all' 
     ? 'No order data yet. Sync some accounts to see analytics.'
     : `No ${retailerNames[analyticsRetailer]} orders found. Sync accounts or select a different retailer.`;
@@ -11733,7 +11733,7 @@ function renderRetailerComparisonChart(allOrders) {
     costco: { border: '#e31837', bg: 'rgba(227, 24, 55, 0.6)' },
     bestbuy: { border: '#0046be', bg: 'rgba(0, 70, 190, 0.6)' }
   };
-  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
 
   const retailerStats = new Map();
   allOrders.forEach(o => {
@@ -14730,7 +14730,7 @@ function renderOrderingHeatmap(orders) {
   const total = dayCounts.reduce((a, b) => a + b, 0);
 
   // Render retailer tabs
-  const retailerNames = { all: 'All', walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const retailerNames = { all: 'All', walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
   const tabsHtml = Object.entries(retailerNames).map(([key, name]) =>
     `<button class="heatmap-tab ${key === (heatmapRetailer || 'all') ? 'active' : ''}" onclick="setHeatmapRetailer('${key}')">${name}</button>`
   ).join('');
@@ -15911,7 +15911,7 @@ async function renderAccountStats() {
   // Dynamic overview title: "{Retailer} — {Period} — {Count} accounts"
   const overviewTitleEl = $('accountStatsOverviewTitle');
   if (overviewTitleEl) {
-    const retailerNames = { all: 'All Retailers', walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+    const retailerNames = { all: 'All Retailers', walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
     const retailerName = retailerNames[selectedRetailer] || selectedRetailer;
     const periodLabel = period === 'all' ? 'All Time' : period === 'custom' ? 'Custom Range' : `${period} Days`;
     const entityLabel = currentDataMode === 'discord' ? 'profiles' : (selectedRetailer === 'pokecenter' ? 'profiles' : 'accounts');
@@ -17321,7 +17321,7 @@ async function saveFlexAsPng() {
   modal.appendChild(wmEl);
 
   // Add site + date label (bottom-left)
-  const _rNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const _rNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
   const _siteName = _rNames[currentFlexRetailer] || currentFlexRetailer || '';
   let _dateLabel = '';
   if (currentFlexDropDate && currentFlexDropDate !== 'Unknown') {
@@ -17475,7 +17475,7 @@ async function flexToDiscord() {
   modal.appendChild(wmEl);
 
   // Add site + date label (bottom-left)
-  const _rNames2 = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const _rNames2 = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
   const _siteName2 = _rNames2[currentFlexRetailer] || currentFlexRetailer || '';
   let _dateLabel2 = '';
   if (currentFlexDropDate && currentFlexDropDate !== 'Unknown') {
@@ -17507,7 +17507,7 @@ async function flexToDiscord() {
     const spent = $('flexModalSpent').textContent;
     const rate = $('flexModalRate').textContent;
 
-    const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+    const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
     const retailerColors = { walmart: 0x0071dc, target: 0xcc0000, pokecenter: 0xf59e0b, samsclub: 0x0067a0, costco: 0xe31837, bestbuy: 0x0046be };
 
     const retailerName = retailerNames[currentFlexRetailer] || currentFlexRetailer || 'Drop';
@@ -18837,7 +18837,7 @@ function closeAddInventoryModal() {
 // ── Match to Existing Item (Portfolio Add) ──
 function _getUniqueOrderItems() {
   const seen = new Map();
-  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
   for (const o of orders) {
     if (!o.item || o.item === 'Unknown Item') continue;
     const key = o.item.toLowerCase().trim();
@@ -23802,7 +23802,7 @@ async function loadAcoMappings() {
 }
 
 function getAcoUserGroups() {
-  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
   function rName(r) { return retailerNames[r] || (r ? r.charAt(0).toUpperCase() + r.slice(1) : 'Unknown'); }
 
   // Build per-profile stats with per-site breakdown
@@ -25380,7 +25380,7 @@ function generateQuickReport() {
 
   const stats = getStatsFor(allOrders);
   _reportFilteredOrders = allOrders; // stash for drill-down
-  const retailerNames = { all: 'All Retailers', walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const retailerNames = { all: 'All Retailers', walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
 
   // Empty state
   if (allOrders.length === 0) {
@@ -25715,7 +25715,7 @@ async function shareReportDiscord() {
     allOrders = allOrders.filter(o => o.date && new Date(o.date) >= cutoff);
   }
   const stats = getStatsFor(allOrders);
-  const retailerNames = { all: 'All Retailers', walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const retailerNames = { all: 'All Retailers', walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
 
   // Find top item
   const itemMap = new Map();
@@ -25793,7 +25793,7 @@ async function flexOrderToDiscord(retailer, orderId) {
     return;
   }
 
-  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy' };
+  const retailerNames = { walmart: 'Walmart', target: 'Target', pokecenter: 'Pokemon Center', samsclub: "Sam's Club", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
   const retailerColors = { walmart: 0x0071dc, target: 0xcc0000, pokecenter: 0xf59e0b, samsclub: 0x0067a0, costco: 0xe31837, bestbuy: 0x0046be };
 
   const statusEmoji = { confirmed: '\u2705', shipped: '\uD83D\uDCE6', delivered: '\uD83C\uDFE0', cancelled: '\u274C' };
@@ -25874,7 +25874,7 @@ function renderReportTemplates() {
     grid.innerHTML = '<div style="color:var(--text-secondary);font-size:var(--text-sm);">No saved templates yet.</div>';
     return;
   }
-  const retailerLabels = { all: 'All', walmart: 'Walmart', target: 'Target', pokecenter: 'Pkmn Ctr', samsclub: "Sam's", costco: 'Costco', bestbuy: 'Best Buy' };
+  const retailerLabels = { all: 'All', walmart: 'Walmart', target: 'Target', pokecenter: 'Pkmn Ctr', samsclub: "Sam's", costco: 'Costco', bestbuy: 'Best Buy', apple: 'Apple', bandai: 'P-Bandai' };
   grid.innerHTML = templates.map(t => `
     <div class="report-template-card">
       <div class="report-template-name">${escapeHtml(t.name)}</div>
